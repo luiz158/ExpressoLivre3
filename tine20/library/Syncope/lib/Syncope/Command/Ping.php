@@ -92,6 +92,12 @@ class Syncope_Command_Ping extends Syncope_Command_Wbxml
         $secondsLeft = $intervalEnd;
         $folders = unserialize($this->_device->pingfolder);
         
+        if (isset(Tinebase_Core::getConfig()->pingtimeout)) {
+        	$_pingtimeout = Tinebase_Core::getConfig()->pingtimeout;
+        } else {
+        	$_pingtimeout = self::PING_TIMEOUT;
+        }
+        
         if ($this->_logger instanceof Zend_Log) 
             $this->_logger->debug(__METHOD__ . '::' . __LINE__ . " Folders to monitor($lifeTime / $intervalStart / $intervalEnd / $status): " . print_r($folders, true));
         
@@ -134,8 +140,8 @@ class Syncope_Command_Ping extends Syncope_Command_Wbxml
                         $this->_logger->info(__METHOD__ . '::' . __LINE__ . " terminate ping process. Some other process updated data already.");
                     break;
                 }
-                
-                sleep(self::PING_TIMEOUT);
+                sleep($_pingtimeout);
+
                 $secondsLeft = $intervalEnd - time();
                 //if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " DeviceId: " . $this->_device->deviceid . " seconds left: " . $secondsLeft);
             } while($secondsLeft > 0);
