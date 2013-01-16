@@ -2,9 +2,9 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Tine 2.0 Messenger\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2013-01-24 16:19-0300\n"
-"PO-Revision-Date: 2013-02-01 14:45-0300\n"
-"Last-Translator: Cassiano Dal Pizzol <cassiano@dalpizzol@serpro.gov.br>\n"
+"POT-Creation-Date: 2013-02-01 15:20-0300\n"
+"PO-Revision-Date: 2013-02-01 15:20-0300\n"
+"Last-Translator: Marcio Albuquerque <marcio.lima.albuquerque@gmail.com>\n"
 "Language-Team: SERPRO Expresso <marcio.albuquerque@serpro.gov.br>\n"
 "Language: \n"
 "MIME-Version: 1.0\n"
@@ -154,13 +154,13 @@ msgid "Change"
 msgstr "Cambiar"
 
 #: Messenger/js/Priority.js:76
-#: Messenger/js/ChatHandler.js:601
+#: Messenger/js/ChatHandler.js:621
 #: Messenger/js/ConfigWindow.js:92
 msgid "Cancel"
 msgstr "Cancelar"
 
 #: Messenger/js/LogHandler.js:81
-#: Messenger/js/ChatHandler.js:157
+#: Messenger/js/ChatHandler.js:83
 msgid "is unavailable"
 msgstr "no está disponible"
 
@@ -264,8 +264,8 @@ msgid "Cancel 503: Service unavailable."
 msgstr "Cancelar 503: Servicio no disponible."
 
 #: Messenger/js/LogHandler.js:258
-#: Messenger/js/ChatHandler.js:157
-#: Messenger/js/ChatHandler.js:158
+#: Messenger/js/ChatHandler.js:83
+#: Messenger/js/ChatHandler.js:84
 #: Messenger/js/VideoChat.js:173
 #: Messenger/js/VideoChat.js:194
 #: Messenger/js/VideoChat.js:214
@@ -281,15 +281,19 @@ msgstr "Chat de grupo en la sala"
 msgid "Chat with"
 msgstr "Chatea con"
 
-#: Messenger/js/ChatHandler.js:87
+#: Messenger/js/ChatHandler.js:84
+msgid "Your messages will be sent offline"
+msgstr "Los mensajes serán enviados fuera de línea"
+
+#: Messenger/js/ChatHandler.js:129
 msgid "You chose to download the every chat history"
 msgstr "Usted elige descargar el historial de cada conversación"
 
-#: Messenger/js/ChatHandler.js:88
+#: Messenger/js/ChatHandler.js:130
 msgid "Do you want to download this chat"
 msgstr "¿Quieres descargar este chat"
 
-#: Messenger/js/ChatHandler.js:108
+#: Messenger/js/ChatHandler.js:150
 #: Messenger/js/FileTransfer.js:15
 #: Messenger/js/FileTransfer.js:39
 #: Messenger/js/FileTransfer.js:127
@@ -298,51 +302,47 @@ msgstr "¿Quieres descargar este chat"
 msgid "File Transfer"
 msgstr "Transferencia de archivos"
 
-#: Messenger/js/ChatHandler.js:109
+#: Messenger/js/ChatHandler.js:151
 msgid "Chat has no content"
 msgstr "Chat no tiene contenido"
 
-#: Messenger/js/ChatHandler.js:116
+#: Messenger/js/ChatHandler.js:158
 #: Messenger/js/FileTransfer.js:152
 msgid "File Transfer Error"
 msgstr "Error de transferencia de archivos"
 
-#: Messenger/js/ChatHandler.js:117
+#: Messenger/js/ChatHandler.js:159
 msgid "Error creating chat history file"
 msgstr "Error al crear el archivo de historial de chat"
 
-#: Messenger/js/ChatHandler.js:127
+#: Messenger/js/ChatHandler.js:169
 #: Messenger/js/FileTransfer.js:87
 #: Messenger/js/FileTransfer.js:94
 msgid "Temporary files not deleted"
 msgstr "Los archivos temporales no se eliminan"
 
-#: Messenger/js/ChatHandler.js:158
-msgid "Your messages will be sent offline"
-msgstr "Los mensajes serán enviados fuera de línea"
-
-#: Messenger/js/ChatHandler.js:283
+#: Messenger/js/ChatHandler.js:287
 msgid " is typing..."
 msgstr " está escribiendo..."
 
-#: Messenger/js/ChatHandler.js:285
+#: Messenger/js/ChatHandler.js:289
 msgid " stopped typing!"
 msgstr " dejó de escribir!"
 
-#: Messenger/js/ChatHandler.js:522
+#: Messenger/js/ChatHandler.js:542
 msgid "Group Message"
 msgstr "Mensaje de Grupo"
 
-#: Messenger/js/ChatHandler.js:532
-#: Messenger/js/ChatHandler.js:558
+#: Messenger/js/ChatHandler.js:552
+#: Messenger/js/ChatHandler.js:578
 msgid "Choose a Emoticon"
 msgstr "Elegir un Emoticono"
 
-#: Messenger/js/ChatHandler.js:587
+#: Messenger/js/ChatHandler.js:607
 msgid "Send"
 msgstr "Enviar"
 
-#: Messenger/js/ChatHandler.js:615
+#: Messenger/js/ChatHandler.js:635
 msgid "Send message to:"
 msgstr "Enviar un mensaje a:"
 
@@ -352,7 +352,7 @@ msgstr "Fecha de creación con éxito"
 
 #: Messenger/js/Window.js:21
 #: Messenger/js/Layout.js:43
-#: Messenger/js/Layout.js:500
+#: Messenger/js/Layout.js:440
 msgid "Add Group"
 msgstr "Agregar grupo"
 
@@ -463,18 +463,27 @@ msgstr "Ocultar contactos desconectados"
 #: Messenger/js/Messenger.js:524
 #: Messenger/js/Layout.js:66
 msgid "Collapse groups"
-msgstr "Contraer los grupos"
+msgstr "Retraer grupos"
 
 #: Messenger/js/Messenger.js:529
 msgid "Expand groups"
-msgstr "Expandir los grupos"
+msgstr "Expandir grupos"
+
+#: Messenger/js/HtmlEditor.js:29
+#: Messenger/js/HtmlEditor.js:37
+msgid "Send Message"
+msgstr "Enviar mensaje"
+
+#: Messenger/js/HtmlEditor.js:29
+msgid "Sends the formated message below"
+msgstr "Envía el mensaje formateado abajo"
 
 #: Messenger/js/Layout.js:8
 msgid "Expresso Messenger"
 msgstr "Expresso Messenger"
 
 #: Messenger/js/Layout.js:34
-#: Messenger/js/Layout.js:424
+#: Messenger/js/Layout.js:364
 msgid "Add Contact"
 msgstr "Añadir este contacto"
 
@@ -499,53 +508,53 @@ msgstr "presione ENTER después de"
 msgid "Online"
 msgstr "Online"
 
-#: Messenger/js/Layout.js:442
+#: Messenger/js/Layout.js:382
 msgid "JID"
 msgstr "JID"
 
-#: Messenger/js/Layout.js:449
-#: Messenger/js/Layout.js:508
+#: Messenger/js/Layout.js:389
+#: Messenger/js/Layout.js:448
 msgid "Name"
 msgstr "Nombre"
 
-#: Messenger/js/Layout.js:454
+#: Messenger/js/Layout.js:394
 msgid "Group"
 msgstr "Grupo"
 
-#: Messenger/js/Layout.js:460
+#: Messenger/js/Layout.js:400
 msgid "Select a group"
 msgstr "Seleccione un grupo de"
 
-#: Messenger/js/Layout.js:470
-#: Messenger/js/Layout.js:513
+#: Messenger/js/Layout.js:410
+#: Messenger/js/Layout.js:453
 msgid "Add"
-msgstr "añadir"
+msgstr "Añadir"
 
-#: Messenger/js/Layout.js:546
+#: Messenger/js/Layout.js:486
 msgid "Join Groupchat"
 msgstr "Únete al grupo de charla"
 
-#: Messenger/js/Layout.js:555
+#: Messenger/js/Layout.js:495
 msgid "Identity"
 msgstr "Identidad"
 
-#: Messenger/js/Layout.js:561
+#: Messenger/js/Layout.js:501
 msgid "Host"
 msgstr "Host"
 
-#: Messenger/js/Layout.js:566
+#: Messenger/js/Layout.js:506
 msgid "Room"
 msgstr "Sala"
 
-#: Messenger/js/Layout.js:571
+#: Messenger/js/Layout.js:511
 msgid "Nickname"
 msgstr "Apodo"
 
-#: Messenger/js/Layout.js:577
+#: Messenger/js/Layout.js:517
 msgid "Password"
 msgstr "Contraseña"
 
-#: Messenger/js/Layout.js:581
+#: Messenger/js/Layout.js:521
 msgid "Join"
 msgstr "Unirse"
 
@@ -708,19 +717,19 @@ msgstr "Guardar"
 
 #: Messenger/js/VideoChat.js:132
 msgid "{0} is inviting you to a video chat. Do you Accept?"
-msgstr "{0} te invita a un chat de vídeo. ¿Aceptas?"
+msgstr "{0} ha invitado a un chat de vídeo. ¿Aceptas?"
 
 #: Messenger/js/VideoChat.js:170
 msgid "{0} rejected your video chat call"
-msgstr "{0} rechazó la llamada de video chat"
+msgstr "{0} rechazado la llamada de video chat"
 
 #: Messenger/js/VideoChat.js:191
 msgid "{0} is busy for video chat"
-msgstr "{0} está ocupado por video chat"
+msgstr "{0} is busy for video chat"
 
 #: Messenger/js/VideoChat.js:211
 msgid "One video chat call missed from {0}"
-msgstr "Una llamada de video chat perdido de {0}"
+msgstr "Un video chat llamada perdida de {0}"
 
 #: Messenger/js/VideoChat.js:259
 msgid "You are already in a video chat"
@@ -780,40 +789,57 @@ msgstr "Historial de chat con contacto"
 
 #~ msgid "File too big - must be less then 2MB"
 #~ msgstr "El archivo es demasiado grande - debe ser inferior a 2 MB"
+
 #~ msgid "File partially uploaded"
 #~ msgstr "Archivo subido partialy"
+
 #~ msgid "File was not uploaded"
 #~ msgstr "El archivo no se ha subido"
+
 #~ msgid "File transfer error"
 #~ msgstr "Error de transferencia de archivos"
+
 #~ msgid "Emoticons"
 #~ msgstr "Emoticonos"
+
 #~ msgid "Can't get Emoticons"
 #~ msgstr "No se puede obtener Emoticones"
+
 #~ msgid "Messenger has been disconnected!"
 #~ msgstr "Messenger se ha desconectado!"
+
 #~ msgid "Disconnecting"
 #~ msgstr "Desconexión"
+
 #~ msgid "Options"
 #~ msgstr "Opciones"
+
 #~ msgid "Connect"
 #~ msgstr "Conectar"
+
 #~ msgid "Actions"
 #~ msgstr "Acciones"
+
 #~ msgid "Logout"
 #~ msgstr "Cerrar sesión"
+
 #~ msgid "Show notifications ..."
 #~ msgstr "Mostrar notificaciones ..."
+
 #~ msgid "History of chats ..."
 #~ msgstr "Historial de Cahts ..."
+
 #~ msgid "Custon name ..."
 #~ msgstr "Nombre personalizado ..."
+
 #~ msgid "Action"
+
 #~ msgid_plural "Actions"
 #~ msgstr[0] "Accion"
 #~ msgstr[1] "Acciones"
+
 #~ msgid "Preference"
+
 #~ msgid_plural "Preferences"
 #~ msgstr[0] "Preferencia"
 #~ msgstr[1] "Preferencias"
-

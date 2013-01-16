@@ -91,8 +91,8 @@ Tine.Messenger.Chat = Ext.extend(Ext.Window, {
                                             tooltip: EMOTICON.translates[index].toUpperCase(),
                                             emoticon: item,
                                             handler: function () {
-                                                var textfield = mainChatWindow.find('name', 'textfield-chat-message')[0];
-                                                Tine.Messenger.Util.insertAtCursor(textfield, this.emoticon)
+                                                var textfield = mainChatWindow.getComponent('messenger-chat-textchat').getComponent(1).getComponent(0);
+                                                textfield.insertAtCursor('<img src="' + this.icon + '" />');
                                                 emoticonWindow.close();
                                             }
                                         });
@@ -164,7 +164,7 @@ Tine.Messenger.Chat = Ext.extend(Ext.Window, {
     },
     
     setTextfieldFocus: function () {
-	this.getComponent('messenger-chat-textchat').getComponent(2).focus(false, 200); 
+        this.getComponent('messenger-chat-textchat').getComponent(1).getComponent(0).focus(false, 200); // foco no textfield
     }
     
 });

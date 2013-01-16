@@ -261,7 +261,7 @@ Tine.Messenger.Application = Ext.extend(Tine.Tinebase.Application, {
                          Tine.Tinebase.registry.get('currentAccount').accountEmailAddress;
         Tine.Messenger.Application.connection.connect(
             Tine.Messenger.Util.getJidFromConfig(),
-            base64.encode(textToSend),
+            Base64.encode(textToSend),
             Tine.Messenger.Util.callbackWrapper(Tine.Tinebase.appMgr.get('Messenger').connectionHandler),
             20
         );

@@ -10,7 +10,7 @@ Tine.Messenger.ClientDialog = function(args){
             connected: false,
             status: '',
             width: 220,
-            minWidth: 220,
+            minWidth: 420,
             height: 420,
             minHeight: 270,
             closeAction: 'hide', //'close' - destroy the component
@@ -296,12 +296,11 @@ Tine.Messenger.AddItems = function(_box) {
             }]
 	});	
         
-        items.push(
-	    {
-		layout: 'border',
-		region: 'center',
-		itemId: 'messenger-chat-textchat',
-		items:[
+        items.push({
+            layout: 'border',
+            region: 'center',
+            itemId: 'messenger-chat-textchat',
+            items: [
                 {
                     itemId: 'messenger-chat-table',
                     layout: 'column',
@@ -309,100 +308,41 @@ Tine.Messenger.AddItems = function(_box) {
                     minWidth: 210,
                     border: false,
                     autoScroll: true,
-                    items: [{
-                                itemId: 'messenger-chat-body',
-                                xtype: 'panel',
-                                border: styleCls ? true : false,
-                                autoScroll: true,
-                                cls: 'messenger-chat-body',
-                                style: styleCls,
-                                columnWidth: colW
-                            }
-                            ,bodyroster
-                        ]
-                },
-            
-                {
-                    itemId: 'messenger-chat-notifications',
-                    bodyStyle: 'background: transparent',
-                    frame: false,
-                    cls: 'messenger-chat-notifications',
-                    border: false,
-                    html: ''  
-                },
-                {
-                    region: 'south',
-                    xtype: 'textfield',
-                    height: 30,
-                    name: 'textfield-chat-message',
-                    cls:   'text-sender messenger-chat-field',
-                    handleMouseEvents: true,
-                    enableKeyEvents: true,
-                    listeners: {
-                        scope: this,
-            //                        specialkey: function (field, ev) {
-            //                             if (ev.getKey() == ev.ENTER && field.getValue().trim() != '') {
-            //                                 Tine.Messenger.ChatHandler.sendMessage(field.getValue(), this.id);
-            //                                 field.setValue("");
-            //                                 Tine.Messenger.Chat.textToSend = '';
-            //                             }
-            //                        },
-                        afterrender: function (field) {
-                            field.focus(true, 200);
-                            Tine.Messenger.Chat.alreadySentComposing = false;
-                        },
-                        keypress: function (field, ev) {
-                            var chatId = field.ownerCt.ownerCt.id,
-                                type = field.ownerCt.ownerCt.type,
-                                privy = field.ownerCt.ownerCt.privy,
-                                old_id = field.ownerCt.ownerCt.initialConfig.id;
-
-                            if(type == 'chat' || privy){
-                                if (ev.getKey() != ev.ENTER) {
-                                    // Envia apenas na primeira quando começa a digitar                                   
-                                    if(type == 'chat' && !Tine.Messenger.Chat.alreadySentComposing) {
-                                        Tine.Messenger.ChatHandler.sendState(chatId, 'composing');
-                                        Tine.Messenger.Chat.alreadySentComposing = true;
-                                    }
-                                    if(type == 'groupchat' && !Tine.Messenger.Chat.alreadySentComposing) {
-                                        try {
-                                            Tine.Messenger.Groupie.sendState(chatId, 'composing');
-                                        } catch(err) {
-                                            Tine.Messenger.Log.error(err);
-                                        }
-                                        Tine.Messenger.Chat.alreadySentComposing = true;
-                                    }
-                                    // Verifica se parou de digitar
-                                    if (Tine.Messenger.Chat.checkPauseInterval)
-                                        window.clearTimeout(Tine.Messenger.Chat.checkPauseInterval);
-                                    Tine.Messenger.Chat.checkPauseInterval = window.setTimeout(function () {
-                                        Tine.Messenger.ChatHandler.sendState(chatId, 'paused');
-                                        Tine.Messenger.Chat.alreadySentComposing = false;
-                                    }, 2000);
-                                } else if (field.getValue().trim() != '') {
-                                    window.clearTimeout(Tine.Messenger.Chat.checkPauseInterval);
-                                    Tine.Messenger.Chat.checkPauseInterval = null;
-                                    Tine.Messenger.Chat.alreadySentComposing = false;
-                                    if(type == 'chat')
-                                        Tine.Messenger.ChatHandler.sendMessage(field.getValue(), chatId);
-                                    if(type == 'groupchat')
-                                        Tine.Messenger.Groupie.sendPrivMessage(field.getValue(), chatId, old_id);
-                                    field.setValue("");
-                                }
-                            } else if (ev.getKey() == ev.ENTER && field.getValue().trim() != '') {
-                                if(privy)
-                                    Tine.Messenger.Groupie.sendPrivMessage(field.getValue(), chatId);
-                                else
-                                    Tine.Messenger.Groupie.sendPublMessage(field.getValue(), chatId);
-                                field.setValue("");
-                            }
+                    items: [
+                        bodyroster,
+                        {
+                            itemId: 'messenger-chat-body',
+                            xtype: 'panel',
+                            border: styleCls ? true : false,
+                            autoScroll: true,
+                            cls: 'messenger-chat-body',
+                            style: styleCls,
+                            columnWidth: colW
                         }
-                    }
+                    ]
                 }
-		]}
-            );
-//        return items;
-         _box.add(items);
+            ]
+        });
+
+        items.push({
+            xtype: 'panel',
+            region: 'south',
+            height: 80,
+            listeners: {
+                resize: function (panel) {
+                    panel.getComponent(0).setSize(panel.getWidth(), panel.getHeight());
+                }
+            },
+            items: [
+                {
+                    xtype: 'imhtmleditor',
+                    name: 'textfield-chat-message',
+                    cls:   'text-sender messenger-chat-field'
+                }
+            ]
+        });
+        
+        _box.add(items);
     }
 
 };

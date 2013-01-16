@@ -12,6 +12,22 @@
       "isDebug": true,
       "fileIncludes": [
         {
+          "text": "base64.js",
+          "path": "js/"
+        },
+        {
+          "text": "md5.js",
+          "path": "js/"
+        },
+        {
+          "text": "sha1.js",
+          "path": "js/"
+        },
+        {
+          "text": "strophe.js",
+          "path": "js/"
+        },
+        {
           "text": "Window.js",
           "path": "js/"
         },
@@ -40,10 +56,6 @@
           "path": "js/"
         },
         {
-          "text": "strophe.min.js",
-          "path": "js/"
-        },
-        {
           "text": "Layout.js",
           "path": "js/"
         },
@@ -53,10 +65,6 @@
         },
         {
           "text": "Groupie.js",
-          "path": "js/"
-        },
-        {
-          "text": "base64.js",
           "path": "js/"
         },
         {
@@ -81,6 +89,10 @@
         },
         {
           "text": "History.js",
+          "path": "js/"
+        },
+        {
+          "text": "HtmlEditor.js",
           "path": "js/"
         },
         {
