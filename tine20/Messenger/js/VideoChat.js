@@ -472,7 +472,9 @@ Tine.Messenger.VideoChat = {
     
     
     setIconVisible: function(chat, visible){
-	chat.getTopToolbar().getComponent('messenger-chat-video').setVisible(visible);
+	if(chat !== null && chat.getTopToolbar !== undefined){
+	    chat.getTopToolbar().getComponent('messenger-chat-video').setVisible(visible);
+	}
     }
     
     
