@@ -134,11 +134,11 @@ class Tinebase_User
      *
      * @return Tinebase_User_Abstract
      */
-    public static function getInstance() 
+    public static function getInstance($_force = false) 
     {
         $backendType = self::getConfiguredBackend();
         
-        if (self::$_instance === NULL) {
+        if (self::$_instance === NULL || $_force) {
             $backendType = self::getConfiguredBackend();
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .' accounts backend: ' . $backendType);
             

@@ -130,9 +130,10 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
         
         return array(
             'results'       => array_values($result),
-            'totalcount'    => $_totalCountMethod == self::TOTALCOUNT_CONTROLLER ?
-                $_controller->searchCount($filter) :
-                count($result),
+            'totalcount'    => $records instanceof Tinebase_Record_SearchTotalCountInterface ? 
+                $records->getSearchTotalCount() :
+                    $_totalCountMethod == self::TOTALCOUNT_CONTROLLER ?
+                    $_controller->searchCount($filter) : count($result),
             'filter'        => $filter->toArray(TRUE),
         );
     }

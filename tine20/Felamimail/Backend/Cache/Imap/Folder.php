@@ -86,6 +86,23 @@ class Felamimail_Backend_Cache_Imap_Folder extends Felamimail_Backend_Cache_Imap
         return $result;
     }
     
+    public function getAllFolderIdsFromAccount($_accountId)
+    {
+        $return = array();
+        $account = ($_accountId instanceof Felamimail_Model_Account) ? $_accountId : Felamimail_Controller_Account::getInstance()->get($_accountId);
+        $imap = Felamimail_Backend_ImapFactory::factory($account);
+        $folders = $imap->getFolders('', '*', $account);
+        foreach ($folders as $folder)
+        {
+            //$folderId = self::encodeFolderUid($folder, $account->id);
+            if ($folder['isSelectable'])
+            {
+                $return[self::encodeFolderUid($folder['globalName'], $account->id)] = array($account->id, Felamimail_Model_Folder::decodeFolderName($folder['globalName']));
+            }
+        }
+        return $return;
+    }
+    
     /**
      * get folders from imap
      * 

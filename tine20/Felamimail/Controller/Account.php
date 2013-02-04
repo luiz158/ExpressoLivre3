@@ -955,7 +955,14 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
     protected function _addUserValues(Felamimail_Model_Account $_account, Tinebase_Model_FullUser $_user = NULL, $_email = NULL)
     {
         if ($_user === NULL) {
-            $_user = Tinebase_User::getInstance()->getFullUserById($this->_currentAccount->getId());
+            try {
+                $_user = Tinebase_User::getInstance()->getFullUserById($this->_currentAccount->getId());
+            }
+            catch (Zend_Ldap_Exception $e) {
+                if ($e->getCode() === 81){
+                    $_user = Tinebase_User::getInstance(true)->getFullUserById($this->_currentAccount->getId());
+                }
+            }
         }
         
         if ($_email === NULL) {

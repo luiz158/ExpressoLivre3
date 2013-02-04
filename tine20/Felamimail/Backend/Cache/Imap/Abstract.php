@@ -143,9 +143,10 @@ abstract class Felamimail_Backend_Cache_Imap_Abstract
      * @param  array $_rawDatas of arrays
      * @return Tinebase_Record_RecordSet
      */
-    protected function _rawDataToRecordSet(array $_rawDatas)
+    protected function _rawDataToRecordSet(array $_rawDatas, $_totalCount = 0)
     {
-        $result = new Tinebase_Record_RecordSet($this->_modelName, $_rawDatas, true);
+        $result = new Tinebase_Record_SearchTotalCountRecordSet($this->_modelName, $_rawDatas, true);
+        $result->setSearchTotalCount($_totalCount);
                 
         return $result;
     }
