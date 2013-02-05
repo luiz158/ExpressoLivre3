@@ -300,11 +300,16 @@ Tinebase_Core::getLogger()->alert(__METHOD__ . '#####::#####' . __LINE__ . ' Fol
              * @todo must see if it is not better do this on the model directly
              */
             $systemFolders = FALSE;
-            if (strtolower($folder[$folderDecoded['globalName']]['parent']) === 'inbox')
+            if (strtolower($globalName) === 'inbox')
+            {
+                $systemFolders = TRUE;
+            }
+            else if (strtolower($folder[$folderDecoded['globalName']]['parent']) === 'inbox')
             {
                 $systemFolders = in_array(strtolower($folder[$folderDecoded['globalName']]['localName']), 
                                                        Felamimail_Controller_Folder::getInstance()->getSystemFolders($folderDecoded['accountId']));
             }
+            
             $localName = Felamimail_Model_Folder::decodeFolderName($folder[$folderDecoded['globalName']]['localName']);
             
             if(ereg("^user/[0-9]{11}$",Felamimail_Model_Folder::decodeFolderName($folder[$folderDecoded['globalName']]['globalName'])))
