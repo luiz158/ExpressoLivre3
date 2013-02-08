@@ -25,9 +25,21 @@ abstract class Tinebase_WebDav_Collection_Abstract extends Sabre_DAV_Collection 
      */
     protected $_application;
     
+    /**
+    * application name
+    *
+    * @var string
+    */
     protected $_applicationName;
     
     protected $_model;
+    
+    /**
+    * app has personal folders
+    *
+    * @var string
+    */
+    protected $_hasPersonalFolders = TRUE;
     
     /**
      * 
@@ -98,7 +110,8 @@ abstract class Tinebase_WebDav_Collection_Abstract extends Sabre_DAV_Collection 
             'name'           => $name,
             'type'           => $containerType,
             'backend'        => 'sql',
-            'application_id' => $this->_getApplication()->getId()
+            'application_id' => $this->_getApplication()->getId(),
+            'model'          => 'Tinebase_Model_Node'
         )));
         
         return $container;
@@ -193,7 +206,9 @@ abstract class Tinebase_WebDav_Collection_Abstract extends Sabre_DAV_Collection 
             # path == ApplicationName
             # return personal and shared folder
             case 1:
-                $children[] = $this->getChild(Tinebase_Model_Container::TYPE_PERSONAL);
+                if ($this->_hasPersonalFolders) {
+                    $children[] = $this->getChild(Tinebase_Model_Container::TYPE_PERSONAL);
+                }
                 $children[] = $this->getChild(Tinebase_Model_Container::TYPE_SHARED);
         
                 break;
@@ -205,7 +220,7 @@ abstract class Tinebase_WebDav_Collection_Abstract extends Sabre_DAV_Collection 
                     foreach ($containers as $container) {
                         $children[] = $this->getChild($container);
                     }
-                } elseif ($this->_pathParts[1] == Tinebase_Model_Container::TYPE_PERSONAL) {
+                } elseif ($this->_hasPersonalFolders && $this->_pathParts[1] == Tinebase_Model_Container::TYPE_PERSONAL) {
                     $children[] = $this->getChild(Tinebase_Core::getUser()->accountLoginName);
                 }
                 
@@ -214,16 +229,16 @@ abstract class Tinebase_WebDav_Collection_Abstract extends Sabre_DAV_Collection 
             # path == Applicationname/personal/accountLoginName
             # return personal folders
             case 3:
-                $containers = Tinebase_Container::getInstance()->getPersonalContainer(Tinebase_Core::getUser(), $this->_applicationName, Tinebase_Core::getUser(), array(Tinebase_Model_Grants::GRANT_READ, Tinebase_Model_Grants::GRANT_SYNC));
-                foreach ($containers as $container) {
-                    $children[] = $this->getChild($container);
+                if ($this->_hasPersonalFolders) { 
+                    $containers = Tinebase_Container::getInstance()->getPersonalContainer(Tinebase_Core::getUser(), $this->_applicationName, Tinebase_Core::getUser(), array(Tinebase_Model_Grants::GRANT_READ, Tinebase_Model_Grants::GRANT_SYNC));
+                    foreach ($containers as $container) {
+                        $children[] = $this->getChild($container);
+                    }
                 }
-                
                 break;
         }
-                
-        return $children;
         
+        return $children;
     }
     
     /**
@@ -397,7 +412,7 @@ abstract class Tinebase_WebDav_Collection_Abstract extends Sabre_DAV_Collection 
      */
     public function updateProperties($mutations) 
     {
-        return $this->carddavBackend->updateAddressBook($this->addressBookInfo['id'], $mutations); 
+        return $this->carddavBackend->updateAddressBook($this->addressBookInfo['id'], $mutations);
     }
     
     protected function _getApplication()

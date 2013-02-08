@@ -27,22 +27,12 @@ class Addressbook_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     protected $_applicationName = 'Addressbook';
     
     /**
-     * user fields (created_by, ...) to resolve in _multipleRecordsToJson and _recordToJson
-     *
-     * @var array
-     */
-    protected $_resolveUserFields = array(
-        'Addressbook_Model_Contact' => array('created_by', 'last_modified_by')
-    );
-
-    /**
      * resolve images
      * @param Tinebase_Record_RecordSet $_records
      */
     public static function resolveImages(Tinebase_Record_RecordSet $_records)
     {
         foreach($_records as &$record) {
-        	if (!isset($record['jpegphoto'])) continue; 
             if($record['jpegphoto'] == '1') {
                 $record['jpegphoto'] = Tinebase_Model_Image::getImageUrl('Addressbook', $record->__get('id'), '');
             }
@@ -209,11 +199,12 @@ class Addressbook_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      *
      * @param Tinebase_Record_RecordSet $_records Tinebase_Record_Abstract
      * @param Tinebase_Model_Filter_FilterGroup
+     * @param Tinebase_Model_Pagination $_pagination
      * @return array data
      */
-    protected function _multipleRecordsToJson(Tinebase_Record_RecordSet $_records, $_filter=NULL)
+    protected function _multipleRecordsToJson(Tinebase_Record_RecordSet $_records, $_filter = NULL, $_pagination = NULL)
     {
-        $result = parent::_multipleRecordsToJson($_records, $_filter);
+        $result = parent::_multipleRecordsToJson($_records, $_filter, $_pagination);
         
         foreach ($result as &$contact) {
             $contact['jpegphoto'] = $this->_getImageLink($contact);
@@ -234,12 +225,13 @@ class Addressbook_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         if (! empty($contactArray['jpegphoto'])) {
             $link = Tinebase_Model_Image::getImageUrl('Addressbook', $contactArray['id'], '');
         } else if (isset($contactArray['salutation']) && ! empty($contactArray['salutation'])) {
-            /*
-            $salutationRecord = Addressbook_Config::getInstance()->get(Addressbook_Config::CONTACT_SALUTATION)->records->getById($contactArray['salutation']);
-            if ($salutationRecord && $salutationRecord->image) {
-                $link = $salutationRecord->image;
+            $salutations = Addressbook_Config::getInstance()->get(Addressbook_Config::CONTACT_SALUTATION, NULL);
+            if ($salutations && $salutations->records instanceof Tinebase_Record_RecordSet) {
+                $salutationRecord = $salutations->records->getById($contactArray['salutation']);
+                if ($salutationRecord && $salutationRecord->image) {
+                    $link = $salutationRecord->image;
+                }
             }
-            */
         }
         
         return $link;
@@ -264,8 +256,8 @@ class Addressbook_Frontend_Json extends Tinebase_Frontend_Json_Abstract
                 'results'               => $definitionConverter->fromTine20RecordSet($importDefinitions),
                 'totalcount'            => count($importDefinitions),
             ),
-        );        
-        return $registryData;    
+        );
+        return $registryData;
     }
     
     /**

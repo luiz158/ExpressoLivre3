@@ -57,12 +57,91 @@ Tine.Timetracker.TimeaccountEditDialog = Ext.extend(Tine.widgets.dialog.EditDial
      * NOTE: when this method gets called, all initalisation is done.
      */
     getFormItems: function() {
+        
+        var secondRow = [{
+            fieldLabel: this.app.i18n._('Unit'),
+            name: 'price_unit'
+        }, {
+            xtype: 'numberfield',
+            fieldLabel: this.app.i18n._('Unit Price'),
+            name: 'price',
+            allowNegative: false
+            //decimalSeparator: ','
+        }, {
+            fieldLabel: this.app.i18n._('Budget'),
+            name: 'budget'
+        }, {
+            fieldLabel: this.app.i18n._('Status'),
+            name: 'is_open',
+            xtype: 'combo',
+            mode: 'local',
+            forceSelection: true,
+            triggerAction: 'all',
+            store: [[0, this.app.i18n._('closed')], [1, this.app.i18n._('open')]]
+        }, {
+            fieldLabel: this.app.i18n._('Billed'),
+            name: 'status',
+            xtype: 'combo',
+            mode: 'local',
+            forceSelection: true,
+            triggerAction: 'all',
+            value: 'not yet billed',
+            store: [
+                ['not yet billed', this.app.i18n._('not yet billed')], 
+                ['to bill', this.app.i18n._('to bill')],
+                ['billed', this.app.i18n._('billed')]
+            ]
+        }, {
+            //disabled: true,
+            //emptyText: this.app.i18n._('not cleared yet...'),
+            fieldLabel: this.app.i18n._('Cleared In'),
+            name: 'billed_in',
+            xtype: 'textfield'
+        }, {
+            fieldLabel: this.app.i18n._('Booking deadline'),
+            name: 'deadline',
+            xtype: 'combo',
+            mode: 'local',
+            forceSelection: true,
+            triggerAction: 'all',
+            value: 'none',
+            store: [
+                ['none', this.app.i18n._('none')], 
+                ['lastweek', this.app.i18n._('last week')]
+            ]
+        }];
+        
+        if(Tine.Tinebase.appMgr.get('Sales')) {
+            secondRow.push({
+                xtype: 'tinerelationpickercombo',
+                fieldLabel: this.app.i18n._('Cost Center'),
+                editDialog: this,
+                allowBlank: true,
+                app: 'Sales',
+                recordClass: Tine.Sales.Model.CostCenter,
+                relationType: 'COST_CENTER',
+                relationDegree: 'sibling',
+                modelUnique: true
+            });
+        }
+        
+        secondRow.push({
+            hideLabel: true,
+            boxLabel: this.app.i18n._('Timesheets are billable'),
+            name: 'is_billable',
+            xtype: 'checkbox',
+            columnWidth: .666
+        })
+        
         return {
             xtype: 'tabpanel',
             border: false,
             plain:true,
             activeTab: 0,
-            items:[{               
+            plugins: [{
+                ptype : 'ux.tabpanelkeyplugin'
+            }],
+            items:[{
                 title: this.app.i18n.ngettext('Time Account', 'Time Accounts', 1),
                 autoScroll: true,
                 border: false,
@@ -93,64 +172,7 @@ Tine.Timetracker.TimeaccountEditDialog = Ext.extend(Tine.widgets.dialog.EditDial
                         xtype: 'textarea',
                         name: 'description',
                         height: 150
-                        }], [{
-                            fieldLabel: this.app.i18n._('Unit'),
-                            name: 'price_unit'
-                        }, {
-                            xtype: 'numberfield',
-                            fieldLabel: this.app.i18n._('Unit Price'),
-                            name: 'price',
-                            allowNegative: false
-                            //decimalSeparator: ','
-                        }, {
-                            fieldLabel: this.app.i18n._('Budget'),
-                            name: 'budget'
-                        }, {
-                            fieldLabel: this.app.i18n._('Status'),
-                            name: 'is_open',
-                            xtype: 'combo',
-                            mode: 'local',
-                            forceSelection: true,
-                            triggerAction: 'all',
-                            store: [[0, this.app.i18n._('closed')], [1, this.app.i18n._('open')]]
-                        }, {
-                            fieldLabel: this.app.i18n._('Billed'),
-                            name: 'status',
-                            xtype: 'combo',
-                            mode: 'local',
-                            forceSelection: true,
-                            triggerAction: 'all',
-                            value: 'not yet billed',
-                            store: [
-                                ['not yet billed', this.app.i18n._('not yet billed')], 
-                                ['to bill', this.app.i18n._('to bill')],
-                                ['billed', this.app.i18n._('billed')]
-                            ]
-                        }, {
-                            //disabled: true,
-                            //emptyText: this.app.i18n._('not cleared yet...'),
-                            fieldLabel: this.app.i18n._('Cleared In'),
-                            name: 'billed_in',
-                            xtype: 'textfield'
-                        }, {
-                            fieldLabel: this.app.i18n._('Booking deadline'),
-                            name: 'deadline',
-                            xtype: 'combo',
-                            mode: 'local',
-                            forceSelection: true,
-                            triggerAction: 'all',
-                            value: 'none',
-                            store: [
-                                ['none', this.app.i18n._('none')], 
-                                ['lastweek', this.app.i18n._('last week')]
-                            ]
-                        }, {
-                            hideLabel: true,
-                            boxLabel: this.app.i18n._('Timesheets are billable'),
-                            name: 'is_billable',
-                            xtype: 'checkbox',
-                            columnWidth: .666
-                        }]] 
+                        }], secondRow] 
                 }, {
                     // activities and tags
                     layout: 'accordion',
@@ -264,7 +286,7 @@ Tine.Timetracker.TimeaccountEditDialog = Ext.extend(Tine.widgets.dialog.EditDial
                 selectAnyone: false,
                 selectTypeDefault: 'group',
                 recordClass: Tine.Tinebase.Model.Grant
-            }); 
+            });
         }
         return this.grantsGrid;
     }

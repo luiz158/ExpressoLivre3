@@ -15,7 +15,7 @@ Ext.ns('Tine.Filemanager.Model');
  * 
  * @author      Cornelius Weiss <c.weiss@metaways.de>
  */
-Tine.Filemanager.Model.Node = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.genericFields.concat([
+Tine.Filemanager.Model.Node = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.modlogFields.concat([
     { name: 'id' },
     { name: 'name' },
     { name: 'path' },
@@ -24,20 +24,25 @@ Tine.Filemanager.Model.Node = Tine.Tinebase.data.Record.create(Tine.Tinebase.Mod
     { name: 'type' },
     { name: 'contenttype' },
     { name: 'description' },
-    { name: 'creation_time' },
-    { name: 'account_grants' }
+    { name: 'account_grants' },
+    { name: 'description' },
+    { name: 'object_id'},
+    
+    { name: 'relations' },
+    { name: 'customfields' },
+    { name: 'notes' },
+    { name: 'tags' }
 ]), {
     appName: 'Filemanager',
     modelName: 'Node',
     idProperty: 'id',
-    titleProperty: 'title',
-    // ngettext('file', 'files', n); gettext('file');
-    recordName: 'file',
-    recordsName: 'files',
-    containerProperty: null,
-    // ngettext('folder', 'folders', n); gettext('folder');
-    containerName: 'folder',
-    containersName: 'folders',
+    titleProperty: 'name',
+    // ngettext('File', 'Files', n); gettext('File');
+    recordName: 'File',
+    recordsName: 'Files',
+    // ngettext('Folder', 'Folders', n); gettext('Folder');
+    containerName: 'Folder',
+    containersName: 'Folders',
     
     /**
      * checks whether creating folders is allowed
@@ -151,6 +156,17 @@ Tine.Filemanager.fileRecordBackend =  new Tine.Tinebase.data.RecordProxy({
     },
     
     /**
+     * is automatically called in generic GridPanel
+     */
+    saveRecord : function(record, request) {
+        if(record.hasOwnProperty('fileRecord')) {
+            return;
+        } else {
+            Tine.Tinebase.data.RecordProxy.prototype.saveRecord.call(this, record, request);
+        }
+    },
+
+    /**
      * deleting file or folder
      * 
      * @param items     files/folders to delete
@@ -242,7 +258,7 @@ Tine.Filemanager.fileRecordBackend =  new Tine.Tinebase.data.RecordProxy({
             
             for(var i=0; i<items.length; i++) {
                 
-                var item = items[i];            
+                var item = items[i];
                 var itemData = item.data;
                 if(!itemData) {
                     itemData = item.attributes;
@@ -314,7 +330,7 @@ Tine.Filemanager.fileRecordBackend =  new Tine.Tinebase.data.RecordProxy({
                             continue;
                         }
                         
-                        if(move) {   
+                        if(move) {
                             var copiedNode = treePanel.cloneTreeNode(nodeToCopy, target),
                                 nodeToCopyId = nodeToCopy.id,
                                 removeNode = treePanel.getNodeById(nodeToCopyId);
@@ -323,12 +339,12 @@ Tine.Filemanager.fileRecordBackend =  new Tine.Tinebase.data.RecordProxy({
                                 removeNode.parentNode.removeChild(removeNode);
                             }
                             
-                            target.appendChild(copiedNode); 
-                            copiedNode.setId(nodeData[i].id);    
+                            target.appendChild(copiedNode);
+                            copiedNode.setId(nodeData[i].id);
                         } 
                         else {
                             var copiedNode = treePanel.cloneTreeNode(nodeToCopy, target);
-                            target.appendChild(copiedNode);  
+                            target.appendChild(copiedNode);
                             copiedNode.setId(nodeData[i].id);
                             
                         }
@@ -369,10 +385,10 @@ Tine.Filemanager.fileRecordBackend =  new Tine.Tinebase.data.RecordProxy({
         params.uploadKey = uploadKey;
         params.addToGridStore = addToGridStore;
         
-        var onSuccess = (function(result, request){ 
+        var onSuccess = (function(result, request){
             
             var nodeData = Ext.util.JSON.decode(response.responseText),
-                fileRecord = Tine.Tinebase.uploadManager.upload(this.uploadKey);  
+                fileRecord = Tine.Tinebase.uploadManager.upload(this.uploadKey);
             
             if(addToGridStore) {
                 var recordToRemove = gridStore.query('name', fileRecord.get('name'));
@@ -427,7 +443,7 @@ Tine.Filemanager.fileRecordBackend =  new Tine.Tinebase.data.RecordProxy({
         params.addToGridStore = addToGridStore;
         
         
-        var onSuccess = (function(response, request){ 
+        var onSuccess = (function(response, request){
             
             var nodeData = Ext.util.JSON.decode(response.responseText);
             
@@ -475,13 +491,6 @@ Tine.Filemanager.fileRecordBackend =  new Tine.Tinebase.data.RecordProxy({
     },
     
     /**
-     * is automatically called in generic GridPanel
-     */
-    saveRecord : function() {
-        // NOOP
-    },
-    
-    /**
      * exception handler for this proxy
      * 
      * @param {Tine.Exception} exception
@@ -495,7 +504,7 @@ Tine.Filemanager.fileRecordBackend =  new Tine.Tinebase.data.RecordProxy({
      */
     updateNodeRecord : function(nodeData, nodeRecord) {
         
-        for(var field in nodeData) {         
+        for(var field in nodeData) {
             nodeRecord.set(field, nodeData[field]);
         };
         

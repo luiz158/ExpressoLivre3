@@ -44,6 +44,7 @@ class Felamimail_Backend_Folder
      */
     public static function getInstance()
     {
+        
         if (self::$_instance === NULL)
         {
             $adapter = Tinebase_Core::getConfig()->messagecache;
@@ -51,6 +52,6 @@ class Felamimail_Backend_Folder
             $classname = 'Felamimail_Backend_Cache_' . ucfirst($adapter) . '_Folder';
             self::$_instance = new $classname;
         }
-        return self::$_instance;
+        return self::$_instance;   
     }
 }

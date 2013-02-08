@@ -10,9 +10,9 @@
 Ext.ns('Tine.Timetracker');
 
 Tine.Timetracker.TimeAccountStatusFilterModel = Ext.extend(Tine.widgets.grid.FilterModel, {
-    field: 'timeaccount_status',
-    valueType: 'string',
-    defaultValue: 'to bill',
+    field: 'is_open',
+    valueType: 'bool',
+    defaultValue: 1,
     
     /**
      * @private
@@ -43,11 +43,7 @@ Tine.Timetracker.TimeAccountStatusFilterModel = Ext.extend(Tine.widgets.grid.Fil
             forceSelection: true,
             blurOnSelect: true,
             triggerAction: 'all',
-            store: [
-                ['not yet billed', this.app.i18n._('not yet billed')], 
-                ['to bill', this.app.i18n._('to bill')],
-                ['billed', this.app.i18n._('billed')]
-            ]
+            store: [[0, this.app.i18n._('closed')], [1, this.app.i18n._('open')]]
         });
         value.on('specialkey', function(field, e){
              if(e.getKey() == e.ENTER){

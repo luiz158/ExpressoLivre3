@@ -2,14 +2,14 @@
 <application>
     <name>Calendar</name>
     <!-- gettext('Calendar') -->   
-    <version>5.4</version>
+    <version>7.0</version>
     <order>15</order>
     <status>enabled</status>
     <tables>
         <!-- events -->
         <table>
             <name>cal_events</name>
-            <version>4</version>
+            <version>6</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -100,8 +100,10 @@
                     <type>integer</type>
                 </field>
                 <field>
-                    <name>status_id</name>
-                    <type>integer</type>
+                    <name>status</name>
+                    <type>text</type>
+                    <length>255</length>
+                    <notnull>false</notnull>
                 </field>
                 <field>
                     <name>summary</name>
@@ -118,7 +120,7 @@
                 <field>
                     <name>uid</name>
                     <type>text</type>
-                    <length>40</length>
+                    <length>255</length>
                     <notnull>true</notnull>
                 </field>
                 <field>
@@ -128,7 +130,7 @@
                 <field>
                     <name>recurid</name>
                     <type>text</type>
-                    <length>60</length>
+                    <length>255</length>
                 </field>
                 <field>
                     <name>rrule</name>

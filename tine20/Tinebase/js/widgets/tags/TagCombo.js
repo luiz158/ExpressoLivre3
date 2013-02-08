@@ -31,14 +31,12 @@ Tine.widgets.tags.TagCombo = Ext.extend(Ext.ux.form.ClearableComboBox, {
      */
     onlyUsableTags: false,
     
-    id: 'TagCombo',
     emptyText: null,
     typeAhead: true,
     mode: 'remote',
     triggerAction: 'all',
     displayField: 'name',
     valueField: 'id',
-    width: 100,
     minChars: 3,
     
     /**
@@ -94,7 +92,9 @@ Tine.widgets.tags.TagCombo = Ext.extend(Ext.ux.form.ClearableComboBox, {
     setValue: function(value) {
         
         if (typeof value === 'object' && Object.prototype.toString.call(value) === '[object Object]') {
-            this.store.addSorted(new Tine.Tinebase.Model.Tag(value));
+            if (! this.store.getById(value.id)) {
+                this.store.addSorted(new Tine.Tinebase.Model.Tag(value));
+            }
             value = value.id;
         }
         
@@ -106,26 +106,10 @@ Tine.widgets.tags.TagCombo = Ext.extend(Ext.ux.form.ClearableComboBox, {
      * init store
      */
     initStore: function() {
-                
-        if(this.selectionModel) {
-            var ids = [];
-            
-            Ext.each(this.selectionModel.getSelections(), function(el){
-                Ext.each(el.data.tags, function(tag) {
-                    ids.push(tag.id);
-                });
-            });
-
-            var baseParams = {
-                method: 'Tinebase.searchDistinctTags',
-                records: ids
-            }
-        } else {
-            var baseParams = {
-                method: 'Tinebase.searchTags',
-                paging: {}
-            };
-        }
+        var baseParams = {
+            method: 'Tinebase.searchTags',
+            paging: {}
+        };
         
         this.store = new Ext.data.JsonStore({
             id: 'id',
@@ -159,7 +143,7 @@ Tine.widgets.tags.TagCombo = Ext.extend(Ext.ux.form.ClearableComboBox, {
             {
                 encode: function(value) {
                      if (value) {
-                        return Ext.util.Format.htmlEncode(value);
+                        return Tine.Tinebase.common.doubleEncode(value);
                     } else {
                         return '';
                     }
@@ -168,3 +152,5 @@ Tine.widgets.tags.TagCombo = Ext.extend(Ext.ux.form.ClearableComboBox, {
         );
     }
 });
+
+Ext.reg('Tine.widgets.tags.TagCombo', Tine.widgets.tags.TagCombo);

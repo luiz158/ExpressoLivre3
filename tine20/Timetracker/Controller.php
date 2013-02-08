@@ -24,14 +24,19 @@ class Timetracker_Controller extends Tinebase_Controller_Abstract
      * @var string
      */
     protected $_applicationName = 'Timetracker';
-       
+    
+    /**
+     * holds the default Model of this application
+     * @var string
+     */
+    protected static $_defaultModel = 'Timetracker_Model_Timeaccount';
+    
     /**
      * the constructor
      *
      * don't use the constructor. use the singleton 
      */
     private function __construct() {
-        $this->_currentAccount = Tinebase_Core::getUser();
     }
     
     /**
@@ -39,7 +44,7 @@ class Timetracker_Controller extends Tinebase_Controller_Abstract
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**

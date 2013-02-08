@@ -7,6 +7,8 @@
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  * @copyright   Copyright (c) 2010-2012 Metaways Infosystems GmbH (http://www.metaways.de)
+ * 
+ * @todo 0007376: Tinebase_FileSystem / Node model refactoring: move all container related functionality to Filemanager
  */
 
 /**
@@ -85,5 +87,9 @@ class Tinebase_Model_Tree_Node_Filter extends Tinebase_Model_Filter_FilterGroup
             'filter' => 'Tinebase_Model_Filter_Int',
             'options' => array('tablename' => 'tree_filerevisions')
         ),
+    // recursive search
+        'recursive' => array(
+            'filter' => 'Tinebase_Model_Filter_Bool'
+        )
     );
 }

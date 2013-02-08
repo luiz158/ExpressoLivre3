@@ -10,13 +10,6 @@
  */
 
 /*
- * Set error reporting 
- * 
- * @todo put that in config.inc as well?
- */
-error_reporting( E_ALL | E_STRICT );
-
-/*
  * Set include path
  */
  
@@ -55,13 +48,20 @@ $path = array(
 
 set_include_path(implode(PATH_SEPARATOR, $path));
 
-/**
- * Set up basic tine 2.0 environment
- */
-require_once 'Zend/Loader/Autoloader.php';
-$autoloader = Zend_Loader_Autoloader::getInstance();
-$autoloader->setFallbackAutoloader(true);
-Tinebase_Autoloader::initialize($autoloader);
+require_once 'bootstrap.php';
+
+// phpunit wants to handle the errors / report all errors + restore the default error handler
+error_reporting(E_ALL | E_STRICT);
+restore_error_handler();
+
+// disable sending cookies
+Zend_Session::setOptions(array(
+    'use_cookies'      => 0,
+    'use_only_cookies' => 0
+));
+
+// fake session_id to trigger creation of session
+$_REQUEST['TINE20SESSID'] = Tinebase_Record_Abstract::generateUID();
 
 // init base framework
 TestServer::getInstance()->initFramework();

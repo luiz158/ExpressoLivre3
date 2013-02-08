@@ -42,6 +42,14 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
     const CLASS_PRIVATE        = 'PRIVATE';
     //const CLASS_CONFIDENTIAL   = 'CONFIDENTIAL';
     
+    const STATUS_CONFIRMED     = 'CONFIRMED';
+    const STATUS_TENTATIVE     = 'TENTATIVE';
+    const STATUS_CANCELED      = 'CANCELED';
+    
+    const RANGE_ALL           = 'ALL';
+    const RANGE_THIS          = 'THIS';
+    const RANGE_THISANDFUTURE = 'THISANDFUTURE';
+    
     /**
      * key in $_validators/$_properties array for the filed which 
      * represents the identifier
@@ -90,7 +98,10 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
         'location'             => array('allowEmpty' => true          ),
         'organizer'            => array('allowEmpty' => true,         ),
         'priority'             => array('allowEmpty' => true, 'Int'   ),
-        'status_id'            => array('allowEmpty' => true          ),
+        'status'            => array(
+            'allowEmpty' => true,
+            array('InArray', array(self::STATUS_CONFIRMED, self::STATUS_TENTATIVE, self::STATUS_CANCELED))
+        ),
         'summary'              => array('allowEmpty' => true          ),
         'url'                  => array('allowEmpty' => true          ),
         'uid'                  => array('allowEmpty' => true          ),
@@ -118,6 +129,7 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
         'originator_tz'         => array('allowEmpty' => true         ),
     
         // grant helper fields
+        Tinebase_Model_Grants::GRANT_FREEBUSY  => array('allowEmpty' => true),
         Tinebase_Model_Grants::GRANT_READ    => array('allowEmpty' => true),
         Tinebase_Model_Grants::GRANT_SYNC    => array('allowEmpty' => true),
         Tinebase_Model_Grants::GRANT_EXPORT  => array('allowEmpty' => true),
@@ -195,6 +207,47 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
     }
     
     /**
+     * add current user to attendee if he's organizer
+     * 
+     * @param bool $ifOrganizer      only add current user if he's organizer
+     * @param bool $ifNoOtherAttendee  only add current user if no other attendee are present
+     */
+    public function assertCurrentUserAsAttendee($ifOrganizer = TRUE, $ifNoOtherAttendee = FALSE)
+    {
+        if ($ifNoOtherAttendee && $this->attendee instanceof Tinebase_Record_RecordSet && $this->attendee->count() > 0) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(
+                    __METHOD__ . '::' . __LINE__ . " not adding current user as attendee as other attendee are present.");
+            return;
+        }
+        
+        $ownAttender = Calendar_Model_Attender::getOwnAttender($this->attendee);
+        
+        if (! $ownAttender) {
+            if ($ifOrganizer && $this->organizer && $this->organizer != Tinebase_Core::getUser()->contact_id) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(
+                    __METHOD__ . '::' . __LINE__ . " not adding current user as attendee as current user is not organizer.");
+            }
+            
+            else {
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(
+                    __METHOD__ . '::' . __LINE__ . " adding current user as attendee.");
+                
+                $newAttender = new Calendar_Model_Attender(array(
+                    'user_id'   => Tinebase_Core::getUser()->contact_id,
+                    'user_type' => Calendar_Model_Attender::USERTYPE_USER,
+                    'status'    => Calendar_Model_Attender::STATUS_ACCEPTED,
+                    'role'      => Calendar_Model_Attender::ROLE_REQUIRED
+                ));
+                
+                if (! $this->attendee instanceof Tinebase_Record_RecordSet) {
+                    $this->attendee = new Tinebase_Record_RecordSet('Calendar_Model_Attender');
+                }
+                $this->attendee->addRecord($newAttender);
+            }
+        }
+    }
+    
+    /**
      * returns the original dtstart of a recur series exception event 
      *  -> when the event should have started with no exception
      * 
@@ -242,7 +295,7 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
             case 'location':          return $t->_('Location');
             case 'organizer':         return $t->_('Organizer');
             case 'priority':          return $t->_('Priority');
-            case 'status_id':         return $t->_('Status');
+            case 'status':            return $t->_('Status');
             case 'summary':           return $t->_('Summary');
             case 'url':               return $t->_('Url');
             case 'rrule':             return $t->_('Recurrance rule');
@@ -272,7 +325,12 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
         
         switch ($_field) {
             case 'transp':
-                return $_value ? $_translation->_('Yes') : $_translation->_('No');
+                return $_value && $_value == Calendar_Model_Event::TRANSP_TRANSP ? $_translation->_('No') : $_translation->_('Yes');
+            case 'organizer':
+                if (! $_value instanceof Addressbook_Model_Contact) {
+                    $organizer = Addressbook_Controller_Contact::getInstance()->getMultiple($this->organizer, TRUE)->getFirstRecord();
+                }
+                return $organizer instanceof Addressbook_Model_Contact ? $organizer->n_fileas : '';
             default:
                 return $_value;
         }
@@ -360,6 +418,10 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
                 $this->rrule_until = $rrule->until;
             }
         }
+        
+        if ($this->rrule_until && $this->rrule_until < $this->dtstart) {
+            throw new Tinebase_Exception_Record_Validation('rrule until must not be before dtstart');
+        }
     }
     
     /**
@@ -370,15 +432,14 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
      */
     public function doFreeBusyCleanup()
     {
-    	if ($this->hasGrant(Tinebase_Model_Grants::GRANT_READ)) {
-    	   return FALSE;
-    	}
-    	
+        if ($this->hasGrant(Tinebase_Model_Grants::GRANT_READ)) {
+           return FALSE;
+        }
+        
         $this->_properties = array_intersect_key($this->_properties, array_flip(array(
             'id', 
             'dtstart', 
             'dtend',
-            'is_all_day_event',
             'transp',
             'seq',
             'uid',
@@ -424,8 +485,8 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
             $_data['priority'] = NULL;
         }
         
-        if (empty($_data['status_id'])) {
-            $_data['status_id'] = NULL;
+        if (empty($_data['status'])) {
+            $_data['status'] = self::STATUS_CONFIRMED;
         }
         
         if (isset($_data['container_id']) && is_array($_data['container_id'])) {
@@ -492,7 +553,7 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
     public function isRescheduled($_event)
     {
         return $this->dtstart != $_event->dtstart
-            || $this->dtend != $_event->dtend
+            || (! $this->is_all_day_event && $this->dtend != $_event->dtend)
             || $this->rrule != $_event->rrule;
     }
     
@@ -508,5 +569,22 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
         }
         
         return $this->organizer;
+    }
+    
+    /**
+     * checks if given attendee is organizer of this event
+     * 
+     * @param Calendar_Model_Attendee $_attendee
+     */
+    public function isOrganizer($_attendee=NULL)
+    {
+        $organizerContactId = NULL;
+        if ($_attendee && in_array($_attendee->user_type, array(Calendar_Model_Attender::USERTYPE_USER, Calendar_Model_Attender::USERTYPE_GROUPMEMBER))) {
+            $organizerContactId = $_attendee->user_id instanceof Tinebase_Record_Abstract ? $_attendee->user_id->getId() : $_attendee->user_id;
+        } else {
+            $organizerContactId = Tinebase_Core::getUser()->contact_id;
+        }
+        
+        return $organizerContactId == ($this->organizer instanceof Tinebase_Record_Abstract ? $this->organizer->getId() : $this->organizer);
     }
 }

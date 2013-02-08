@@ -6,7 +6,7 @@
  * @subpackage  Backend
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Lars Kneschke <l.kneschke@metaways.de>
- * @copyright   Copyright (c) 2009-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * 
  */
 
@@ -74,7 +74,8 @@ class Felamimail_Backend_Imap extends Zend_Mail_Storage_Imap
      * 
      * @param object $_params
      * @return void
-     * @throws Felamimail_Exception_IMAPInvalidCredentials, Felamimail_Exception_IMAPServiceUnavailable
+     * @throws Felamimail_Exception_IMAPInvalidCredentials
+     * @throws Felamimail_Exception_IMAPServiceUnavailable
      */
     public function connectAndLogin($_params)
     {
@@ -87,9 +88,15 @@ class Felamimail_Backend_Imap extends Zend_Mail_Storage_Imap
         $timeEndConnect = microtime(true);
         $connectTime = $timeEndConnect - $timeStartConnect;
         
-        if (! $this->_protocol->login($_params->user, $_params->password)) {
+        try {
+            $loginResult = $this->_protocol->login($_params->user, $_params->password);
+        } catch (Exception $e) {
+            throw new Felamimail_Exception_IMAPServiceUnavailable($e->getMessage());
+        }
+        if (! $loginResult) {
             throw new Felamimail_Exception_IMAPInvalidCredentials('Cannot login, user or password wrong.');
         }
+        
         $timeEndLogin = microtime(true);
         $loginTime = $timeEndLogin - $timeEndConnect;
         
@@ -160,9 +167,32 @@ class Felamimail_Backend_Imap extends Zend_Mail_Storage_Imap
     public function getFolderStatus($globalName)
     {
         $this->_currentFolder = $globalName;
-        $result = $this->_protocol->getFolderStatus($this->_currentFolder);        
+        $result = $this->_protocol->getFolderStatus($this->_currentFolder);
         return $result;
     }
+    
+     /**
+     * get folder Acls
+     * 
+     * @param  Zend_Mail_Storage_Folder|string $globalName global name of folder or instance for subfolder
+     * @return array with folder values
+     */
+    public function getFolderAcls($globalName)
+    {
+        $this->_currentFolder = $globalName;
+        $result = $this->_protocol->getFolderAcls($this->_currentFolder);        
+        return $result;
+    }
+    
+    
+    public function setFolderAcls($globalName,$acls)
+    {
+        $this->_currentFolder = $globalName;
+        $result = $this->_protocol->setFolderAcls($this->_currentFolder,$acls);        
+        return $result;
+    }
+    
+    
     
     /**
      * create a new folder
@@ -647,7 +677,7 @@ class Felamimail_Backend_Imap extends Zend_Mail_Storage_Imap
                 $value = $_structure[$index][++$i];
                 $parameters[$key] = $this->_mimeDecodeHeader($value);
             }
-            $structure['parameters'] = $parameters; 
+            $structure['parameters'] = $parameters;
         }
         $index++;
         
@@ -671,13 +701,13 @@ class Felamimail_Backend_Imap extends Zend_Mail_Storage_Imap
         
         // body language
         if (isset($_structure[$index]) && $_structure[$index] != 'NIL') {
-            $structure['language'] = $_structure[$index]; 
+            $structure['language'] = $_structure[$index];
         }
         $index++;
         
         // body location
         if (isset($_structure[$index]) && $_structure[$index] != 'NIL') {
-            $structure['location'] = strtolower($_structure[$index]); 
+            $structure['location'] = strtolower($_structure[$index]);
         }
         
         return $structure;
@@ -717,27 +747,27 @@ class Felamimail_Backend_Imap extends Zend_Mail_Storage_Imap
                 $value = $_structure[2][++$i];
                 $parameters[$key] = $this->_mimeDecodeHeader($value);
             }
-            $structure['parameters'] = $parameters; 
+            $structure['parameters'] = $parameters;
         }
         
         // body id
         if($_structure[3] != 'NIL') {
-            $structure['id'] = $_structure[3]; 
+            $structure['id'] = $_structure[3];
         }
         
         // body description
         if($_structure[4] != 'NIL') {
-            $structure['description'] = $_structure[4]; 
+            $structure['description'] = $_structure[4];
         }
         
         // body encoding
         if($_structure[5] != 'NIL') {
-            $structure['encoding'] = strtolower($_structure[5]); 
+            $structure['encoding'] = strtolower($_structure[5]);
         }
         
         // body size
         if($_structure[6] != 'NIL') {
-            $structure['size'] = strtolower($_structure[6]); 
+            $structure['size'] = strtolower($_structure[6]);
         }
         
         /** basic fields end **/
@@ -752,7 +782,7 @@ class Felamimail_Backend_Imap extends Zend_Mail_Storage_Imap
             $index = 10;
         } elseif($type == 'text') {
             if($_structure[7] != 'NIL') {
-                $structure['lines'] = $_structure[7]; 
+                $structure['lines'] = $_structure[7];
             }
             // index of the first element containing extension data 
             $index = 8;
@@ -760,7 +790,7 @@ class Felamimail_Backend_Imap extends Zend_Mail_Storage_Imap
         
         // body md5
         if(array_key_exists($index, $_structure) && $_structure[$index] != 'NIL') {
-            $structure['md5'] = strtolower($_structure[$index]); 
+            $structure['md5'] = strtolower($_structure[$index]);
         }
         $index++;
         
@@ -782,13 +812,13 @@ class Felamimail_Backend_Imap extends Zend_Mail_Storage_Imap
         
         // body language
         if(array_key_exists($index, $_structure) && $_structure[$index] != 'NIL' && ! is_array($_structure[$index])) {
-            $structure['language'] = strtolower($_structure[$index]); 
+            $structure['language'] = strtolower($_structure[$index]);
         }
         $index++;
         
         // body location
         if(array_key_exists($index, $_structure) && $_structure[$index] != 'NIL' && ! is_array($_structure[$index])) {
-            $structure['location'] = strtolower($_structure[$index]); 
+            $structure['location'] = strtolower($_structure[$index]);
         }
         
         return $structure;
@@ -968,16 +998,71 @@ class Felamimail_Backend_Imap extends Zend_Mail_Storage_Imap
      */
     protected function _fixHeader($_header, $_messageId, &$_leadingSpaces = 0)
     {
+        $header = $this->_replaceHeaderSpaces($_header, $_messageId, $_leadingSpaces);
+        $result = $this->_fixHeaderEncoding($header);
+        
+        return $result;
+    }
+    
+    /**
+     * remove leading spaces from headers
+     * 
+     * @param string $_header
+     * @param string $_messageId
+     * @param integer $_leadingSpaces
+     * @return string
+     */
+    protected function _replaceHeaderSpaces($_header, $_messageId, &$_leadingSpaces = 0)
+    {
         // check for valid header at first line (this is done again in Zend_Mime_Decode)
         $firstline = strtok($_header, "\n");
         if (preg_match('/^([\s]+)[^:]+:/', $firstline, $matches)) {
             // replace all spaces before headers
-            Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' No headers found. Removing leading spaces from headers for message ' . $_messageId . '.');
+            if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ 
+                . ' No headers found. Removing leading spaces from headers for message ' . $_messageId . '.');
             $_leadingSpaces = strlen($matches[1]);
             $result = preg_replace("/^[\s]{1," . $_leadingSpaces . "}/m", "", $_header);
         } else {
             $_leadingSpaces = 0;
             $result = $_header;
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * (mime) encode some headers ('subject', 'from', 'to', ...)
+     * 
+     * @param string $_header
+     * @return string
+     * 
+     * @todo support multiple to, ... headers
+     */
+    protected function _fixHeaderEncoding($_header)
+    {
+        $result = $_header;
+
+        $encoding = (extension_loaded('mbstring')) ? mb_detect_encoding($result) : 'unknown';
+        if ($encoding !== 'ASCII' && preg_match('/[^\x20-\x7E]*/', $result)) {
+            
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                . ' Non-ASCII character (encoding:' . $encoding .') detected, mime encode some headers.');
+            
+            foreach (array('subject', 'from', 'to', 'cc', 'bcc') as $field) {
+                if (preg_match('/' . $field . ': (.*?[\n][\s]*?)/i', $result, $matches)) {
+                    if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__
+                        . ' ' . print_r($matches, TRUE));
+                    
+                    $headerValue = str_replace("\n", '', $matches[1]);
+                    $headerValue = mbConvertTo($headerValue);
+                    $headerString = iconv_mime_encode(ucfirst($field), $headerValue);
+                    
+                    $result = str_replace($matches[0], $headerString . "\n", $result);
+                }
+            }
+            
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ 
+                . ' ' .$result);
         }
         
         return $result;

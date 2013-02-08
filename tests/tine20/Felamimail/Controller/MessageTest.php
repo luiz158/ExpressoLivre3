@@ -4,7 +4,7 @@
  *
  * @package     Felamimail
  * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2013 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  *
  */
@@ -72,9 +72,9 @@ class Felamimail_Controller_MessageTest extends PHPUnit_Framework_TestCase
      */
     public static function main()
     {
-		$suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Felamimail Message Controller Tests');
+        $suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Felamimail Message Controller Tests');
         PHPUnit_TextUI_TestRunner::run($suite);
-	}
+    }
 
     /**
      * Sets up the fixture.
@@ -832,8 +832,10 @@ class Felamimail_Controller_MessageTest extends PHPUnit_Framework_TestCase
         $completeForwardedMessage = $this->_controller->getCompleteMessage($forwardedMessage);
         
         $this->assertEquals(Felamimail_Model_Message::CONTENT_TYPE_MESSAGE_RFC822, $forwardedMessage['structure']['parts'][2]['contentType']);
-        $this->assertEquals($cachedMessage->subject . '.eml', $forwardedMessage['structure']['parts'][2]['parameters']['name']);
-        $this->assertEquals($cachedMessage->subject . '.eml', $completeForwardedMessage->attachments[0]['filename']);
+        $this->assertEquals($cachedMessage->subject . '.eml', $forwardedMessage['structure']['parts'][2]['parameters']['name'],
+            'filename mismatch in structure' . print_r($forwardedMessage['structure']['parts'][2], TRUE));
+        $this->assertEquals($cachedMessage->subject . '.eml', $completeForwardedMessage->attachments[0]['filename'],
+            'filename mismatch of attachment' . print_r($completeForwardedMessage->attachments[0], TRUE));
         
         return $forwardedMessage;
     }
@@ -1148,20 +1150,31 @@ class Felamimail_Controller_MessageTest extends PHPUnit_Framework_TestCase
     */
     public function testEmailInvitation()
     {
-        $testConfig = Zend_Registry::get('testConfig');
-        $email = ($testConfig->email) ? $testConfig->email : 'unittest@tine20.org';
+        $email = $this->_getTestEmailAddress();
         $cachedMessage = $this->messageTestHelper('invitation.eml', NULL, NULL, array('unittest@tine20.org', $email));
+        $this->_testInvitationMessage($cachedMessage, 'pwulf@tine20.org', 'testevent', 2);
+    }
     
+    /**
+     * _testInvitationMessage
+     * 
+     * @param Felamimail_Model_Message $cachedMessage
+     * @param string $expectedOriginator
+     * @param string $expectedEventSummary
+     * @param integer $expectedAttendeeCount
+     */
+    protected function _testInvitationMessage($cachedMessage, $expectedOriginator, $expectedEventSummary, $expectedAttendeeCount)
+    {
         $message = $this->_controller->getCompleteMessage($cachedMessage);
         
         $this->assertEquals(1, count($message->preparedParts));
         $preparediMIPPart = $message->preparedParts->getFirstRecord()->preparedData;
         $this->assertTrue($preparediMIPPart instanceof Calendar_Model_iMIP, 'is no iMIP');
-        $this->assertEquals('pwulf@tine20.org', $preparediMIPPart->originator);
+        $this->assertEquals($expectedOriginator, $preparediMIPPart->originator);
         $event = $preparediMIPPart->getEvent();
         $this->assertTrue($event instanceof Calendar_Model_Event, 'is no event');
-        $this->assertEquals('testevent', $event->summary);
-        $this->assertEquals(2, count($event->attendee));
+        $this->assertEquals($expectedEventSummary, $event->summary);
+        $this->assertEquals($expectedAttendeeCount, count($event->attendee));
     }
 
    /**
@@ -1177,6 +1190,93 @@ class Felamimail_Controller_MessageTest extends PHPUnit_Framework_TestCase
         $preparediMIPPart = $message->preparedParts->getFirstRecord()->preparedData;
         $this->assertTrue($preparediMIPPart instanceof Calendar_Model_iMIP, 'is no iMIP');
         $this->assertEquals('pwulf@tine20.org', $preparediMIPPart->originator);
+    }
+
+   /**
+    * validate email invitation from outlook
+    * 
+    * @see 0006110: handle iMIP messages from outlook
+    */
+    public function testEmailInvitationFromOutlook()
+    {
+        $email = $this->_getTestEmailAddress();
+        $cachedMessage = $this->messageTestHelper('outlookimip.eml', NULL, NULL, array('name@example.net', $email));
+        $this->_testInvitationMessage($cachedMessage, 'name@example.com', 'test', 1);
+    }
+    
+   /**
+    * validate email invitation from outlook (base64 encoded ics)
+    * 
+    * @see 0006110: handle iMIP messages from outlook
+    */
+    public function testEmailInvitationFromOutlookBase64()
+    {
+        $email = $this->_getTestEmailAddress();
+        $cachedMessage = $this->messageTestHelper('invite_outlook.eml', NULL, NULL, array('oliver@example.org', $email));
+        $this->_testInvitationMessage($cachedMessage, 'user@telekom.ch', 'Test von Outlook an Tine20', 1);
+    }
+    
+    /**
+     * get test email address
+     * 
+     * @return string
+     */
+    protected function _getTestEmailAddress()
+    {
+        $testConfig = Zend_Registry::get('testConfig');
+        $email = ($testConfig->email) ? $testConfig->email : 'unittest@tine20.org';
+        return $email;
+    }
+    
+    /**
+     * testFromUTF8Encoding
+     * 
+     * @see 0006538: charset problems with recipients/senders
+     */
+    public function testFromUTF8Encoding()
+    {
+        $cachedMessage = $this->messageTestHelper('UTF8inFrom.eml');
+        $this->assertEquals('Philipp Schüle', $cachedMessage->from_name, print_r($cachedMessage->toArray(), TRUE));
+    }
+    
+    /**
+     * testHeaderWithoutEncodingInformation
+     * 
+     * @see 0006250: missing Umlauts in some mails
+     */
+    public function testHeaderWithoutEncodingInformation()
+    {
+        $cachedMessage = $this->messageTestHelper('Wortmann1.eml');
+        
+        $this->assertTrue(! empty($cachedMessage->subject) && is_string($cachedMessage->subject), 'subject empty or no string: '. print_r($cachedMessage->toArray(), TRUE));
+        $this->assertContains('Höchstgeschwindigkeit', $cachedMessage->subject, print_r($cachedMessage->toArray(), TRUE));
+    }
+    
+    /**
+     * testFilterTooMuchHtml
+     * 
+     * @see 0007142: sometimes we filter to much html content
+     */
+    public function testFilterTooMuchHtml()
+    {
+        $cachedMessage = $this->messageTestHelper('heavyhtml.eml');
+        $message = $this->_controller->getCompleteMessage($cachedMessage);
+        
+        $this->assertContains('unwahrscheinlichen Fall, dass Probleme auftreten sollten,', $message->body, print_r($message->toArray(), TRUE));
+    }
+    
+    /**
+     * testUmlautAttachment
+     * 
+     * @see 0007624: losing umlauts in attached filenames
+     */
+    public function testUmlautAttachment()
+    {
+        $cachedMessage = $this->messageTestHelper('attachmentUmlaut.eml');
+        $message = $this->_controller->getCompleteMessage($cachedMessage);
+        
+        $this->assertEquals(1, count($message->attachments));
+        $this->assertEquals('äöppopä.txt', $message->attachments[0]['filename']);
     }
     
     /********************************* protected helper funcs *************************************/
@@ -1220,12 +1320,17 @@ class Felamimail_Controller_MessageTest extends PHPUnit_Framework_TestCase
      *
      * @param string $_testHeaderValue
      * @param Felamimail_Model_Folder $_folder
-     * @return Felamimail_Model_Message
+     * @param boolean $assert
+     * @return Felamimail_Model_Message|NULL
      */
-    public function searchAndCacheMessage($_testHeaderValue, $_folder = NULL)
+    public function searchAndCacheMessage($_testHeaderValue, $_folder = NULL, $assert = TRUE)
     {
         $folder = ($_folder !== NULL) ? $_folder : $this->_folder;
-        $message = $this->_searchMessage($_testHeaderValue, $folder);
+        $message = $this->_searchMessage($_testHeaderValue, $folder, $assert);
+        
+        if ($message === NULL && ! $assert) {
+            return NULL;
+        }
         
         $cachedMessage = $this->_cache->addMessage($message, $folder);
         if ($cachedMessage === FALSE) {
@@ -1234,7 +1339,9 @@ class Felamimail_Controller_MessageTest extends PHPUnit_Framework_TestCase
             $cachedMessage = $this->_cache->addMessage($message, $folder);
         }
         
-        $this->assertTrue($cachedMessage instanceof Felamimail_Model_Message, 'could not add message to cache');
+        if ($assert) {
+            $this->assertTrue($cachedMessage instanceof Felamimail_Model_Message, 'could not add message to cache');
+        }
         
         $this->_createdMessages->addRecord($cachedMessage);
         
@@ -1246,7 +1353,8 @@ class Felamimail_Controller_MessageTest extends PHPUnit_Framework_TestCase
      *
      * @param string $_testHeaderValue
      * @param Felamimail_Model_Folder $_folder
-     * @return array
+     * @param boolean $_assert
+     * @return array|NULL
      */
     protected function _searchMessage($_testHeaderValue, $_folder, $_assert = TRUE)
     {
@@ -1261,7 +1369,7 @@ class Felamimail_Controller_MessageTest extends PHPUnit_Framework_TestCase
         if ($_assert) {
             $this->assertGreaterThan(0, count($result), 'No messages with HEADER X-Tine20TestMessage: ' . $_testHeaderValue . ' in folder ' . $_folder->globalname . ' found.');
         }
-        $message = $imap->getSummary($result[0]);
+        $message = (! empty($result)) ? $imap->getSummary($result[0]) : NULL;
         
         return $message;
     }
@@ -1317,7 +1425,7 @@ class Felamimail_Controller_MessageTest extends PHPUnit_Framework_TestCase
         $filename = dirname(dirname(__FILE__)) . '/files/' . $_filename;
         if (! empty($_replacements)) {
             $message = file_get_contents($filename);
-            $message = preg_replace('/' . preg_quote($_replacements[0]) . '/m', $_replacements[1], $message);
+            $message = preg_replace('/' . preg_quote($_replacements[0], '/') . '/m', $_replacements[1], $message);
         } else {
             $message = fopen($filename, 'r');
         }

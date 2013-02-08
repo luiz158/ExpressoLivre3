@@ -24,6 +24,9 @@ Tine.Calendar.EventDetailsPanel = Ext.extend(Tine.widgets.grid.DetailsPanel, {
      * @return {String}
      */
     attendeeRenderer: function(attendeeData) {
+        if (! attendeeData) {
+            return _('No Information');
+        }
         var attendeeStore = Tine.Calendar.Model.Attender.getAttendeeStore(attendeeData);
         
         var a = [];
@@ -45,10 +48,10 @@ Tine.Calendar.EventDetailsPanel = Ext.extend(Tine.widgets.grid.DetailsPanel, {
      */
     containerRenderer: function(container) {
         if(this.record) {   // no record after delete
-            var displayContainer = this.record.getDisplayContainer();
-            return Tine.Tinebase.common.containerRenderer(displayContainer);
+            var renderer = Tine.widgets.grid.RendererManager.get('Calendar', 'Event', 'container_id');
+            return renderer.call(this, container, {}, this.record);
         } else {
-            return null;
+            return '';
         }
     },
     
@@ -58,7 +61,7 @@ Tine.Calendar.EventDetailsPanel = Ext.extend(Tine.widgets.grid.DetailsPanel, {
      * @param {Date} dt
      * @return {String}
      */
-    datetimeRenderer: function(dt) {                                                                                                                        
+    datetimeRenderer: function(dt) {
         return String.format(this.app.i18n._("{0} {1} o'clock"), Tine.Tinebase.common.dateRenderer(dt), dt.format('H:i'));
     },
     
@@ -66,22 +69,37 @@ Tine.Calendar.EventDetailsPanel = Ext.extend(Tine.widgets.grid.DetailsPanel, {
         return Tine.Tinebase.common.booleanRenderer(transp == 'OPAQUE');
     },
     
+    statusRenderer: function(transp) {
+        return Tine.Tinebase.common.booleanRenderer(transp == 'TENTATIVE');
+    },
+    
     summaryRenderer: function(summary) {
-        
         var myAttenderRecord = this.record.getMyAttenderRecord(),
-            ret = '';
-        if(myAttenderRecord) {
-            var status = Tine.Tinebase.widgets.keyfield.Renderer.render('Calendar', 'attendeeStatus', myAttenderRecord.get('status'));
-            if(status) ret += status;
-        }
+            ret = Tine.Tinebase.common.tagsRenderer(this.record.get('tags')),
+            status = null,
+            recur = null;
             
-        if(this.record.isRecurBase() || this.record.isRecurInstance()) {   
-            ret += '<img class="cal-recurring" unselectable="on" src="' + Ext.BLANK_IMAGE_URL + '">' + this.app.i18n._('recurring event');
-        } else if (this.record.isRecurException()) {
-            ret += '<img class="cal-recurring exception" unselectable="on" src="' + Ext.BLANK_IMAGE_URL + '">' + this.app.i18n._('recurring event exception');
-        }   
+        ret += Ext.util.Format.htmlEncode(summary);
         
-        return Ext.util.Format.htmlEncode(summary) + '&nbsp;&nbsp;&nbsp;(' + ret + ')';
+        if(myAttenderRecord) {
+            status = Tine.Tinebase.widgets.keyfield.Renderer.render('Calendar', 'attendeeStatus', myAttenderRecord.get('status'));
+        }
+           
+        if(this.record.isRecurBase() || this.record.isRecurInstance()) {
+            recur = '<img class="cal-recurring" unselectable="on" src="' + Ext.BLANK_IMAGE_URL + '">' + this.app.i18n._('recurring event');
+        } else if (this.record.isRecurException()) {
+            recur = '<img class="cal-recurring exception" unselectable="on" src="' + Ext.BLANK_IMAGE_URL + '">' + this.app.i18n._('recurring event exception');
+        }   
+
+        if(status || recur) {
+            ret += '&nbsp;&nbsp;&nbsp;(&nbsp;';
+            if(status) ret += status;
+            if(status && recur) ret += '&nbsp;&nbsp;';
+            if(recur) ret += recur;
+            ret += '&nbsp;)';
+        }
+        
+        return ret;
                    
     },
     
@@ -171,7 +189,6 @@ Tine.Calendar.EventDetailsPanel = Ext.extend(Tine.widgets.grid.DetailsPanel, {
     getSingleRecordPanel: function() {
         if (! this.singleRecordPanel) {
             this.singleRecordPanel = new Ext.ux.display.DisplayPanel ({
-                //xtype: 'displaypanel',
                 layout: 'fit',
                 border: false,
                 items: [{
@@ -190,6 +207,7 @@ Tine.Calendar.EventDetailsPanel = Ext.extend(Tine.widgets.grid.DetailsPanel, {
                             align:'stretch'
                         },
                         items: [{
+                            flex: 0.5,
                             xtype: 'ux.displayfield',
                             name: 'summary',
                             style: 'padding-top: 2px',
@@ -197,7 +215,7 @@ Tine.Calendar.EventDetailsPanel = Ext.extend(Tine.widgets.grid.DetailsPanel, {
                             htmlEncode: false,
                             renderer: this.summaryRenderer.createDelegate(this)
                         }, {
-                            flex: 1,
+                            flex: 0.5,
                             xtype: 'ux.displayfield',
                             style: 'text-align: right;',
                             cls: 'x-ux-display-header',
@@ -243,6 +261,11 @@ Tine.Calendar.EventDetailsPanel = Ext.extend(Tine.widgets.grid.DetailsPanel, {
                                 name: 'transp',
                                 fieldLabel: this.app.i18n._('Blocking'),
                                 renderer: this.transpRenderer.createDelegate(this)
+                            }, {
+                                xtype: 'ux.displayfield',
+                                name: 'status',
+                                fieldLabel: this.app.i18n._('Tentative'),
+                                renderer: this.statusRenderer.createDelegate(this)
                             }, {
                                 xtype: 'ux.displayfield',
                                 name: 'location',

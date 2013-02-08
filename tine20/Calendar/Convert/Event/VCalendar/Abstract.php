@@ -43,7 +43,7 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
     {
         $this->_version = $_version;
     }
-        
+    
     /**
      * convert Calendar_Model_Event to Sabre_VObject_Component
      *
@@ -52,7 +52,8 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
      */
     public function fromTine20Model(Tinebase_Record_Abstract $_record)
     {
-        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' event ' . print_r($_record->toArray(), true));
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ 
+            . ' event ' . print_r($_record->toArray(), true));
         
         $vcalendar = new Sabre_VObject_Component('VCALENDAR');
         
@@ -65,22 +66,16 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
         $vcalendar->VERSION  = '2.0';
         $vcalendar->CALSCALE = 'GREGORIAN';
         
-        $vtimezone = $this->_convertDateTimezone($_record->originator_tz);
-        $vcalendar->add($vtimezone);
+        $vcalendar->add(new Sabre_VObject_Component_VTimezone($_record->originator_tz));
         
         $vevent = $this->_convertCalendarModelEvent($_record);
         $vcalendar->add($vevent);
         
         if ($_record->exdate instanceof Tinebase_Record_RecordSet) {
+            $_record->exdate->addIndices(array('is_deleted'));
             $eventExceptions = $_record->exdate->filter('is_deleted', false);
             
-            foreach($eventExceptions as $eventException) {
-                // set timefields
-                // @todo move to MS event facade
-                $eventException->creation_time = $_record->creation_time;
-                if (isset($_record->last_modified_time)) {
-                    $eventException->last_modified_time = $_record->last_modified_time;
-                }
+            foreach ($eventExceptions as $eventException) {
                 $vevent = $this->_convertCalendarModelEvent($eventException, $_record);
                 $vcalendar->add($vevent);
             }
@@ -92,102 +87,6 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
         if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' card ' . $vcalendar->serialize());
         
         return $vcalendar;
-    }
-    
-    /**
-     * convert DateTimezone to Sabre_VObject_Component('VTIMEZONE')
-     * 
-     * @param  string|DateTimeZone  $_timezone
-     * @return Sabre_VObject_Component
-     */
-    protected function _convertDateTimezone($_timezone)
-    {
-        $timezone = new DateTimeZone($_timezone);
-        
-        $vtimezone = new Sabre_VObject_Component('VTIMEZONE');
-        $vtimezone->add(new Sabre_VObject_Property('TZID', $timezone->getName()));
-        $vtimezone->add(new Sabre_VObject_Property('X-LIC-LOCATION', $timezone->getName()));
-        
-        list($standardTransition, $daylightTransition) = $transitions = $this->_getTransitionsForTimezoneAndYear($timezone, date('Y'));
-        
-        $dtstart = new Sabre_VObject_Element_DateTime('DTSTART');
-        $dtstart->setDateTime(new DateTime(), Sabre_VObject_Element_DateTime::LOCAL);
-        
-        if ($daylightTransition !== null) {
-            $offsetTo   = ($daylightTransition['offset'] < 0 ? '-' : '+') . strftime('%H%M', abs($daylightTransition['offset']));
-            $offsetFrom = ($standardTransition['offset'] < 0 ? '-' : '+') . strftime('%H%M', abs($standardTransition['offset']));
-            
-            $daylight  = new Sabre_VObject_Component('DAYLIGHT');
-            $daylight->add('TZOFFSETFROM', $offsetFrom);
-            $daylight->add('TZOFFSETTO',   $offsetTo);
-            $daylight->add('TZNAME',       $daylightTransition['abbr']);
-            $daylight->add($dtstart);
-            #$daylight->add('RRULE', 'FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3');
-            
-            $vtimezone->add($daylight);
-        }
-
-        if ($standardTransition !== null) {
-            $offsetTo   = ($standardTransition['offset'] < 0 ? '-' : '+') . strftime('%H%M', abs($standardTransition['offset']));
-            if ($daylightTransition !== null) {
-                $offsetFrom = ($daylightTransition['offset'] < 0 ? '-' : '+') . strftime('%H%M', abs($daylightTransition['offset']));
-            } else {
-                $offsetFrom = $offsetTo;
-            }
-            
-            $standard  = new Sabre_VObject_Component('STANDARD');
-            $standard->add('TZOFFSETFROM', $offsetFrom);
-            $standard->add('TZOFFSETTO',   $offsetTo);
-            $standard->add('TZNAME',       $standardTransition['abbr']);
-            $standard->add($dtstart);
-            #$standard->add('RRULE', 'FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10');
-            
-            $vtimezone->add($standard);
-        }
-        
-        return $vtimezone;
-    }
-    
-    /**
-     * Returns the standard and daylight transitions for the given {@param $_timezone}
-     * and {@param $_year}.
-     *
-     * @param DateTimeZone $_timezone
-     * @param $_year
-     * @return Array
-     */
-    protected function _getTransitionsForTimezoneAndYear(DateTimeZone $_timezone, $_year)
-    {
-        $standardTransition = null;
-        $daylightTransition = null;
-    
-        if (version_compare(PHP_VERSION, '5.3.0', '>=')) {
-            // Since php version 5.3.0 getTransitions accepts optional start and end parameters.
-            $start = mktime(0, 0, 0, 12, 1, $_year - 1);
-            $end   = mktime(24, 0, 0, 12, 31, $_year);
-            $transitions = $_timezone->getTransitions($start, $end);
-        } else {
-            $transitions = $_timezone->getTransitions();
-        }
-    
-        $index = 0;            //we need to access index counter outside of the foreach loop
-        $transition = array(); //we need to access the transition counter outside of the foreach loop
-        foreach ($transitions as $index => $transition) {
-            if (strftime('%Y', $transition['ts']) == $_year) {
-                if (isset($transitions[$index+1]) && strftime('%Y', $transitions[$index]['ts']) == strftime('%Y', $transitions[$index+1]['ts'])) {
-                    $daylightTransition = $transition['isdst'] ? $transition : $transitions[$index+1];
-                    $standardTransition = $transition['isdst'] ? $transitions[$index+1] : $transition;
-                } else {
-                    $daylightTransition = $transition['isdst'] ? $transition : null;
-                    $standardTransition = $transition['isdst'] ? null : $transition;
-                }
-                break;
-            } elseif ($index == count($transitions) -1) {
-                $standardTransition = $transition;
-            }
-        }
-         
-        return array($standardTransition, $daylightTransition);
     }
     
     /**
@@ -257,13 +156,19 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
         $vevent->add($dtstart);
         $vevent->add($dtend);
         
+        // auto status for deleted events
+        if ($event->is_deleted) {
+            $event->status = Calendar_Model_Event::STATUS_CANCELED;
+        }
+        
         // event organizer
         if (!empty($event->organizer)) {
-            $organizerContact = Addressbook_Controller_Contact::getInstance()->getMultiple(array($event->organizer), TRUE)->getFirstRecord();
+            $organizerContact = $event->resolveOrganizer();
 
             if ($organizerContact instanceof Addressbook_Model_Contact && !empty($organizerContact->email)) {
                 $organizer = new Sabre_VObject_Property('ORGANIZER', 'mailto:' . $organizerContact->email);
                 $organizer->add('CN', $organizerContact->n_fileas);
+                $organizer->add('EMAIL', $organizerContact->email);
                 $vevent->add($organizer);
             }
         }
@@ -272,6 +177,7 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
         
         $optionalProperties = array(
             'class',
+            'status',
             'description',
             'geo',
             'location',
@@ -305,6 +211,7 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
                 $vevent->add(new Sabre_VObject_Property_Recure('RRULE', preg_replace('/(UNTIL=)(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/', '$1$2$3$4T$5$6$7Z', $event->rrule)));
             }
             if ($event->exdate instanceof Tinebase_Record_RecordSet) {
+                $event->exdate->addIndices(array('is_deleted'));
                 $deletedEvents = $event->exdate->filter('is_deleted', true);
                 
                 foreach($deletedEvents as $deletedEvent) {
@@ -322,26 +229,25 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
             }
         }
         
-        // add alarms only to vcalendar if current user attends to this event
-        if ($event->alarms) {
-            $ownAttendee = Calendar_Model_Attender::getOwnAttender($event->attendee);
-            
-            if ($ownAttendee && $ownAttendee->alarm_ack_time instanceof Tinebase_DateTime) {
-                $xMozLastAck = new Sabre_VObject_Element_DateTime('X-MOZ-LASTACK');
-                $xMozLastAck->setDateTime($ownAttendee->alarm_ack_time, Sabre_VObject_Element_DateTime::UTC);
-                $vevent->add($xMozLastAck);
-            }
-            
-            if ($ownAttendee && $ownAttendee->alarm_snooze_time instanceof Tinebase_DateTime) {
-                $xMozSnoozeTime = new Sabre_VObject_Element_DateTime('X-MOZ-SNOOZE-TIME');
-                $xMozSnoozeTime->setDateTime($ownAttendee->alarm_snooze_time, Sabre_VObject_Element_DateTime::UTC);
-                $vevent->add($xMozSnoozeTime);
-            }
-            
+        $ownAttendee = Calendar_Model_Attender::getOwnAttender($event->attendee);
+        
+        if ($ownAttendee && $ownAttendee->alarm_ack_time instanceof Tinebase_DateTime) {
+            $xMozLastAck = new Sabre_VObject_Element_DateTime('X-MOZ-LASTACK');
+            $xMozLastAck->setDateTime($ownAttendee->alarm_ack_time, Sabre_VObject_Element_DateTime::UTC);
+            $vevent->add($xMozLastAck);
+        }
+        
+        if ($ownAttendee && $ownAttendee->alarm_snooze_time instanceof Tinebase_DateTime) {
+            $xMozSnoozeTime = new Sabre_VObject_Element_DateTime('X-MOZ-SNOOZE-TIME');
+            $xMozSnoozeTime->setDateTime($ownAttendee->alarm_snooze_time, Sabre_VObject_Element_DateTime::UTC);
+            $vevent->add($xMozSnoozeTime);
+        }
+        
+        if ($event->alarms instanceof Tinebase_Record_RecordSet) {
             foreach($event->alarms as $alarm) {
                 $valarm = new Sabre_VObject_Component('VALARM');
                 $valarm->add('ACTION', 'DISPLAY');
-                $valarm->add('DESCRIPTION', $event->summary);
+                $valarm->add(new Sabre_VObject_Property('DESCRIPTION', $event->summary));
                 
                 if (is_numeric($alarm->minutes_before)) {
                     if ($event->dtstart == $alarm->alarm_time) {
@@ -428,7 +334,7 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
         $vcalendar = self::getVcal($_blob);
         
         // contains the VCALENDAR any VEVENTS
-        if (!isset($vcalendar->VEVENT)) {
+        if (! isset($vcalendar->VEVENT)) {
             throw new Tinebase_Exception_UnexpectedValue('no vevents found');
         }
         
@@ -439,22 +345,13 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
             $event = new Calendar_Model_Event(null, false);
         }
         
-        // keep current exdate's (only the not deleted ones)
-        if ($event->exdate instanceof Tinebase_Record_RecordSet) {
-            $oldExdates = $event->exdate->filter('is_deleted', false);
-        } else {
-            $oldExdates = new Tinebase_Record_RecordSet('Calendar_Model_Events');
-        }
-        
         if (!isset($vcalendar->METHOD)) {
             $this->_method = $vcalendar->METHOD;
         }
         
         // find the main event - the main event has no RECURRENCE-ID
         foreach($vcalendar->VEVENT as $vevent) {
-            // "-" is not allowed in property names
-            $RECURRENCEID = 'RECURRENCE-ID';
-            if(!isset($vevent->$RECURRENCEID)) {
+            if(!isset($vevent->{'RECURRENCE-ID'})) {
                 $this->_convertVevent($vevent, $event);
                 
                 break;
@@ -462,13 +359,14 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
         }
 
         // if we have found no VEVENT component something went wrong, lets stop here
-        if (!isset($event)) {
+        if (! $event->toArray()) {
             throw new Tinebase_Exception_UnexpectedValue('no main VEVENT component found in VCALENDAR');
         }
         
         // parse the event exceptions
-        foreach($vcalendar->VEVENT as $vevent) {
-            if(isset($vevent->$RECURRENCEID) && $event->uid == $vevent->UID) {
+        $oldExdates = $event->exdate instanceof Tinebase_Record_RecordSet ? $event->exdate->filter('is_deleted', false) : new Tinebase_Record_RecordSet('Calendar_Model_Events');
+        foreach ($vcalendar->VEVENT as $vevent) {
+            if(isset($vevent->{'RECURRENCE-ID'}) && $event->uid == $vevent->UID) {
                 $recurException = $this->_getRecurException($oldExdates, $vevent);
                 
                 // initialize attendee with attendee from base events for new exceptions
@@ -488,7 +386,7 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
                 
                 $this->_convertVevent($vevent, $recurException);
                     
-                if(! $event->exdate instanceof Tinebase_Record_RecordSet) {
+                if (! $event->exdate instanceof Tinebase_Record_RecordSet) {
                     $event->exdate = new Tinebase_Record_RecordSet('Calendar_Model_Event');
                 }
                 $event->exdate->addRecord($recurException);
@@ -516,7 +414,71 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
             if (is_resource($_blob)) {
                 $_blob = stream_get_contents($_blob);
             }
-            $vcalendar = Sabre_VObject_Reader::read($_blob);
+            $vcalendar = self::readVCalBlob($_blob);
+        }
+        
+        return $vcalendar;
+    }
+    
+    /**
+     * reads vcal blob and tries to repair some parsing problems that Sabre has
+     * 
+     * @param string $blob
+     * @param integer $failcount
+     * @param integer $spacecount
+     * @param integer $lastBrokenLineNumber
+     * @param array $lastLines
+     * @throws Sabre_VObject_ParseException
+     * @return Sabre_VObject_Component
+     * 
+     * @see 0006110: handle iMIP messages from outlook
+     * @see 0007438: update Sabre library
+     * 
+     * @todo maybe we can remove this when #7438 is resolved
+     */
+    public static function readVCalBlob($blob, $failcount = 0, $spacecount = 0, $lastBrokenLineNumber = 0, $lastLines = array())
+    {
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ .
+            ' ' . $blob);
+        
+        try {
+            $vcalendar = Sabre_VObject_Reader::read($blob);
+        } catch (Sabre_VObject_ParseException $svpe) {
+            // NOTE: we try to repair Sabre_VObject_Reader as it fails to detect followup lines that do not begin with a space or tab
+            if ($failcount < 10 && preg_match(
+                '/Invalid VObject, line ([0-9]+) did not follow the icalendar\/vcard format/', $svpe->getMessage(), $matches
+            )) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
+                    ' ' . $svpe->getMessage() .
+                    ' lastBrokenLineNumber: ' . $lastBrokenLineNumber);
+                
+                $brokenLineNumber = $matches[1] - 1 + $spacecount;
+                
+                if ($lastBrokenLineNumber === $brokenLineNumber) {
+                    if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
+                        ' Try again: concat this line to previous line.');
+                    $lines = $lastLines;
+                    $brokenLineNumber--;
+                    // increase spacecount because one line got removed
+                    $spacecount++;
+                } else {
+                    $lines = preg_split('/[\r\n]*\n/', $blob);
+                    if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
+                        ' Concat next line to this one.');
+                    $lastLines = $lines; // for retry
+                }
+                $lines[$brokenLineNumber] .= $lines[$brokenLineNumber + 1];
+                unset($lines[$brokenLineNumber + 1]);
+                
+                if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ .
+                    ' failcount: ' . $failcount .
+                    ' brokenLineNumber: ' . $brokenLineNumber .
+                    ' spacecount: ' . $spacecount);
+                
+                $vcalendar = self::readVCalBlob(implode("\n", $lines), $failcount + 1, $spacecount, $brokenLineNumber, $lastLines);
+            } else {
+                throw $svpe;
+            }
         }
         
         return $vcalendar;
@@ -545,10 +507,7 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
      */
     protected function _getRecurException(Tinebase_Record_RecordSet $_oldExdates, Sabre_VObject_Component $_vevent)
     {
-        // "-" is not allowed in property names
-        $RECURRENCEID = 'RECURRENCE-ID';
-        
-        $exDate = clone $_vevent->$RECURRENCEID->getDateTime();
+        $exDate = clone $_vevent->{'RECURRENCE-ID'}->getDateTime();
         $exDate->setTimeZone(new DateTimeZone('UTC'));
         $exDateString = $exDate->format('Y-m-d H:i:s');
         foreach ($_oldExdates as $id => $oldExdate) {
@@ -595,7 +554,7 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
         if (isset($_attendee['EMAIL']) && !empty($_attendee['EMAIL']->value)) {
             $email = $_attendee['EMAIL']->value;
         } else {
-            if (!preg_match('/(?P<protocol>mailto:|urn:uuid:)(?P<email>.*)/', $_attendee->value, $matches)) {
+            if (!preg_match('/(?P<protocol>mailto:|urn:uuid:)(?P<email>.*)/i', $_attendee->value, $matches)) {
                 throw new Tinebase_Exception_UnexpectedValue('invalid attendee provided: ' . $_attendee->value);
             }
             $email = $matches['email'];
@@ -667,6 +626,14 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
                     
                     break;
                     
+                case 'STATUS':
+                    if (in_array($property->value, array(Calendar_Model_Event::STATUS_CONFIRMED, Calendar_Model_Event::STATUS_TENTATIVE, Calendar_Model_Event::STATUS_CANCELED))) {
+                        $event->status = $property->value;
+                    } else {
+                        $event->status = Calendar_Model_Event::STATUS_CONFIRMED;
+                    }
+                    break;
+                    
                 case 'DTEND':
                     
                     if (isset($property['VALUE']) && strtoupper($property['VALUE']) == 'DATE') {
@@ -713,12 +680,20 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
                     break;
                     
                 case 'ORGANIZER':
-                    if (preg_match('/mailto:(?P<email>.*)/i', $property->value, $matches)) {
+                    $email = null;
+                    
+                    if (isset($property['EMAIL']) && !empty($property['EMAIL']->value)) {
+                        $email = $property['EMAIL']->value;
+                    } else if (preg_match('/mailto:(?P<email>.*)/i', $property->value, $matches)) {
+                        $email = $matches['email'];
+                    }
+                    
+                    if ($email !== null) {
                         // it's not possible to change the organizer by spec
                         if (empty($event->organizer)) {
-                            $name = isset($property['CN']) ? $property['CN']->value : $matches['email'];
+                            $name = isset($property['CN']) ? $property['CN']->value : $email;
                             $contact = Calendar_Model_Attender::resolveEmailToContact(array(
-                                'email'     => $matches['email'],
+                                'email'     => $email,
                                 'lastName'  => $name,
                             ));
                         
@@ -808,7 +783,22 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
                     
                 case 'VALARM':
                     foreach($property as $valarm) {
-                        switch(strtoupper($valarm->TRIGGER['VALUE']->value)) {
+                        
+                        if ($valarm->ACTION == 'NONE') {
+                            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
+                                . ' We can\'t cope with action NONE: iCal 6.0 sends default alarms in the year 1976 with action NONE. Skipping alarm.');
+                            continue;
+                        }
+                        
+                        if (! is_object($valarm->TRIGGER['VALUE'])) {
+                            // @see 0006110: handle iMIP messages from outlook
+                            // @todo fix 0007446: handle broken alarm in outlook invitation message
+                            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
+                                . ' Alarm has no TRIGGER value. Skipping it.');
+                            continue;
+                        }
+                        
+                        switch (strtoupper($valarm->TRIGGER['VALUE']->value)) {
                             # TRIGGER;VALUE=DATE-TIME:20111031T130000Z
                             case 'DATE-TIME':
                                 //@TODO fixme
@@ -902,14 +892,13 @@ class Calendar_Convert_Event_VCalendar_Abstract implements Tinebase_Convert_Inte
      */
     protected function _convertToTinebaseDateTime(Sabre_VObject_Element_DateTime $dateTimeProperty, $_useUserTZ = FALSE)
     {
-        try {
-            $dateTime = $dateTimeProperty->getDateTime();
-        } catch (Exception $e) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' Error: ' . $e->getMessage());
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG))  Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $e->getTraceAsString());
-            $dateTimeProperty['TZID'] = (string) Tinebase_Core::get(Tinebase_Core::USERTIMEZONE);
-            $dateTime = $dateTimeProperty->getDateTime();
-        }
+        $defaultTimezone = date_default_timezone_get();
+        date_default_timezone_set((string) Tinebase_Core::get(Tinebase_Core::USERTIMEZONE));
+        $dateTime = $dateTimeProperty->getDateTime();
+        
+        // convert to Tinebase_DateTime
+        date_default_timezone_set($defaultTimezone);
+        
         $tz = ($_useUserTZ) ? (string) Tinebase_Core::get(Tinebase_Core::USERTIMEZONE) : $dateTime->getTimezone();
         $result = new Tinebase_DateTime($dateTime->format(Tinebase_Record_Abstract::ISO8601LONG), $tz);
         

@@ -97,7 +97,7 @@ class Tinebase_Preference extends Tinebase_Preference_Abstract
             ),
             self::WINDOW_TYPE  => array(
                 'label'         => $translate->_('Window Type'),
-                'description'   => $translate->_('You can choose between ExtJs style windows or normal Browser popup windows.'),
+                'description'   => $translate->_('You can choose between modal windows or normal browser popup windows.'),
             ),
             self::CONFIRM_LOGOUT  => array(
                 'label'         => $translate->_('Confirm Logout'),
@@ -129,7 +129,7 @@ class Tinebase_Preference extends Tinebase_Preference_Abstract
                 $preference->value      = 'Addressbook';
                 break;
             case self::WINDOW_TYPE:
-                $preference->value      = 'Ext';
+                $preference->value      = 'Browser';
                 $preference->options    = '<?xml version="1.0" encoding="UTF-8"?>
                     <options>
                         <option>
@@ -137,7 +137,7 @@ class Tinebase_Preference extends Tinebase_Preference_Abstract
                             <value>Ext</value>
                         </option>
                         <option>
-                            <label>Browser style</label>
+                            <label>Browser windows</label>
                             <value>Browser</value>
                         </option>
                     </options>';

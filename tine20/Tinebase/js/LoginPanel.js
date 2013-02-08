@@ -105,9 +105,9 @@ Tine.Tinebase.LoginPanel = Ext.extend(Ext.Panel, {
                     selectOnFocus: true,
                     value: this.defaultUsername ? this.defaultUsername : undefined,
                     listeners: {
-                    	render: function (field) {
-                    		field.focus(false, 250);
-                    	}
+                        render: function (field) {
+                            field.focus(false, 250);
+                        }
                     }
                 }, {
                     xtype: 'textfield',
@@ -170,7 +170,16 @@ Tine.Tinebase.LoginPanel = Ext.extend(Ext.Panel, {
                     html: '<ul>' + 
                         '<li><a target="_blank" href="' + Tine.weburl + '" border="0">' + _('Tine 2.0 Homepage') + '</a></li>' +
                         '<li><a target="_blank" href="' + Tine.weburl + 'forum/" border="0">' + _('Tine 2.0 Forum') + '</a></li>' +
-                    '</ul>'
+                    '</ul><br/>'
+                }, {
+                    cls: 'tb-login-big-label',
+                    html: _('Translations')
+                }, {
+                    html: '<p>' + _('If you miss a language, or your language is not supported completely, you can help our translation teams at transifex.') + '</p>'
+                }, {
+                    html: '<br/><ul>' +
+                        '<li><a target="_blank" href="https://www.transifex.com/projects/p/tine20/" border="0">' + _('Tine 2.0 Translation Portal') + '</a></li>'
+                    + '</ul>'
                 }]
             });
         }
@@ -382,7 +391,7 @@ Tine.Tinebase.LoginPanel = Ext.extend(Ext.Panel, {
         });
         
         this.items = [{
-        	xtype: 'container',
+            xtype: 'container',
             layout: 'absolute',
             border: false,
             items: [
@@ -407,8 +416,8 @@ Tine.Tinebase.LoginPanel = Ext.extend(Ext.Panel, {
      */
     onLoginPress: function () {
         var form = this.getLoginPanel().getForm(),
-        	values = form.getValues();
-        	
+            values = form.getValues();
+            
         if (form.isValid()) {
             Ext.MessageBox.wait(_('Logging you in...'), _('Please wait'));
             
@@ -455,7 +464,7 @@ Tine.Tinebase.LoginPanel = Ext.extend(Ext.Panel, {
                 }
             });
         } else {
-        	Ext.MessageBox.alert(_('Errors'), _('Please fix the errors noted.'));
+            Ext.MessageBox.alert(_('Errors'), _('Please fix the errors noted.'));
         }
     },
     
@@ -476,9 +485,9 @@ Tine.Tinebase.LoginPanel = Ext.extend(Ext.Panel, {
     onResize: function () {
         this.supr().onResize.apply(this, arguments);
 
-        var box 	 = this.getBox(),
-        	loginBox = {width : this.getLoginPanel().width, height: this.loginPanelheight},
-        	infoBox  = this.infoPanel.rendered ? this.infoPanel.getBox() : {width : this.infoPanel.width, height: this.infoPanel.height};
+        var box      = this.getBox(),                                                 
+            loginBox = this.getLoginPanel().rendered ? this.getLoginPanel().getBox() : {width : this.getLoginPanel().width, height: this.getLoginPanel().height},
+            infoBox  = this.infoPanel.rendered ? this.infoPanel.getBox() : {width : this.infoPanel.width, height: this.infoPanel.height};
 
         var top = (box.height - loginBox.height) / 2;
         if (box.height - top < infoBox.height) {
@@ -503,6 +512,6 @@ Tine.Tinebase.LoginPanel = Ext.extend(Ext.Panel, {
             html: _('Tine 2.0 needs your help')
         }, {
             html: '<p>' + _('We regularly need your feedback to make the next Tine 2.0 releases fit your needs even better. Help us and yourself by participating:') + '</p>'
-        }];      
+        }];
     }
 });

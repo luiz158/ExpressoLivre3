@@ -41,7 +41,7 @@ class Felamimail_Controller_Cache_Folder
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**

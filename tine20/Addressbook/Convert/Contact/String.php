@@ -57,8 +57,8 @@ class Addressbook_Convert_Contact_String implements Tinebase_Convert_Interface
     /**
      * converts string to Addressbook_Model_Contact
      * 
-     * @param  string  						$_blob   the string to parse
-     * @param  Tinebase_Record_Abstract		$_record  update existing contact
+     * @param  string                          $_blob   the string to parse
+     * @param  Tinebase_Record_Abstract        $_record  update existing contact
      * @return Addressbook_Model_Contact
      */
     public function toTine20Model($_blob, Tinebase_Record_Abstract $_record = null)
@@ -73,7 +73,7 @@ class Addressbook_Convert_Contact_String implements Tinebase_Convert_Interface
             }
             $matches = array();
             if (preg_match($rule->regex, $contactString, $matches)) {
-                $contactData[$rule->field] = $matches[1];
+                $contactData[$rule->field] = trim($matches[1]);
             }
         }
         

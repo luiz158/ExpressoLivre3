@@ -3,11 +3,10 @@
  * class to hold lead data
  * 
  * @package     Crm
+ * @subpackage  Model
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Thomas Wadewitz <t.wadewitz@metaways.de>
- * @copyright   Copyright (c) 2007-2008 Metaways Infosystems GmbH (http://www.metaways.de)
- * 
- * @todo        switch to hashed ids
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 
 /**
@@ -23,7 +22,7 @@ class Crm_Model_Lead extends Tinebase_Record_Abstract
      * 
      * @var string
      */    
-    protected $_identifier = 'id';    
+    protected $_identifier = 'id';
     
     /**
      * application the record belongs to
@@ -33,6 +32,20 @@ class Crm_Model_Lead extends Tinebase_Record_Abstract
     protected $_application = 'Crm';
     
     /**
+     * if foreign Id fields should be resolved on search and get from json
+     * should have this format: 
+     *     array('Calendar_Model_Contact' => 'contact_id', ...)
+     * or for more fields:
+     *     array('Calendar_Model_Contact' => array('contact_id', 'customer_id), ...)
+     * (e.g. resolves contact_id with the corresponding Model)
+     * 
+     * @var array
+     */
+    protected static $_resolveForeignIdFields = array(
+        'Tinebase_Model_User' => array('created_by', 'last_modified_by')
+    );
+    
+    /**
      * list of zend inputfilter
      * 
      * this filter get used when validating user generated content with Zend_Input_Filter
@@ -40,7 +53,6 @@ class Crm_Model_Lead extends Tinebase_Record_Abstract
      * @var array
      */
     protected $_filters = array(
-        'id'            => 'Digits',
         'lead_name'     => 'StringTrim',
         'probability'   => 'Digits',
     );
@@ -70,6 +82,7 @@ class Crm_Model_Lead extends Tinebase_Record_Abstract
         'tags'                  => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'relations'             => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => NULL),
         'notes'                 => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => NULL),
+        'customfields'          => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => array()),
     // modlog information
         'created_by'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'creation_time'         => array(Zend_Filter_Input::ALLOW_EMPTY => true),
@@ -78,6 +91,7 @@ class Crm_Model_Lead extends Tinebase_Record_Abstract
         'is_deleted'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'deleted_time'          => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'deleted_by'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'seq'                   => array(Zend_Filter_Input::ALLOW_EMPTY => true),
     );
 
     /**
@@ -93,6 +107,18 @@ class Crm_Model_Lead extends Tinebase_Record_Abstract
         'creation_time',
         'last_modified_time',
         'deleted_time'
+    );
+    
+    /**
+     * @see Tinebase_Record_Abstract
+     */
+    protected static $_relatableConfig = array(
+        array('relatedApp' => 'Addressbook', 'relatedModel' => 'Contact', 'config' => array(
+            array('type' => 'RESPONSIBLE', 'degree' => 'parent', 'text' => 'Responsible', 'max' => '1:0'), // _('Responsible')
+            array('type' => 'CUSTOMER', 'degree' => 'parent', 'text' => 'Customer', 'max' => '1:0'),  // _('Customer')
+            ),
+            'default' => array('type' => 'CUSTOMER', 'own_degree' => 'parent')
+        )
     );
 
     /**
@@ -158,8 +184,12 @@ class Crm_Model_Lead extends Tinebase_Record_Abstract
     protected function _setFromJson(array &$_data)
     {
         if (isset($_data['relations'])) {
-            // add new relations
             foreach ((array)$_data['relations'] as $key => $relation) {
+                if ((! isset($relation['type']) || empty($relation['type'])) && isset($relation['related_record']) && isset($relation['related_record']['n_fileas'])) {
+                    // relation type might be missing for contact relations
+                    $relation['type'] = 'CUSTOMER';
+                }
+                
                 if (! isset($relation['id'])) {
                     if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
                         . ' Setting new relation of type ' . $relation['type']);
@@ -175,6 +205,8 @@ class Crm_Model_Lead extends Tinebase_Record_Abstract
                         'related_record'         => (isset($relation['related_record'])) ? $relation['related_record'] : array(),
                         'related_id'             => (isset($relation['related_id'])) ? $relation['related_id'] : NULL,
                         'remark'                 => (isset($relation['remark'])) ? $relation['remark'] : NULL,
+                        'related_model'          => (isset($relation['related_model'])) ? $relation['related_model'] : NULL,
+                        'related_backend'        => (isset($relation['related_backend'])) ? $relation['related_backend'] : Addressbook_Backend_Factory::SQL
                     );
                     
                     // set id from related record (if it didn't got set in javascript frontend)
@@ -205,7 +237,7 @@ class Crm_Model_Lead extends Tinebase_Record_Abstract
                             $data['related_backend'] = 'Sql';
                             break;
                         default:
-                            throw new Crm_Exception_UnexpectedValue('Relation type ' . $relation['type'] . ' not supported.');
+                            // do nothing
                     }
     
                     // sanitize container id

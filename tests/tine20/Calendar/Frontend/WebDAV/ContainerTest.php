@@ -35,9 +35,9 @@ class Calendar_Frontend_WebDAV_ContainerTest extends PHPUnit_Framework_TestCase
      */
     public static function main()
     {
-		$suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Calendar WebDAV Container Tests');
+        $suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Calendar WebDAV Container Tests');
         PHPUnit_TextUI_TestRunner::run($suite);
-	}
+    }
 
     /**
      * Sets up the fixture.
@@ -96,7 +96,7 @@ class Calendar_Frontend_WebDAV_ContainerTest extends PHPUnit_Framework_TestCase
         
         //var_dump($result);
         
-        $this->assertEquals(5, count($result));
+        $this->assertEquals(6, count($result));
     }
     
     /**
@@ -119,7 +119,7 @@ class Calendar_Frontend_WebDAV_ContainerTest extends PHPUnit_Framework_TestCase
         $this->testCreateFile();
         
         $requestedProperties = array(
-        	'{http://calendarserver.org/ns/}getctag',
+            '{http://calendarserver.org/ns/}getctag',
             '{DAV:}resource-id'
         );
         
@@ -129,6 +129,32 @@ class Calendar_Frontend_WebDAV_ContainerTest extends PHPUnit_Framework_TestCase
        
         $this->assertTrue(! empty($result['{http://calendarserver.org/ns/}getctag']));
         $this->assertEquals($result['{DAV:}resource-id'], 'urn:uuid:' . $this->objects['initialContainer']->getId());
+    }
+    
+    /**
+     * test updateProperties of calendar folder
+     */
+    public function testUpdateProperties()
+    {
+        $this->testCreateFile();
+        
+        $mutations = array(
+            '{http://apple.com/ns/ical/}calendar-color'      => '#123456FF',
+            '{DAV:}displayname'                              => 'testUpdateProperties',
+            '{http://calendarserver.org/ns/}invalidProperty' => null
+        );
+        
+        $container = new Calendar_Frontend_WebDAV_Container($this->objects['initialContainer']);
+        
+        $result = $container->updateProperties($mutations);
+        
+        $updatedContainer = Tinebase_Container::getInstance()->get($this->objects['initialContainer']);
+        
+        $this->assertEquals($result[200]["{http://apple.com/ns/ical/}calendar-color"],      null);
+        $this->assertEquals($result[200]["{DAV:}displayname"],                              null);
+        $this->assertEquals($result[403]["{http://calendarserver.org/ns/}invalidProperty"], null);
+        $this->assertEquals($updatedContainer->color, substr($mutations['{http://apple.com/ns/ical/}calendar-color'], 0, 7));
+        $this->assertEquals($updatedContainer->name,  $mutations['{DAV:}displayname']);
     }
     
     /**

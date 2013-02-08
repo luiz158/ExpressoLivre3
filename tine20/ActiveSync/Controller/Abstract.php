@@ -4,11 +4,8 @@
  *
  * @package     ActiveSync
  * @subpackage  Controller
- * @license     http://www.tine20.org/licenses/agpl-nonus.txt AGPL Version 1 (Non-US)
- *              NOTE: According to sec. 8 of the AFFERO GENERAL PUBLIC LICENSE (AGPL), 
- *              Version 1, the distribution of the Tine 2.0 ActiveSync module in or to the 
- *              United States of America is excluded from the scope of this license.
- * @copyright   Copyright (c) 2008-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @copyright   Copyright (c) 2008-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  */
 
@@ -18,13 +15,14 @@
  * @package     ActiveSync
  * @subpackage  Controller
  */
- 
-abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
+abstract class ActiveSync_Controller_Abstract implements Syncroton_Data_IData
 {
+    const LONGID_DELIMITER = "\xe2\x87\x94"; # ⇔
+    
     /**
      * information about the current device
      *
-     * @var Syncope_Model_IDevice
+     * @var Syncroton_Model_IDevice
      */
     protected $_device;
     
@@ -125,7 +123,7 @@ abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
      *
      * @param Tinebase_DateTime $_syncTimeStamp
      */
-    public function __construct(Syncope_Model_IDevice $_device, DateTime $_syncTimeStamp)
+    public function __construct(Syncroton_Model_IDevice $_device, DateTime $_syncTimeStamp)
     {
         if(empty($this->_applicationName)) {
             throw new Tinebase_Exception_UnexpectedValue('$this->_applicationName can not be empty');
@@ -154,18 +152,19 @@ abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
         if (empty($this->_contentControllerName)) {
             $this->_contentControllerName = $this->_applicationName . '_Controller_' . $this->_modelName;
         }
-        $this->_contentController   = call_user_func(array($this->_contentControllerName, 'getInstance')); 
+        $this->_contentController   = call_user_func(array($this->_contentControllerName, 'getInstance'));
     }
     
     /**
-     * return list of supported folders for this backend
-     *
-     * @return array
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::getAllFolders()
      */
     public function getAllFolders()
     {
+        $syncrotonFolders = array();
+        
         // device supports multiple folders ?
-        if(in_array(strtolower($this->_device->devicetype), array('iphone', 'ipad', 'thundertine', 'windowsphone'))) {
+        if(in_array(strtolower($this->_device->devicetype), array('iphone', 'ipad', 'thundertine', 'windowsphone', 'playbook'))) {
         
             // get the folders the user has access to
             $allowedFolders = $this->_getSyncableFolders();
@@ -173,57 +172,51 @@ abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
             $wantedFolders = null;
             
             // check if contentfilter has a container limitation
-            // @TODO discuss if we query distinct containers of contentfilters?
             $filter = $this->_getContentFilter(0);
-            $containerFilter = $filter->getFilter('container_id');
+            
+            // @TODO work with multiple container filters?
+            $containerFilter = $filter->getFilter('container_id', FALSE, TRUE);
             if ($containerFilter && $containerFilter instanceof Tinebase_Model_Filter_Container) {
-                $wantedFolders = array_flip($containerFilter->getContainerIds());
+                $wantedFolders = $containerFilter->getContainerIds();
+                
+                foreach($allowedFolders as $allowedFolder) {
+                    if (! in_array($allowedFolder->getId(), $wantedFolders)) {
+                        $allowedFolders->removeRecord($allowedFolder);
+                    }
+                }
+            }
+            $folders = $allowedFolders;
+            
+            foreach ($folders as $container) {
+                $syncrotonFolders[$container->id] = new Syncroton_Model_Folder(array(
+                    'serverId'      => $container->id,
+                    'parentId'      => 0,
+                    'displayName'   => $container->name,
+                    'type'          => (count($syncrotonFolders) == 0) ? $this->_defaultFolderType : $this->_folderType
+                ));
             }
             
-            $folders = $wantedFolders === null ? $allowedFolders : array_intersect_key($allowedFolders, $wantedFolders);
         } else {
-            
-            $folders[$this->_specialFolderName] = array(
-                'folderId'      => $this->_specialFolderName,
+            $syncrotonFolders[$this->_specialFolderName] = new Syncroton_Model_Folder(array(
+                'serverId'      => $this->_specialFolderName,
                 'parentId'      => 0,
                 'displayName'   => $this->_applicationName,
                 'type'          => $this->_defaultFolderType
-            );
-            
+            ));
         }
         
-        return $folders;
+        return $syncrotonFolders;
     }
     
     /**
-     * Returns a set of records identified by their id's
-     * 
-     * @param   array $_ids       array of record identifiers
-     * @return  Tinebase_Record_RecordSet 
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::moveItem()
      */
-    public function getMultiple($_ids)
+    public function moveItem($srcFolderId, $serverId, $dstFolderId)
     {
-        $records = $this->_contentController->getMultiple($_ids);
+        $item = $this->_contentController->get($serverId);
         
-        $firstRecord = $records->getFirstRecord();
-        if ($firstRecord) {
-            // get tags / alarms
-            if ($firstRecord->has('tags')) {
-                Tinebase_Tags::getInstance()->getMultipleTagsOfRecords($records);
-            }
-            if ($firstRecord->has('alarms')) {
-                $this->_contentController->getAlarms($records);
-            }
-        }
-        
-        return $records;
-    }
-    
-    public function moveItem($_srcFolderId, $_serverId, $_dstFolderId)
-    {
-        $item = $this->_contentController->get($_serverId);
-        
-        $item->container_id = $_dstFolderId;
+        $item->container_id = $dstFolderId;
         
         $item = $this->_contentController->update($item);
         
@@ -231,66 +224,19 @@ abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
     }
     
     /**
-     * get folder identified by $_folderId
-     *
-     * @param string $_folderId
-     * @return string
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::createEntry()
      */
-    public function getFolder($_folderId)
-    {
-        $folder = array();
-        
-        if($_folderId == $this->_specialFolderName) {
-            $folder[$this->_specialFolderName] = array(
-                'folderId'      => $this->_specialFolderName,
-                'parentId'      => 0,
-                'displayName'   => $this->_applicationName,
-                'type'          => $this->_defaultFolderType
-            );
-            
-        } else {
-            try {
-                $container = Tinebase_Container::getInstance()->getContainerById($_folderId);
-            } catch (Tinebase_Exception_NotFound $e) {
-                throw new ActiveSync_Exception_FolderNotFound('folder not found. ' . $_folderId);
-            } catch (Tinebase_Exception_InvalidArgument $e) {
-                throw new ActiveSync_Exception_FolderNotFound('folder not found. ' . $_folderId);
-            }
-            
-            if(!Tinebase_Core::getUser()->hasGrant($_folderId, Tinebase_Model_Grants::GRANT_SYNC)) {
-            	throw new ActiveSync_Exception_FolderNotFound('No sync right for folder: ' . $_folderId);
-            }
-            
-            $folder[$container->id] = array(
-                'folderId'      => $container->id,
-                'parentId'      => 0,
-                'displayName'   => $container->name,
-                'type'          => $this->_folderType
-            );
-        }
-
-        return $folder;
-    }
-    
-    /**
-     * add entry from xml data
-     *
-     * @param string $_folderId
-     * @param SimpleXMLElement $_data
-     * @return Tinebase_Record_Abstract
-     */
-    public function createEntry($_folderId, SimpleXMLElement $_entry)
+    public function createEntry($folderId, Syncroton_Model_IEntry $entry)
     {
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) 
             Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " create entry");
         
-        $entry = $this->toTineModel($_entry);
-        $entry->creation_time = new Tinebase_DateTime($this->_syncTimeStamp);
-        $entry->created_by = Tinebase_Core::getUser()->getId();
+        $entry = $this->toTineModel($entry);
         
         // container_id gets set to personal folder in application specific controller if missing
-        if($_folderId != $this->_specialFolderName) {
-            $entry->container_id = $_folderId;
+        if($folderId != $this->_specialFolderName) {
+            $entry->container_id = $folderId;
         } else {
             $containerId = Tinebase_Core::getPreference('ActiveSync')->{$this->_defaultFolder};
             
@@ -298,50 +244,132 @@ abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
                 $entry->container_id = $containerId;
             }
         }
-            
-        $entry = $this->_contentController->create($entry);
         
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " added entry id " . $entry->getId());
+        try {
+            $entry = $this->_contentController->create($entry);
+        } catch (Tinebase_Exception_AccessDenied $tead) {
+            throw new Syncroton_Exception_AccessDenied();
+        }
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(
+                __METHOD__ . '::' . __LINE__ . " added entry id " . $entry->getId());
 
         return $entry->getId();
     }
-        
+    
     /**
-     * update existing entry
-     *
-     * @param unknown_type $_collectionId
-     * @param string $_id
-     * @param SimpleXMLElement $_data
-     * @return Tinebase_Record_Abstract
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::createFolder()
      */
-    public function updateEntry($_folderId, $_serverId, SimpleXMLElement $_entry)
+    public function createFolder(Syncroton_Model_IFolder $folder)
     {
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) 
-            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " update CollectionId: $_folderId Id: $_serverId");
+        $container = Tinebase_Container::getInstance()->addContainer(new Tinebase_Model_Container(array(
+            'name'              => $folder->displayName,
+            'type'              => Tinebase_Model_Container::TYPE_PERSONAL,
+            'owner_id'          => Tinebase_Core::getUser(),
+            'backend'           => 'Sql',
+            'model'             => $this->_applicationName . '_Model_' . $this->_modelName,
+            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName)->getId()
+        )));
         
-        $oldEntry = $this->_contentController->get($_serverId); 
+        $folder->serverId = $container->getId();
         
-        $entry = $this->toTineModel($_entry, $oldEntry);
-        $entry->last_modified_time = new Tinebase_DateTime($this->_syncTimeStamp);
-        
-        $entry = $this->_contentController->update($entry);
-
-        return $entry->getId();
+        return $folder;
     }
-        
+    
     /**
-     * delete entry
-     *
-     * @param  string  $_collectionId
-     * @param  string  $_id
-     * @param  array   $_options
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::deleteFolder()
      */
-    public function deleteEntry($_folderId, $_serverId, $_collectionData)
+    public function deleteFolder($_folderId)
+    {
+        
+    }
+    
+    /**
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::getEntry()
+     */
+    public function getEntry(Syncroton_Model_SyncCollection $collection, $serverId)
+    {
+        // is $serverId a LongId?
+        if (strpos($serverId, ActiveSync_Controller_Abstract::LONGID_DELIMITER) !== false) {
+            list($collection->collectionId, $serverId) = explode(ActiveSync_Controller_Abstract::LONGID_DELIMITER, $serverId, 2);
+        }
+        
+        try {
+            $entry = $this->_contentController->get($serverId);
+        } catch (Tinebase_Exception_NotFound $tenf) {
+            throw new Syncroton_Exception_NotFound();
+        }
+        
+        return $this->toSyncrotonModel($entry, $collection->options);
+    }
+    
+    /**
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::getFileReference()
+     */
+    public function getFileReference($fileReference)
+    {
+        
+    }
+    
+    /**
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::updateEntry()
+     */
+    public function updateEntry($folderId, $serverId, Syncroton_Model_IEntry $entry)
     {
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) 
-            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " delete ColectionId: $_folderId Id: $_serverId");
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " update CollectionId: $folderId Id: $serverId");
         
-        $this->_contentController->delete($_serverId);
+        try {
+            $oldEntry = $this->_contentController->get($serverId);
+        } catch (Tinebase_Exception_NotFound $tenf) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                . ' ' . $tenf);
+            throw new Syncroton_Exception_NotFound($tenf->getMessage());
+        }
+        
+        $updatedEmtry = $this->toTineModel($entry, $oldEntry);
+        // @FIXME: this skips concurrency handling
+        $updatedEmtry->last_modified_time = new Tinebase_DateTime($this->_syncTimeStamp);
+        
+        try {
+            $updatedEmtry = $this->_contentController->update($updatedEmtry);
+        } catch (Tinebase_Exception_AccessDenied $tead) {
+            throw new Syncroton_Exception_AccessDenied();
+        }
+        
+        return $updatedEmtry->getId();
+    }
+    
+    /**
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::updateFolder()
+     */
+    public function updateFolder(Syncroton_Model_IFolder $folder)
+    {
+        
+    }
+    
+    /**
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::deleteEntry()
+     */
+    public function deleteEntry($folderId, $serverId, $collectionData)
+    {
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) 
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " delete ColectionId: $folderId Id: $serverId");
+        
+        try {
+            $this->_contentController->delete($serverId);
+        } catch (Tinebase_Exception_AccessDenied $tead) {
+            throw new Syncroton_Exception_AccessDenied();
+        } catch (Tinebase_Exception_NotFound $tenf) {
+            throw new Syncroton_Exception_NotFound();
+        }
     }
     
     /**
@@ -390,9 +418,9 @@ abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
         $containerIds = array();
         
         if($_containerId == $this->_specialFolderName) {
-            $containerIds = array_keys($syncableContainers);
-        } elseif(array_key_exists($_containerId, $syncableContainers)) {
-            $containerIds = array($_containerId);        
+            $containerIds = $syncableContainers->getArrayOfIds();
+        } elseif(in_array($_containerId, $syncableContainers->id)) {
+            $containerIds = array($_containerId);
         }
 
         $_filter->addFilter($_filter->createFilter('container_id', 'in', $containerIds));
@@ -401,42 +429,29 @@ abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
     /**
      * get syncable folders
      * 
-     * @return array
+     * @return Tinebase_Record_RecordSet
      */
     protected function _getSyncableFolders()
     {
-        $folders = array();
-        
         $containers = Tinebase_Container::getInstance()->getContainerByACL(Tinebase_Core::getUser(), $this->_applicationName, Tinebase_Model_Grants::GRANT_SYNC);
         
-        foreach ($containers as $container) {
-            $folders[$container->id] = array(
-                'folderId'      => $container->id,
-                'parentId'      => 0,
-                'displayName'   => $container->name,
-                'type'          => (count($folders) == 0) ? $this->_defaultFolderType : $this->_folderType
-            );
-        }
-                
-        return $folders;
+        return $containers;
     }
     
     /**
-     * get all entries changed between to dates
-     *
-     * @param unknown_type $_field
-     * @param unknown_type $_startTimeStamp
-     * @param unknown_type $_endTimeStamp
-     * @return array
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::getChangedEntries()
      */
-    public function getChangedEntries($_folderId, DateTime $_startTimeStamp, DateTime $_endTimeStamp = NULL)
+    public function getChangedEntries($folderId, DateTime $_startTimeStamp, DateTime $_endTimeStamp = NULL)
     {
         $filter = $this->_getContentFilter(0);
-        $this->_addContainerFilter($filter, $_folderId);
-
+        
+        $this->_addContainerFilter($filter, $folderId);
+        
         $startTimeStamp = ($_startTimeStamp instanceof DateTime) ? $_startTimeStamp->format(Tinebase_Record_Abstract::ISO8601LONG) : $_startTimeStamp;
         $endTimeStamp = ($_endTimeStamp instanceof DateTime) ? $_endTimeStamp->format(Tinebase_Record_Abstract::ISO8601LONG) : $_endTimeStamp;
         
+        // @todo filter also for create_timestamo??
         $filter->addFilter(new Tinebase_Model_Filter_DateTime(
             'last_modified_time',
             'after',
@@ -457,16 +472,15 @@ abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
     }    
     
     /**
-     * get id's of all entries available on the server
-     *
-     * @param string $_folderId
-     * @param int $_filterType
-     * @return array
+     * 
+     * @param unknown_type $_folderId
+     * @param unknown_type $_filterType
+     * @return Ambigous <Tinebase_Record_RecordSet, multitype:>
      */
-    public function getServerEntries($_folderId, $_filterType)
+    public function getServerEntries($folderId, $filterType)
     {
-        $filter = $this->_getContentFilter($_filterType);
-        $this->_addContainerFilter($filter, $_folderId);
+        $filter = $this->_getContentFilter($filterType);
+        $this->_addContainerFilter($filter, $folderId);
         
         if(!empty($this->_sortField)) {
             $pagination = new Tinebase_Model_Pagination(array(
@@ -492,9 +506,13 @@ abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
         return $result;
     }
     
-    public function getCountOfChanges(Syncope_Backend_IContent $contentBackend, Syncope_Model_IFolder $folder, Syncope_Model_ISyncState $syncState)
+    /**
+     * (non-PHPdoc)
+     * @see Syncroton_Data_IData::getCountOfChanges()
+     */
+    public function getCountOfChanges(Syncroton_Backend_IContent $contentBackend, Syncroton_Model_IFolder $folder, Syncroton_Model_ISyncState $syncState)
     {
-        $this->updateCache($folder->folderid);
+        $this->updateCache($folder->serverId);
         
         $allClientEntries = $contentBackend->getFolderState($this->_device, $folder);
        	$allServerEntries = $this->getServerEntries($folder->folderid, $folder->lastfiltertype);
@@ -505,7 +523,6 @@ abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
         	
        	return count($addedEntries) + count($deletedEntries) + count($changedEntries);        	
     }
-    
     
     /**
      * return (outer) contentfilter array
@@ -535,34 +552,7 @@ abstract class ActiveSync_Controller_Abstract implements Syncope_Data_IData
      * @param SimpleXMLElement $_data
      * @return Tinebase_Record_Interface
      */
-    abstract public function toTineModel(SimpleXMLElement $_data, $_entry = null);
+    abstract public function toTineModel(Syncroton_Model_IEntry $data, $entry = null);
     
-    /**
-     * convert contact from xml to Addressbook_Model_ContactFilter
-     *
-     * @param SimpleXMLElement $_data
-     * @return array
-     */
-    abstract protected function _toTineFilterArray(SimpleXMLElement $_data);
-    
-    /**
-     * append entry data to xml element
-     *
-     * @param DOMElement  $_xmlNode   the parrent xml node
-     * @param string      $_folderId  the local folder id
-     * @param string      $_serverId  the local entry id
-     * @param boolean     $_withBody  retrieve body of entry
-     */
-    #abstract public function appendXML(DOMElement $_xmlNode, $_folderId, $_serverId, array $_options, $_neverTruncate = false);
-    
-    /**
-     * removed control chars from string which are not allowd in ActiveSync
-     * 
-     * @param  string|array $_dirty
-     * @return string
-     */
-    public function removeControlChars($_dirty)
-    {
-        return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', null, $_dirty);
-    }
+    abstract public function toSyncrotonModel($entry, array $options = array());
 }

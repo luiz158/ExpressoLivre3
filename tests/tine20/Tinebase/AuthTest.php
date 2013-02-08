@@ -56,6 +56,7 @@ class Tinebase_AuthTest extends PHPUnit_Framework_TestCase
      */
     protected function setUp()
     {
+        Tinebase_TransactionManager::getInstance()->startTransaction(Tinebase_Core::getDb());
         $this->_originalBackendConfiguration = Tinebase_Auth::getBackendConfiguration();
         $this->_originalBackendType = Tinebase_Auth::getConfiguredBackend();
     }
@@ -68,11 +69,14 @@ class Tinebase_AuthTest extends PHPUnit_Framework_TestCase
      */
     protected function tearDown()
     {
+        // this needs to be done because Tinebase_Auth & Tinebase_Config use caching mechanisms
         Tinebase_Auth::setBackendType($this->_originalBackendType);
         Tinebase_Auth::deleteBackendConfiguration();
         Tinebase_Auth::setBackendConfiguration($this->_originalBackendConfiguration);
         Tinebase_Auth::saveBackendConfiguration();
         Tinebase_Auth::getInstance()->setBackend();
+        
+        Tinebase_TransactionManager::getInstance()->rollBack();
     }
 
     /**
@@ -82,12 +86,12 @@ class Tinebase_AuthTest extends PHPUnit_Framework_TestCase
     {
         Tinebase_Auth::setBackendType(Tinebase_Auth::LDAP);
      
-        $rawConfigBefore = Tinebase_Config::getInstance()->getConfig(Tinebase_Config::AUTHENTICATIONBACKEND, null, 'null');
+        $rawConfigBefore = Tinebase_Config::getInstance()->get(Tinebase_Config::AUTHENTICATIONBACKEND);
         $key = 'host';
         $testValue = 'phpunit-test-host2';
         Tinebase_Auth::setBackendConfiguration($testValue, $key);
         Tinebase_Auth::saveBackendConfiguration();
-        $rawConfigAfter = Tinebase_Config::getInstance()->getConfig(Tinebase_Config::AUTHENTICATIONBACKEND);
+        $rawConfigAfter = Tinebase_Config::getInstance()->get(Tinebase_Config::AUTHENTICATIONBACKEND);
         $this->assertNotEquals($rawConfigBefore, $rawConfigAfter);
     }
     
@@ -97,7 +101,7 @@ class Tinebase_AuthTest extends PHPUnit_Framework_TestCase
      */
     public function testSetBackendConfiguration()
     {
-        Tinebase_Auth::setBackendType(Tinebase_Auth::LDAP);   
+        Tinebase_Auth::setBackendType(Tinebase_Auth::LDAP);
      
         $key = 'host';
         $testValue = 'phpunit-test-host';
@@ -119,7 +123,7 @@ class Tinebase_AuthTest extends PHPUnit_Framework_TestCase
      */
     public function testDeleteBackendConfiguration()
     {
-        Tinebase_Auth::setBackendType(Tinebase_Auth::LDAP);   
+        Tinebase_Auth::setBackendType(Tinebase_Auth::LDAP);
      
         $key = 'host';
         Tinebase_Auth::setBackendConfiguration('configured-host', $key);
@@ -159,7 +163,7 @@ class Tinebase_AuthTest extends PHPUnit_Framework_TestCase
     public function testImapAuth()
     {
         // use imap config for the auth config
-        $imapConfig = Tinebase_Config::getInstance()->getConfigAsArray(Tinebase_Config::IMAP);
+        $imapConfig = Tinebase_Config::getInstance()->get(Tinebase_Config::IMAP, new Tinebase_Config_Struct())->toArray();
         
         if (empty($imapConfig)) {
              $this->markTestSkipped('No IMAP config found.');
@@ -171,7 +175,7 @@ class Tinebase_AuthTest extends PHPUnit_Framework_TestCase
             'ssl'       => $imapConfig['ssl'],
             'domain'    => $imapConfig['domain'],
         );
-        Tinebase_Auth::setBackendType(Tinebase_Auth::IMAP);   
+        Tinebase_Auth::setBackendType(Tinebase_Auth::IMAP);
         Tinebase_Auth::setBackendConfiguration($authConfig);
         Tinebase_Auth::saveBackendConfiguration();
         Tinebase_Auth::getInstance()->setBackend();
@@ -182,7 +186,7 @@ class Tinebase_AuthTest extends PHPUnit_Framework_TestCase
         
         // valid authentication
         $authResult = Tinebase_Auth::getInstance()->authenticate($testConfig->username, $testConfig->password);
-        $this->assertTrue($authResult->isValid());        
+        $this->assertTrue($authResult->isValid());
         
         // invalid authentication
         $authResult = Tinebase_Auth::getInstance()->authenticate($testConfig->username, 'some pw');
@@ -200,6 +204,7 @@ class Tinebase_AuthTest extends PHPUnit_Framework_TestCase
     {
         // add dummy record to credential cache
         $id = Tinebase_Record_Abstract::generateUID();
+        $db = Tinebase_Core::getDb();
         $oneMinuteAgo = Tinebase_DateTime::now()->subMinute(1)->format(Tinebase_Record_Abstract::ISO8601LONG);
         $data = array(
             'id'            => $id,
@@ -212,7 +217,7 @@ class Tinebase_AuthTest extends PHPUnit_Framework_TestCase
         
         Tinebase_Auth_CredentialCache::getInstance()->clearCacheTable();
         
-        $result = Tinebase_Core::getDb()->fetchAll('SELECT * FROM ' . $table . ' WHERE valid_until < ?', Tinebase_DateTime::now()->format(Tinebase_Record_Abstract::ISO8601LONG));
-        $this->assertTrue(count($result) == 0);
+        $result = $db->fetchCol('SELECT id FROM ' . $db->quoteIdentifier($table) . ' WHERE ' . $db->quoteInto($db->quoteIdentifier('valid_until') .' < ?', Tinebase_DateTime::now()->format(Tinebase_Record_Abstract::ISO8601LONG)));
+        $this->assertNotContains($id, $result);
     }
 }

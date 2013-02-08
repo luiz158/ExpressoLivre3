@@ -19,6 +19,13 @@
 class Tinebase_Server_Http implements Tinebase_Server_Interface
 {
     /**
+     * the request method
+     * 
+     * @var string
+     */
+    protected $_method = NULL;
+    
+    /**
      * handler for HTTP api requests
      * @todo session expire handling
      * 
@@ -26,18 +33,21 @@ class Tinebase_Server_Http implements Tinebase_Server_Interface
      */
     public function handle()
     {
+        $server = new Tinebase_Http_Server();
+        $server->setClass('Tinebase_Frontend_Http', 'Tinebase');
+        
         try {
-            Tinebase_Core::initFramework();
-            Tinebase_Core::getLogger()->INFO(__METHOD__ . '::' . __LINE__ .' Is HTTP request. method: ' . (isset($_REQUEST['method']) ? $_REQUEST['method'] : 'EMPTY'));
-            //Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .' Rawdata: ' . print_r($_REQUEST, true));
+            try {
+                Tinebase_Core::initFramework();
+            } catch (Zend_Session_Exception $zse) {
+                // expire session cookie on client
+                Zend_Session::expireSessionCookie();
+            }
             
-            $server = new Tinebase_Http_Server();
+            Tinebase_Core::getLogger()->INFO(__METHOD__ . '::' . __LINE__ .' Is HTTP request. method: ' . $this->getRequestMethod());
             
-            //NOTE: auth check for Tinebase HTTP api is done via Tinebase_Http::checkAuth  
-            $server->setClass('Tinebase_Frontend_Http', 'Tinebase');
-    
             // register addidional HTTP apis only available for authorised users
-            if (Zend_Auth::getInstance()->hasIdentity()) {
+            if (Zend_Session::isStarted() && Zend_Auth::getInstance()->hasIdentity()) {
                 if (empty($_REQUEST['method'])) {
                     $_REQUEST['method'] = 'Tinebase.mainScreen';
                 }
@@ -52,48 +62,74 @@ class Tinebase_Server_Http implements Tinebase_Server_Interface
                         Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ ." Failed to add HTTP API for application '$applicationName' Exception: \n". $e);
                     }
                 }
+                
+            } else {
+                if (empty($_REQUEST['method'])) {
+                    $_REQUEST['method'] = 'Tinebase.login';
+                }
+                
+                // sessionId got send by client, but we don't use sessions for non authenticated users
+                if (Zend_Session::sessionExists()) {
+                    // expire session cookie on client
+                    Zend_Session::expireSessionCookie();
+                }
             }
             
-            if (empty($_REQUEST['method'])) {
-                $_REQUEST['method'] = 'Tinebase.login';
-            }
-
+            $this->_method = $_REQUEST['method'];
+            
             $server->handle($_REQUEST);
+            
+        } catch (Zend_Json_Server_Exception $zjse) {
+            // invalid method requested or not authenticated
+            Tinebase_Core::getLogger()->INFO(__METHOD__ . '::' . __LINE__ .' Attempt to request a privileged Http-API method without valid session from "' . $_SERVER['REMOTE_ADDR']);
+            
+            header('HTTP/1.0 403 Forbidden');
+
+            exit;
+            
         } catch (Exception $exception) {
             if (! is_object(Tinebase_Core::getLogger())) {
-                // no logger -> exception happened very early, just rethrow it
+                // no logger -> exception happened very early
                 error_log($exception);
                 header('HTTP/1.0 503 Service Unavailable');
                 die('Service Unavailable');
             }
-            Tinebase_Core::getLogger()->INFO($exception);
             
-            $server = new Tinebase_Http_Server();
-            $server->setClass('Tinebase_Frontend_Http', 'Tinebase');
-            if ($exception instanceof Zend_Session_Exception) {
-                Tinebase_Core::getLogger()->INFO(__METHOD__ . '::' . __LINE__ .' Attempt to request a privileged Http-API method without valid session from "' . $_SERVER['REMOTE_ADDR']);
+            Tinebase_Core::getLogger()->info($exception);
+            
+            try {
+                // check if setup is required
+                $setupController = Setup_Controller::getInstance();
+                if ($setupController->setupRequired()) {
+                    $this->_method = 'Tinebase.setupRequired';
+                } else {
+                    if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->DEBUG(
+                        __METHOD__ . '::' . __LINE__ . ' (' . __LINE__ .') Http-Api exception: ' . print_r($exception, true));
+                    
+                    $this->_method = 'Tinebase.exception';
+                }
                 
-                // expire session cookie for client
-                Zend_Session::expireSessionCookie();
-            
-                header('HTTP/1.0 403 Forbidden');
-                exit;
-            } else {
-            	try {
-	                // check if setup is required
-	                $setupController = Setup_Controller::getInstance(); 
-	                if ($setupController->setupRequired()) {
-	                    $server->handle(array('method' => 'Tinebase.setupRequired'));
-	                } else {                
-	                    if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->DEBUG(__CLASS__ . '::' . __METHOD__ . ' (' . __LINE__ .') Http-Api exception: ' . print_r($exception, true));
-	                    $server->handle(array('method' => 'Tinebase.exception'));
-	                }
-            	} catch (Exception $e) {
-            		error_log($exception);
-                	header('HTTP/1.0 503 Service Unavailable');
-                	die('Service Unavailable');
-            	}
+                $server->handle(array('method' => $this->_method));
+                
+            } catch (Exception $e) {
+                error_log($exception);
+                header('HTTP/1.0 503 Service Unavailable');
+                die('Service Unavailable');
             }
         }
+    }
+    
+    /**
+    * returns request method
+    *
+    * @return string|NULL
+    */
+    public function getRequestMethod()
+    {
+        if ($this->_method && isset($_REQUEST['method'])) {
+            $this->_method = $_REQUEST['method'];
+        }
+        
+        return $this->_method;
     }
 }

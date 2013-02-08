@@ -1,0 +1,167 @@
+# 
+# Translators:
+#   <mail@demiveo.de>, 2012.
+msgid ""
+msgstr ""
+"Project-Id-Version: Tine 2.0\n"
+"POT-Creation-Date: 2008-05-17 22:12+0100\n"
+"PO-Revision-Date: 2012-12-26 19:51+0000\n"
+"Last-Translator: demiveo <mail@demiveo.de>\n"
+"Language-Team: Turkish (Turkey) (http://www.transifex.com/projects/p/tine20/language/tr_TR/)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: tr_TR\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Poedit-Country: GB\n"
+"X-Poedit-Language: en\n"
+"X-Poedit-SourceCharset: utf-8\n"
+
+#: Controller.php:114
+#, python-format
+msgid "%s's personal FAQs"
+msgstr ""
+
+#: Controller.php:164
+msgid "Draft"
+msgstr "Taslak"
+
+#: Controller.php:165
+msgid "released"
+msgstr "Yayınlanmış"
+
+#: Controller.php:166
+msgid "obsolete"
+msgstr "Eskimiş"
+
+#: Controller.php:169
+msgid "Internal"
+msgstr "Sistem İçi"
+
+#: Controller.php:170
+msgid "Public"
+msgstr "Açık"
+
+#: Setup/Initialize.php:33
+msgid "All FAQs of my FAQ Lists"
+msgstr "FAQ Listemdeki FAQlar"
+
+#: Setup/Initialize.php:40
+msgid "Last modified by me"
+msgstr "Son düzenlediğim"
+
+#: Setup/Initialize.php:41
+msgid "All FAQs that I have last modified"
+msgstr "Son düzenlediğim FAQlar"
+
+#: Preference.php:28
+msgid "All my FAQs"
+msgstr "Bütün FAQlarım"
+
+#: Preference.php:70
+msgid "Default Favorite"
+msgstr ""
+
+#: Preference.php:71
+msgid "The default favorite which is loaded on FAQ startup"
+msgstr ""
+
+#: Preference.php:74
+msgid "Default FAQ List"
+msgstr "Standart FAQ Listesi"
+
+#: Preference.php:75
+msgid "The default FAQ list to create new FAQ in."
+msgstr ""
+
+#: js/AdminPanel.js:93 js/AdminPanel.js:125 js/FaqStatusFilterModel.js:27
+#: js/FaqStatus.js:26 js/FaqGridDetailsPanel.js:199
+msgid "FAQ Status"
+msgid_plural "FAQ Status"
+msgstr[0] "one: FAQ Durumu\n\nother: FAQ Durumu"
+
+#: js/AdminPanel.js:97 js/AdminPanel.js:132 js/FaqType.js:26
+#: js/FaqTypeFilterModel.js:27 js/FaqGridDetailsPanel.js:204
+msgid "FAQ Type"
+msgid_plural "FAQ Types"
+msgstr[0] "one: FAQ Tipi\n\nother: FAQ Tipleri"
+
+#: js/AdminPanel.js:105
+msgid "Defaults"
+msgstr "Standartlar"
+
+#: js/FaqType.js:144
+msgid "Add a new FAQ Type..."
+msgstr "Yeni FAQ Tipi Ekle"
+
+#: js/SimpleFAQ.js:19 js/Model.js:33
+msgid "FAQ"
+msgid_plural "FAQs"
+msgstr[0] "one: FAQ\n\nother: FAQs"
+
+#: js/FaqGridPanel.js:94
+msgid "FAQ id"
+msgstr "FAQ ID"
+
+#: js/FaqGridPanel.js:101 js/FaqGridDetailsPanel.js:163
+msgid "Tags"
+msgstr ""
+
+#: js/FaqGridPanel.js:108 js/FaqEditDialog.js:136
+msgid "Status"
+msgstr "Durum"
+
+#: js/FaqGridPanel.js:114 js/FaqEditDialog.js:124
+msgid "Type"
+msgstr "Tip"
+
+#: js/FaqGridPanel.js:120 js/FaqEditDialog.js:108
+#: js/FaqGridDetailsPanel.js:151
+msgid "Question"
+msgstr "Soru"
+
+#: js/FaqGridPanel.js:127 js/FaqEditDialog.js:115
+#: js/FaqGridDetailsPanel.js:157
+msgid "Answer"
+msgstr "Cevap"
+
+#: js/FaqStatus.js:141
+msgid "Add a new FAQ Status..."
+msgstr "Yeni FAQ Durumu Ekle"
+
+#: js/Model.js:37
+msgid "FAQ List"
+msgid_plural "FAQ Lists"
+msgstr[0] "one: FAQ Listesi\n\nother: FAQ Listeleri"
+
+#: js/Model.js:37
+msgid "FAQ Lists"
+msgstr "FAQ Listeleri"
+
+#: js/Model.js:72
+msgid "Quick search"
+msgstr "Hızlı Arama"
+
+#: js/FaqEditDialog.js:109
+msgid "Enter a question..."
+msgstr "Soru Gir"
+
+#: js/FaqEditDialog.js:116
+msgid "Enter a answer..."
+msgstr "Cevap Gir"
+
+#: js/FaqGridDetailsPanel.js:97 js/FaqGridDetailsPanel.js:182
+msgid "FAQ Infos"
+msgstr "FAQ Bilgileri"
+
+#: js/FaqGridDetailsPanel.js:189
+msgid "Creation Time"
+msgstr "Oluşturum Vakti"
+
+#: js/FaqGridDetailsPanel.js:194
+msgid "Created By"
+msgstr "Oluşturan"
+
+#: js/FaqGridDetailsPanel.js:226
+msgid "No answer yet"
+msgstr "Şu An Cevap Yok"

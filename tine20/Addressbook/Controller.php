@@ -28,10 +28,15 @@ class Addressbook_Controller extends Tinebase_Controller_Event implements Tineba
     private static $_instance = NULL;
 
     /**
+     * holds the default Model of this application
+     * @var string
+     */
+    protected static $_defaultModel = 'Addressbook_Model_Contact';
+    
+    /**
      * constructor (get current user)
      */
     private function __construct() {
-        $this->_currentAccount = Tinebase_Core::getUser();
         $this->_applicationName = 'Addressbook';
     }
     
@@ -40,7 +45,7 @@ class Addressbook_Controller extends Tinebase_Controller_Event implements Tineba
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -97,9 +102,10 @@ class Addressbook_Controller extends Tinebase_Controller_Event implements Tineba
         $newContainer = new Tinebase_Model_Container(array(
             'name'              => sprintf($translation->_("%s's personal addressbook"), $account->accountFullName),
             'type'              => Tinebase_Model_Container::TYPE_PERSONAL,
-        	'owner_id'          => $_account,
+            'owner_id'          => $_account,
             'backend'           => 'Sql',
-            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName)->getId() 
+            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName)->getId(),
+            'model'             => 'Addressbook_Model_Contact'
         ));
         
         $personalContainer = Tinebase_Container::getInstance()->addContainer($newContainer);

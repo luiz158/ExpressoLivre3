@@ -5,7 +5,7 @@
  * @package     Tinebase
  * @subpackage  User
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2013 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  * 
  * @todo        extend Tinebase_Application_Backend_Sql and replace some functions
@@ -69,6 +69,11 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
     protected $_tableName = 'accounts';
     
     /**
+     * @var Tinebase_Backend_Sql_Command_Interface
+     */
+    protected $_dbCommand;
+
+    /**
      * the constructor
      *
      * @param  array $options Options used in connecting, binding, etc.
@@ -78,6 +83,7 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
         parent::__construct($_options);
 
         $this->_db = Tinebase_Core::getDb();
+        $this->_dbCommand = Tinebase_Backend_Sql_Command::factory($this->_db);
         
         foreach ($this->_plugins as $plugin) {
             if ($plugin instanceof Tinebase_User_Plugin_SqlInterface) {
@@ -98,7 +104,7 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
      * @return Tinebase_Record_RecordSet with record class Tinebase_Model_User
      */
     public function getUsers($_filter = NULL, $_sort = NULL, $_dir = 'ASC', $_start = NULL, $_limit = NULL, $_accountClass = 'Tinebase_Model_User')
-    {        
+    {
         $select = $this->_getUserSelectObject()
             ->limit($_limit, $_start);
             
@@ -152,9 +158,10 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
         foreach ($this->_sqlPlugins as $plugin) {
             try {
                 $plugin->inspectGetUserByProperty($user);
+            } catch (Tinebase_Exception_NotFound $tenf) {
+                // do nothing
             } catch (Exception $e) {
-                if (Tinebase_Core::isLogLevel(Zend_Log::CRIT)) Tinebase_Core::getLogger()->crit(__METHOD__ . '::' . __LINE__ . ' User sql plugin failure: ' . $e->getMessage());
-                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $e->getTraceAsString());
+                if (Tinebase_Core::isLogLevel(Zend_Log::CRIT)) Tinebase_Core::getLogger()->crit(__METHOD__ . '::' . __LINE__ . ' User sql plugin failure: ' . $e);
             }
         }
             
@@ -213,11 +220,13 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
         $select = $this->_getUserSelectObject()
             ->where($this->_db->quoteInto($this->_db->quoteIdentifier( SQL_TABLE_PREFIX . 'accounts.' . $this->rowNameMapping[$_property]) . ' = ?', $value));
         
+        $aux = $select->assemble();
+        
         $stmt = $select->query();
 
         $row = $stmt->fetch(Zend_Db::FETCH_ASSOC);
         if ($row === false) {
-            throw new Tinebase_Exception_NotFound('User with ' . $_property . ' = ' . $value . ' not found.');           
+            throw new Tinebase_Exception_NotFound('User with ' . $_property . ' = ' . $value . ' not found.');
         }
         
         try {
@@ -257,6 +266,16 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
          * WHEN (`login_failures` > 5 AND `last_login_failure_at` + INTERVAL 15 MINUTE > NOW()) 
          * THEN 'blocked' ELSE 'enabled' END) ELSE 'disabled' END
          */
+        $maxLoginFailures = Tinebase_Config::getInstance()->get(Tinebase_Config::MAX_LOGIN_FAILURES, 5);
+        if ($maxLoginFailures > 0) {
+            $loginFailuresCondition = 'WHEN ( ' . $this->_db->quoteIdentifier($this->rowNameMapping['loginFailures']) . " > {$maxLoginFailures} AND "
+                . $this->_dbCommand->setDate($this->_db->quoteIdentifier($this->rowNameMapping['lastLoginFailure'])) . " + INTERVAL '{$this->_blockTime}' MINUTE > "
+                . $this->_dbCommand->setDate('NOW()') .") THEN 'blocked'";
+        } else {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                . ' User blocking disabled.');
+            $loginFailuresCondition = '';
+        }
 /*        
         $statusSQL = 'CASE WHEN ' . $this->_db->quoteIdentifier($this->rowNameMapping['accountStatus']) . ' = ' . $this->_db->quote('enabled') . ' THEN (';
         $statusSQL .= 'CASE WHEN '.Tinebase_Backend_Sql_Command::setDate($this->_db, 'NOW()') .' > ' . $this->_db->quoteIdentifier($this->rowNameMapping['accountExpires']) . ' THEN ' . $this->_db->quote('expired') . 
@@ -302,7 +321,7 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
                     'container_id'            => 'container_id'
                 )
             );
-                
+        
         return $select;
     }
     
@@ -319,10 +338,12 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
     public function setPassword($_userId, $_password, $_encrypt = TRUE, $_mustChange = null)
     {
         $userId = $_userId instanceof Tinebase_Model_User ? $_userId->getId() : $_userId;
+        $user = $_userId instanceof Tinebase_Model_FullUser ? $_userId : $this->getFullUserById($userId);
+        $this->checkPasswordPolicy($_password, $user);
         
         $accountsTable = new Tinebase_Db_Table(array('name' => SQL_TABLE_PREFIX . 'accounts'));
         
-        $accountData['password'] = ( $_encrypt ) ? Hash_Password::generate('SSHA256', $_password) : $_password;
+        $accountData['password'] = ($_encrypt) ? Hash_Password::generate('SSHA256', $_password) : $_password;
         $accountData['last_password_change'] = Tinebase_DateTime::now()->get(Tinebase_Record_Abstract::ISO8601LONG);
         
         $where = array(
@@ -335,10 +356,110 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
             throw new Tinebase_Exception_NotFound('Unable to update password! account not found in authentication backend.');
         }
         
-        // add data from plugins
+        $this->_setPluginsPassword($userId, $_password, $_encrypt);
+    }
+    
+    /**
+     * set password in plugins
+     * 
+     * @param string $userId
+     * @param string $password
+     * @param bool   $encrypt encrypt password
+     * @throws Tinebase_Exception_Backend
+     */
+    protected function _setPluginsPassword($userId, $password, $encrypt = TRUE)
+    {
         foreach ($this->_sqlPlugins as $plugin) {
-            $plugin->inspectSetPassword($userId, $_password);
+            try {
+                $plugin->inspectSetPassword($userId, $password, $encrypt);
+            } catch (Exception $e) {
+                Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__ . ' Could not change plugin password: ' . $e);
+                throw new Tinebase_Exception_Backend($e->getMessage());
+            }
         }
+    }
+    
+    /**
+     * ensure password policy
+     * 
+     * @param string $password
+     * @param Tinebase_Model_FullUser $user
+     * @throws Tinebase_Exception_PasswordPolicyViolation
+     */
+    public function checkPasswordPolicy($password, Tinebase_Model_FullUser $user)
+    {
+        if (! Tinebase_Config::getInstance()->get(Tinebase_Config::PASSWORD_POLICY_ACTIVE, FALSE)) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                . ' No password policy enabled');
+            return;
+        }
+        
+        $failedTests = array();
+        
+        $policy = array(
+            Tinebase_Config::PASSWORD_POLICY_ONLYASCII              => '/[^\x00-\x7F]/',
+            Tinebase_Config::PASSWORD_POLICY_MIN_LENGTH             => NULL,
+            Tinebase_Config::PASSWORD_POLICY_MIN_WORD_CHARS         => '/[\W]*/',
+            Tinebase_Config::PASSWORD_POLICY_MIN_UPPERCASE_CHARS    => '/[^A-Z]*/',
+            Tinebase_Config::PASSWORD_POLICY_MIN_SPECIAL_CHARS      => '/[\w]*/',
+            Tinebase_Config::PASSWORD_POLICY_MIN_NUMBERS            => '/[^0-9]*/',
+            Tinebase_Config::PASSWORD_POLICY_FORBID_USERNAME        => $user->accountLoginName,
+        );
+        
+        foreach ($policy as $key => $regex) {
+            $test = $this->_testPolicy($password, $key, $regex);
+            if ($test !== TRUE) {
+                $failedTests[$key] = $test;
+            }
+        }
+        
+        if (! empty($failedTests)) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                . ' ' . print_r($failedTests, TRUE));
+            
+            $policyException = new Tinebase_Exception_PasswordPolicyViolation('Password failed to match the following policy requirements: ' 
+                . implode('|', array_keys($failedTests)));
+            throw $policyException;
+        }
+    }
+    
+    /**
+     * test password policy
+     * 
+     * @param string $password
+     * @param string $configKey
+     * @param string $regex
+     * @return mixed
+     */
+    protected function _testPolicy($password, $configKey, $regex = NULL)
+    {
+        $result = TRUE;
+        
+        if ($configKey === Tinebase_Config::PASSWORD_POLICY_ONLYASCII && Tinebase_Config::getInstance()->get($configKey, 0) && $regex !== NULL) {
+            $nonAsciiFound = preg_match($regex, $password, $matches);
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                . ' ' . print_r($matches, TRUE));
+            
+            $result = ($nonAsciiFound) ? array('expected' => 0, 'got' => count($matches)) : TRUE;
+        } else if ($configKey === Tinebase_Config::PASSWORD_POLICY_FORBID_USERNAME) {
+            // $regex contains username in this case
+            $result = preg_match('/' . preg_quote($password) . '/i', $regex);
+        } else {
+            // check min length restriction
+            $minLength = Tinebase_Config::getInstance()->get($configKey, 0);
+            if ($minLength > 0) {
+                $reduced = ($regex) ? preg_replace($regex, '', $password) : $password;
+                $charCount = strlen(utf8_decode($reduced));
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                    . ' Found ' . $charCount . '/' . $minLength . ' chars for ' . $configKey /*. ': ' . $reduced */);
+                
+                if ($charCount < $minLength) {
+                    $result = array('expected' => $minLength, 'got' => $charCount);
+                }
+            }
+        }
+        
+        return $result;
     }
     
     /**
@@ -535,13 +656,22 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
         }
         
         $updatedUser = $this->updateUserInSqlBackend($_user);
-        
-        // update data from plugins
-        foreach ($this->_sqlPlugins as $plugin) {
-            $plugin->inspectUpdateUser($updatedUser, $_user);
-        }
+        $this->updatePluginUser($updatedUser, $_user);
         
         return $updatedUser;
+    }
+    
+    /**
+    * update data in plugins
+    *
+    * @param Tinebase_Model_FullUser $updatedUser
+    * @param Tinebase_Model_FullUser $newUserProperties
+    */
+    public function updatePluginUser($updatedUser, $newUserProperties)
+    {
+        foreach ($this->_sqlPlugins as $plugin) {
+            $plugin->inspectUpdateUser($updatedUser, $newUserProperties);
+        }
     }
     
     /**
@@ -625,20 +755,31 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
      */
     public function addUser(Tinebase_Model_FullUser $_user)
     {
-        if($this instanceof Tinebase_User_Interface_SyncAble) {
+        if ($this instanceof Tinebase_User_Interface_SyncAble) {
             $userFromSyncBackend = $this->addUserToSyncBackend($_user);
-            // set accountId for sql backend sql backend
-            $_user->setId($userFromSyncBackend->getId());
+            if ($userFromSyncBackend !== NULL) {
+                // set accountId for sql backend sql backend
+                $_user->setId($userFromSyncBackend->getId());
+            }
         }
         
         $addedUser = $this->addUserInSqlBackend($_user);
-        
-        // add data from plugins
-        foreach ($this->_sqlPlugins as $plugin) {
-            $plugin->inspectAddUser($addedUser, $_user);
-        }
+        $this->addPluginUser($addedUser, $_user);
         
         return $addedUser;
+    }
+    
+    /**
+     * add data from/to plugins
+     * 
+     * @param Tinebase_Model_FullUser $addedUser
+     * @param Tinebase_Model_FullUser $newUserProperties
+     */
+    public function addPluginUser($addedUser, $newUserProperties)
+    {
+        foreach ($this->_sqlPlugins as $plugin) {
+            $plugin->inspectAddUser($addedUser, $newUserProperties);
+        }
     }
     
     /**
@@ -651,9 +792,7 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
      */
     public function addUserInSqlBackend(Tinebase_Model_FullUser $_user)
     {
-        if(!$_user->isValid()) {
-            throw(new Exception('invalid user object'));
-        }
+        $_user->isValid(TRUE);
         
         $accountsTable = new Tinebase_Db_Table(array('name' => SQL_TABLE_PREFIX . 'accounts'));
         
@@ -719,7 +858,7 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
      * @return Tinebase_Model_FullUser  the delete user
      */
     public function deleteUserInSqlBackend($_userId)
-    {   
+    {
         if ($_userId instanceof Tinebase_Model_FullUser) {
             $user = $_userId;
         } else {
@@ -770,7 +909,8 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
      * 
      * @param array $_accountIds
      */
-    public function deleteUsers(array $_accountIds) {
+    public function deleteUsers(array $_accountIds)
+    {
         foreach ( $_accountIds as $accountId ) {
             $this->deleteUser($accountId);
         }
@@ -778,11 +918,14 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
     
     /**
      * Delete all users returned by {@see getUsers()} using {@see deleteUsers()}
+     * 
      * @return void
      */
     public function deleteAllUsers()
     {
-        $users = $this->getUsers();
+        // need to fetch FullUser because otherwise we would get only enabled accounts :/
+        $users = $this->getUsers(NULL, NULL, 'ASC', NULL, NULL, 'Tinebase_Model_FullUser');
+        
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Deleting ' . count($users) .' users');
         foreach ( $users as $user ) {
             $this->deleteUser($user);
@@ -792,7 +935,7 @@ class Tinebase_User_Sql extends Tinebase_User_Abstract
     /**
      * Get multiple users
      *
-     * @param 	string|array $_id Ids
+     * @param     string|array $_id Ids
      * @param   string  $_accountClass  type of model to return
      * @return Tinebase_Record_RecordSet of 'Tinebase_Model_User' or 'Tinebase_Model_FullUser'
      */

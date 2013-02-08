@@ -37,11 +37,6 @@ class Calendar_Controller_Resource extends Tinebase_Controller_Record_Abstract
     private static $_instance = NULL;
     
     /**
-     * @var Tinebase_Model_User
-     */
-    protected $_currentAccount = NULL;
-    
-    /**
      * the constructor
      *
      * don't use the constructor. use the singleton 
@@ -55,8 +50,6 @@ class Calendar_Controller_Resource extends Tinebase_Controller_Record_Abstract
             'tableName' => 'cal_resources'
         ));
         $this->_backend->setModlogActive(TRUE);
-        
-        $this->_currentAccount  = Tinebase_Core::getUser();
     }
 
     /**
@@ -94,7 +87,8 @@ class Calendar_Controller_Resource extends Tinebase_Controller_Record_Abstract
             'name'              => $_record->name,
             'type'              => Tinebase_Model_Container::TYPE_SHARED,
             'backend'           => $this->_backend->getType(),
-            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName)->getId() 
+            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName)->getId(),
+            'model'             => 'Calendar_Model_Event'
         )), NULL, TRUE);
         
         // remove default admin
@@ -136,15 +130,15 @@ class Calendar_Controller_Resource extends Tinebase_Controller_Record_Abstract
     protected function _checkRight($_action)
     {
         switch ($_action) {
-        	case 'create':
-        	case 'update':
-        	case 'delete':
-        		if (! Tinebase_Core::getUser()->hasRight('Calendar', Calendar_Acl_Rights::MANAGE_RESOURCES)) {
-        			throw new Tinebase_Exception_AccessDenied("You don't have the right to manage resources");
-        		}
-        		break;
-        	default;
-        	   break;
+            case 'create':
+            case 'update':
+            case 'delete':
+                if (! Tinebase_Core::getUser()->hasRight('Calendar', Calendar_Acl_Rights::MANAGE_RESOURCES)) {
+                    throw new Tinebase_Exception_AccessDenied("You don't have the right to manage resources");
+                }
+                break;
+            default;
+               break;
         }
     }
 }

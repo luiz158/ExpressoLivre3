@@ -37,6 +37,7 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
         $this->_currentAccount = Tinebase_Core::getUser();
         $this->_purgeRecords = FALSE;
         $this->_resolveCustomFields = TRUE;
+        $this->_updateMultipleValidateEachRecord = TRUE;
         $this->_duplicateCheckFields = Addressbook_Config::getInstance()->get(Addressbook_Config::CONTACT_DUP_FIELDS, array(
             array('n_given', 'n_family', 'org_name'),
             array('email'),
@@ -45,7 +46,7 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
         // fields used for private and company address
         $this->_addressFields = array('locality', 'postalcode', 'street', 'countryname');
         
-        $this->_setGeoDataForContacts = Tinebase_Config::getInstance()->getConfig(Tinebase_Config::MAPPANEL, NULL, TRUE)->value;
+        $this->_setGeoDataForContacts = Tinebase_Config::getInstance()->get(Tinebase_Config::MAPPANEL, TRUE);
         if (! $this->_setGeoDataForContacts) {
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Mappanel/geoext/nominatim disabled with config option.');
         }
@@ -56,7 +57,7 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -138,7 +139,7 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
             if (empty($contact->container_id)) {
                 throw new Addressbook_Exception_NotFound('Contact is hidden from addressbook (container id is empty).');
             }
-            if (! $this->_currentAccount->hasGrant($contact->container_id, Tinebase_Model_Grants::GRANT_READ)) {
+            if (! Tinebase_Core::getUser()->hasGrant($contact->container_id, Tinebase_Model_Grants::GRANT_READ)) {
                 throw new Addressbook_Exception_AccessDenied('Read access to contact denied.');
             }
         }
@@ -302,6 +303,8 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
      * @param   Tinebase_Record_Interface $_record      the update record
      * @param   Tinebase_Record_Interface $_oldRecord   the current persistent record
      * @return  void
+     * 
+     * @todo remove system note for updated jpegphoto when images are modlogged (@see 0000284: modlog of contact images / move images to vfs)
      */
     protected function _inspectBeforeUpdate($_record, $_oldRecord)
     {
@@ -320,7 +323,17 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
         if ($addressDataChanged) {
             $this->_setGeoData($_record);
         }
-                
+        
+        if (isset($_record->jpegphoto) && ! empty($_record->jpegphoto)) {
+            // add system note when jpegphoto gets updated
+            $translate = $translate = Tinebase_Translation::getTranslation('Addressbook');
+            $noteMessage = $translate->_('Uploaded new contact image.');
+            $traceException = new Exception($noteMessage);
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                . ' ' . $traceException);
+            Tinebase_Notes::getInstance()->addSystemNote($_record, Tinebase_Core::getUser(), Tinebase_Model_Note::SYSTEM_NOTE_NAME_CHANGED, $noteMessage);
+        }
+        
         if (isset($_oldRecord->type) && $_oldRecord->type == Addressbook_Model_Contact::CONTACTTYPE_USER) {
             $_record->type = Addressbook_Model_Contact::CONTACTTYPE_USER;
         }
@@ -368,7 +381,7 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
             $nominatim->setCountry($country);
         }
         
-        try {            
+        try {
             $places = $nominatim->search();
             
             if (count($places) > 0) {
@@ -465,7 +478,7 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
      */
     public function parseAddressData($_address)
     {
-        $converter = new Addressbook_Convert_Contact_String(); 
+        $converter = new Addressbook_Convert_Contact_String();
         
         $result = array(
             'contact'             => $converter->toTine20Model($_address),

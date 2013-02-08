@@ -33,9 +33,9 @@ class Crm_Controller_Lead extends Tinebase_Controller_Record_Abstract
         $this->_sendNotifications       = TRUE;
         $this->_purgeRecords            = FALSE;
         $this->_doRightChecks           = TRUE;
+        $this->_resolveCustomFields     = TRUE;
         
         $this->_backend                 = new Crm_Backend_Lead();
-        $this->_currentAccount          = Tinebase_Core::getUser();
     }
     
     /**
@@ -43,7 +43,7 @@ class Crm_Controller_Lead extends Tinebase_Controller_Record_Abstract
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -209,14 +209,15 @@ class Crm_Controller_Lead extends Tinebase_Controller_Record_Abstract
         $recipients = $this->_getNotificationRecipients($_lead);
         // send notificaton to updater in any case!
         if (! in_array($_updater->accountId, $recipients)) {
-            $recipients[] = Addressbook_Controller_Contact::getInstance()->getContactByUserId($this->_currentAccount->getId(), TRUE)->getId();
+            $recipients[] = Addressbook_Controller_Contact::getInstance()->getContactByUserId(Tinebase_Core::getUser()->getId(), TRUE)->getId();
         }
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . $plain);
         
         try {
-            Tinebase_Notification::getInstance()->send($this->_currentAccount, $recipients, $subject, $plain, $html, array($attachment));
-        } catch (Tinebase_Exception $te) {
-            Tinebase_Core::getLogger()->warn(__CLASS__ . '::' . __METHOD__ . '::' . __LINE__ . ' ' . $te->getMessage());
+            Tinebase_Notification::getInstance()->send(Tinebase_Core::getUser(), $recipients, $subject, $plain, $html, array($attachment));
+        } catch (Exception $e) {
+            Tinebase_Core::getLogger()->warn(__CLASS__ . '::' . __METHOD__ . '::' . __LINE__ . ' ' . $e->getMessage());
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__CLASS__ . '::' . __METHOD__ . '::' . __LINE__ . ' ' . $e->getTraceAsString());
         }
     }
     
@@ -253,7 +254,7 @@ class Crm_Controller_Lead extends Tinebase_Controller_Record_Abstract
                         $recipients[] = Addressbook_Controller_Contact::getInstance()->getContactByUserId($grant['account_id'], TRUE)->getId();
                     } catch (Addressbook_Exception_NotFound $aenf) {
                         if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__CLASS__ . '::' . __METHOD__ . '::' . __LINE__ 
-                            . ' Do not send notification to non-existant user: ' . $aenf->getMessage()); 
+                            . ' Do not send notification to non-existant user: ' . $aenf->getMessage());
                     }
                 }
             }
@@ -328,7 +329,7 @@ class Crm_Controller_Lead extends Tinebase_Controller_Record_Abstract
                 
                 // check if relation is product and has price
                 if ($relation['type'] == 'PRODUCT') {
-                    $quantity = (isset($relation['remark']['quantity'])) ? $relation['remark']['quantity'] : 1; 
+                    $quantity = (isset($relation['remark']['quantity'])) ? $relation['remark']['quantity'] : 1;
                     $sum += $relation['remark']['price'] * (integer) $quantity;
                 }
             }

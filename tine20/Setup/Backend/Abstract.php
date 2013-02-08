@@ -6,7 +6,7 @@
  * @subpackage  Backend
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Matthias Greiling <m.greiling@metaways.de>
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 
 /**
@@ -176,7 +176,7 @@ abstract class Setup_Backend_Abstract implements Setup_Backend_Interface
                         break;
                         
                     default:
-                        throw new Setup_Exception('Unsupported special type ' . strtolower($field->value['special']));                    
+                        throw new Setup_Exception('Unsupported special type ' . strtolower($field->value['special']));
                     }
             } else {
                 $value = $field->value;
@@ -267,8 +267,8 @@ abstract class Setup_Backend_Abstract implements Setup_Backend_Interface
      */
     public function dropTable($_tableName, $_applicationId = NULL)
     {
-    	if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Dropping table ' . $_tableName);
-        $statement = "DROP TABLE " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName);
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Dropping table ' . $_tableName);
+        $statement = "DROP TABLE IF EXISTS " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName);
         $this->execQueryVoid($statement);
         
         if ($_applicationId !== NULL) {
@@ -296,9 +296,8 @@ abstract class Setup_Backend_Abstract implements Setup_Backend_Interface
      */
     public function columnExists($_columnName, $_tableName)
     {
-        $tableName = SQL_TABLE_PREFIX . $_tableName;
-        $tableInfo = $this->_db->describeTable($tableName);
-        return array_key_exists($_columnName, $tableInfo);
+        $columns = Tinebase_Db_Table::getTableDescriptionFromCache(SQL_TABLE_PREFIX . $_tableName, $this->_db); 
+        return array_key_exists($_columnName, $columns);
     }
     
     /**
@@ -310,7 +309,7 @@ abstract class Setup_Backend_Abstract implements Setup_Backend_Interface
     public function dropCol($_tableName, $_colName)
     {
         $statement = 'ALTER TABLE ' . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName) . ' DROP COLUMN ' . $this->_db->quoteIdentifier($_colName);
-        $this->execQueryVoid($statement);    
+        $this->execQueryVoid($statement);
     }
     
     /**
@@ -334,7 +333,7 @@ abstract class Setup_Backend_Abstract implements Setup_Backend_Interface
     public function dropPrimaryKey($_tableName)
     {
         $statement = "ALTER TABLE " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName) . " DROP PRIMARY KEY " ;
-        $this->execQueryVoid($statement);    
+        $this->execQueryVoid($statement);
     }
 
     /**
@@ -342,12 +341,12 @@ abstract class Setup_Backend_Abstract implements Setup_Backend_Interface
      * 
      * @param string tableName
      * @param Setup_Backend_Schema_Index_Abstract declaration
-     */       
+     */
     public function addForeignKey($_tableName, Setup_Backend_Schema_Index_Abstract $_declaration)
     {
         $statement = "ALTER TABLE " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName) . " ADD " 
                     . $this->getForeignKeyDeclarations($_declaration, $_tableName);
-        $this->execQueryVoid($statement);    
+        $this->execQueryVoid($statement);
     }
     
     /**
@@ -355,7 +354,7 @@ abstract class Setup_Backend_Abstract implements Setup_Backend_Interface
      * 
      * @param string tableName
      * @param string foreign key name
-     */     
+     */
     public function dropForeignKey($_tableName, $_name)
     {
         $statement = "ALTER TABLE " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName) 
@@ -376,11 +375,17 @@ abstract class Setup_Backend_Abstract implements Setup_Backend_Interface
      * 
      * @param string tableName 
      * @param string key name
-     */    
+     */
     public function dropIndex($_tableName, $_indexName)
     {
-        $statement = "ALTER TABLE " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName) . " DROP INDEX `"  . $_indexName. "`" ;
-        $this->execQueryVoid($statement);    
+        $statement = "ALTER TABLE " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName) . " DROP INDEX " . $this->_db->quoteIdentifier($_indexName);
+        try {
+            $this->execQueryVoid($statement);
+        } catch (Zend_Db_Statement_Exception $zdse) {
+            // try it again with table prefix
+            $statement = "ALTER TABLE " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName) . " DROP INDEX " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_indexName);
+            $this->execQueryVoid($statement);
+        }
     }
 
     /**
@@ -434,58 +439,58 @@ abstract class Setup_Backend_Abstract implements Setup_Backend_Interface
     protected function _addDeclarationFieldType(array $_buffer, Setup_Backend_Schema_Field_Abstract $_field, $_tableName = '')
     {
         $typeMapping = $this->getTypeMapping($_field->type);
-        if ($typeMapping) {
-            $fieldType = $typeMapping['defaultType'];
-            if (isset($typeMapping['declarationMethod'])) {
-                $fieldBuffer = call_user_func(array($this, $typeMapping['declarationMethod']), $_field, $_tableName);
-                $_buffer = array_merge($_buffer, $fieldBuffer); 
-            } else {
-                if ($_field->length !== NULL) {
-                	// Oracle don't have bigint or long - max number is 38 length 
-			        if ($this->_db instanceof Zend_Db_Adapter_Oracle) {
-                        if($_field->type == 'integer' && $_field->length == '64'){
-	                		$_field->length = '38';
-	                	}
-                	}
-                    if (isset($typeMapping['lengthTypes']) && is_array($typeMapping['lengthTypes'])) {
-                        foreach ($typeMapping['lengthTypes'] as $maxLength => $type) {
-                            if ($_field->length <= $maxLength) {
-                                $fieldType = $type;
-                                $scale  = '';
-                                if (isset($_field->scale)) {
-                                    $scale = ',' . $_field->scale;
-                                } elseif(isset($typeMapping['defaultScale'])) {
-                                    $scale = ',' . $typeMapping['defaultScale'];
-                                }
-                                 
-                                $options = "({$_field->length}{$scale})";
-                                break;
-                            }
-                        }
-                        if (!isset($options)) {
-                            throw new Setup_Backend_Exception_InvalidSchema("Could not get field declaration for field {$_field->name}: The given length of {$_field->length} is not supported by field type {$_field->type}");
-                        }
-                    } else {
-                        throw new Setup_Backend_Exception_InvalidSchema("Could not get field declaration for field {$_field->name}: Length option was specified but is not supported by field type {$_field->type}");
-                    }
-                } else {
-                    $options = '';
-                    if (isset($_field->value)) {
-                        foreach ($_field->value as $value) {
-                            $values[] = $value;
-                        }
-                        $options = "('" . implode("','", $values) . "')";
-                    } elseif(isset($typeMapping['defaultLength'])) {
-                        $scale = isset($typeMapping['defaultScale']) ? ',' . $typeMapping['defaultScale'] : '';
-                        $options = "({$typeMapping['defaultLength']}{$scale})";
-                    }
-                }
-    
-                $_buffer[] = $fieldType . $options;
-            }
-        } else {
+        if (!$typeMapping) {
             throw new Setup_Backend_Exception_InvalidSchema("Could not get field declaration for field {$_field->name}: The given field type {$_field->type} is not supported");
         }
+        
+        $fieldType = $typeMapping['defaultType'];
+        if (isset($typeMapping['declarationMethod'])) {
+            $fieldBuffer = call_user_func(array($this, $typeMapping['declarationMethod']), $_field, $_tableName);
+            $_buffer = array_merge($_buffer, $fieldBuffer);
+        } else {
+            if ($_field->length !== NULL) {
+                if ($this->_db instanceof Zend_Db_Adapter_Oracle) {
+                    if ($_field->type == 'integer' && $_field->length == '64') {
+                        $_field->length = '38';
+                    }
+                }
+                if (isset($typeMapping['lengthTypes']) && is_array($typeMapping['lengthTypes'])) {
+                    foreach ($typeMapping['lengthTypes'] as $maxLength => $type) {
+                        if ($_field->length <= $maxLength) {
+                            $fieldType = $type;
+                            $scale  = '';
+                            if (isset($_field->scale)) {
+                                $scale = ',' . $_field->scale;
+                            } elseif(isset($typeMapping['defaultScale'])) {
+                                $scale = ',' . $typeMapping['defaultScale'];
+                            }
+                             
+                            $options = "({$_field->length}{$scale})";
+                            break;
+                        }
+                    }
+                    if (!isset($options)) {
+                        throw new Setup_Backend_Exception_InvalidSchema("Could not get field declaration for field {$_field->name}: The given length of {$_field->length} is not supported by field type {$_field->type}");
+                    }
+                } else {
+                    throw new Setup_Backend_Exception_InvalidSchema("Could not get field declaration for field {$_field->name}: Length option was specified but is not supported by field type {$_field->type}");
+                }
+            } else {
+                $options = '';
+                if (isset($_field->value)) {
+                    foreach ($_field->value as $value) {
+                        $values[] = $value;
+                    }
+                    $options = "('" . implode("','", $values) . "')";
+                } elseif(isset($typeMapping['defaultLength'])) {
+                    $scale = isset($typeMapping['defaultScale']) ? ',' . $typeMapping['defaultScale'] : '';
+                    $options = "({$typeMapping['defaultLength']}{$scale})";
+                }
+            }
+
+            $_buffer[] = $fieldType . $options;
+        }
+        
         return $_buffer;
     }
     
@@ -536,6 +541,4 @@ abstract class Setup_Backend_Abstract implements Setup_Backend_Interface
         }
         return $_name;
     }
-    
-
 }

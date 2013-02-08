@@ -3,7 +3,7 @@
  * 
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2009 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  */
  
@@ -56,7 +56,7 @@ Tine.widgets.dialog.LinkPanel = Ext.extend(Ext.Panel, {
 
         this.initLinksDataView();
         this.items = [this.linksDataView];
-        this.on('added', Tine.widgets.dialog.EditDialog.prototype.addToDisableOnEditMultiple, this);
+        Tine.widgets.dialog.MultipleEditDialogPlugin.prototype.registerSkipItem(this);
        
         Tine.widgets.dialog.LinkPanel.superclass.initComponent.call(this);
     },
@@ -87,7 +87,6 @@ Tine.widgets.dialog.LinkPanel = Ext.extend(Ext.Panel, {
      * init activities data view
      */
     initLinksDataView: function() {
-        
         var linksTpl = new Ext.XTemplate(
             '<tpl for=".">',
                '<div class="x-widget-links-linkitem" id="{id}">',
@@ -99,12 +98,17 @@ Tine.widgets.dialog.LinkPanel = Ext.extend(Ext.Panel, {
             '</tpl>' ,{
                 relatedRecords: this.relatedRecords,
                 render: function(value, model, type, id) {
-                    var record = new this.relatedRecords[model].recordClass(value);
-                    
-                    var result = record.modelName 
-                        + ' ( <i>' + type + '</i> ): <a class="tinebase-relation-link" href="#" id="' + id + ':' + model + '">' 
-                        + Ext.util.Format.htmlEncode(record.getTitle()) + '</a>';
-                    
+                    var result = '',
+                        record = null;
+                    if (this.relatedRecords[model]) {
+                        Tine.log.debug('Tine.widgets.dialog.LinkPanel::initLinksDataView - showing link for ' + model);
+                        record = new this.relatedRecords[model].recordClass(value);
+                        result = record.modelName 
+                            + ' ( <i>' + type + '</i> ): <a class="tinebase-relation-link" href="#" id="' + id + ':' + model + '">' 
+                            + Ext.util.Format.htmlEncode(record.getTitle()) + '</a>';
+                    } else {
+                        Tine.log.warn('Tine.widgets.dialog.LinkPanel::initLinksDataView - ' + model + ' does in exist in related records!');
+                    }
                     return result;
                 }
             }
@@ -117,7 +121,7 @@ Tine.widgets.dialog.LinkPanel = Ext.extend(Ext.Panel, {
             store: this.store,
             overClass: 'x-view-over',
             itemSelector: 'activities-item-small' // don't forget that
-        }); 
+        });
     },
     
     /**

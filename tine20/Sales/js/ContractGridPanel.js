@@ -39,15 +39,20 @@ Tine.Sales.ContractGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         autoExpandColumn: 'title'
     },
     
+    multipleEdit: true,
+    
     initComponent: function() {
         this.recordProxy = Tine.Sales.contractBackend;
         
         this.gridConfig.columns = this.getColumns();
         this.initFilterToolbar();
-        
         this.plugins.push(this.filterToolbar);
         
         Tine.Sales.ContractGridPanel.superclass.initComponent.call(this);
+        this.action_addInNewWindow.actionUpdater = function() {
+            var defaultContainer = this.app.getRegistry().get('defaultContainer');
+            this.action_addInNewWindow.setDisabled(! defaultContainer.account_grants[this.action_addInNewWindow.initialConfig.requiredGrant]);
+        }
     },
     
     /**
@@ -55,6 +60,7 @@ Tine.Sales.ContractGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
      */
     initFilterToolbar: function() {
         this.filterToolbar = new Tine.widgets.grid.FilterToolbar({
+            recordClass: this.recordClass,
             filterModels: Tine.Sales.Model.Contract.getFilterModel(),
             defaultFilter: 'query',
             filters: [],
@@ -88,7 +94,22 @@ Tine.Sales.ContractGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
             header: this.app.i18n._("Status"),
             width: 100,
             sortable: true,
-            dataIndex: 'status'
-        }];
-    }  
+            dataIndex: 'status',
+            renderer: Tine.Tinebase.widgets.keyfield.Renderer.get('Sales', 'contractStatus')
+        },{
+            id: 'cleared',
+            header: this.app.i18n._("Cleared"),
+            width: 15,
+            sortable: true,
+            dataIndex: 'cleared',
+            renderer: Tine.Tinebase.widgets.keyfield.Renderer.get('Sales', 'contractCleared')
+        },{
+            id: 'cleared_in',
+            header: this.app.i18n._("Cleared in"),
+            width: 100,
+            sortable: true,
+            dataIndex: 'cleared_in'
+        }
+        ];
+    }
 });

@@ -27,29 +27,30 @@ Tine.Tasks.Application = Ext.extend(Tine.Tinebase.Application, {
 });
 
 // default mainscreen
-Tine.Tasks.MainScreen = Tine.widgets.MainScreen;
+Tine.Tasks.MainScreen = Ext.extend(Tine.widgets.MainScreen, {
+    activeContentType: 'Task'
+});
 
-Tine.Tasks.TreePanel = function(config) {
+Tine.Tasks.TaskTreePanel = function(config) {
     Ext.apply(this, config);
     
     this.id = 'TasksTreePanel';
-    this.recordClass = Tine.Tasks.Task;
+    this.recordClass = Tine.Tasks.Model.Task;
     
     this.filterMode = 'filterToolbar';
-    Tine.Tasks.TreePanel.superclass.constructor.call(this);
+    Tine.Tasks.TaskTreePanel.superclass.constructor.call(this);
 };
-Ext.extend(Tine.Tasks.TreePanel, Tine.widgets.container.TreePanel, {
+Ext.extend(Tine.Tasks.TaskTreePanel, Tine.widgets.container.TreePanel, {
     afterRender: function() {
         this.supr().afterRender.apply(this, arguments);
-        //this.selectContainerPath(Tine.Tinebase.container.getMyNodePath());
     }
 });
 
-Tine.Tasks.FilterPanel = function(config) {
+Tine.Tasks.TaskFilterPanel = function(config) {
     Ext.apply(this, config);
-    Tine.Tasks.FilterPanel.superclass.constructor.call(this);
+    Tine.Tasks.TaskFilterPanel.superclass.constructor.call(this);
 };
-Ext.extend(Tine.Tasks.FilterPanel, Tine.widgets.persistentfilter.PickerPanel, {
+Ext.extend(Tine.Tasks.TaskFilterPanel, Tine.widgets.persistentfilter.PickerPanel, {
     filter: [{field: 'model', operator: 'equals', value: 'Tasks_Model_TaskFilter'}]
 });
 

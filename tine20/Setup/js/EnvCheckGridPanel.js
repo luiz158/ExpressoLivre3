@@ -30,7 +30,7 @@ Ext.ns('Tine', 'Tine.Setup');
  * Create a new Tine.Setup.EnvCheckGridPanel
  */
  Tine.Setup.EnvCheckGridPanel = Ext.extend(Ext.Panel, {
-	
+    
     /**
      * @property actionToolbar
      * @type Ext.Toolbar
@@ -48,7 +48,7 @@ Ext.ns('Tine', 'Tine.Setup');
      */
     layout: 'border',
     border: false,
-	
+    
     /**
      * 
      * @cfg grid config 
@@ -56,17 +56,17 @@ Ext.ns('Tine', 'Tine.Setup');
     gridConfig: {
         autoExpandColumn: 'key'
     },
-	
+    
     /**
      * init component
      */
     initComponent: function() {
-    	
-    	this.gridConfig.columns = this.getColumns();
-    	
+        
+        this.gridConfig.columns = this.getColumns();
+        
         this.initActions();
         this.initStore();
-        this.initGrid();        
+        this.initGrid();
         this.initLayout();
 
         Tine.Setup.EnvCheckGridPanel.superclass.initComponent.call(this);
@@ -77,7 +77,7 @@ Ext.ns('Tine', 'Tine.Setup');
      * @private
      */
     initStore: function() {
-    	this.store = new Ext.data.JsonStore({
+        this.store = new Ext.data.JsonStore({
             fields: Tine.Setup.Model.EnvCheck,
             mode: 'local',
             id: 'key',
@@ -127,7 +127,7 @@ Ext.ns('Tine', 'Tine.Setup');
             autoFill: true,
             forceFit:true,
             ignoreAdd: true
-            //emptyText: String.format(Tine.Tinebase.translation._("No {0} where found. Please try to change your filter-criteria, view-options or the {1} you search in."), this.i18nRecordsName, this.i18nContainersName),
+            //emptyText: String.format(Tine.Tinebase.translation._("There could not be found any {0}. Please try to change your filter-criteria, view-options or the {1} you search in."), this.i18nRecordsName, this.i18nContainersName),
             /*
             onLoad: Ext.emptyFn,
             listeners: {
@@ -164,18 +164,18 @@ Ext.ns('Tine', 'Tine.Setup');
     },
 
     resultRenderer: function(value) {
-    	var icon = (value) ? 'images/oxygen/16x16/actions/dialog-apply.png' : 'images/oxygen/16x16/actions/dialog-cancel.png';
+        var icon = (value) ? 'images/oxygen/16x16/actions/dialog-apply.png' : 'images/oxygen/16x16/actions/dialog-cancel.png';
         return '<img class="TasksMainGridStatus" src="' + icon + '">';
     },
     
     messageRenderer: function(value) {
-    	// overwrite the default renderer to show links correctly
+        // overwrite the default renderer to show links correctly
         return value;
     },
     
     initActions: function() {
-    	// @todo add re-run checks here
-    	
+        // @todo add re-run checks here
+        
         this.action_reCheck = new Ext.Action({
             text: this.app.i18n._('Run setup tests'),
             handler: function() {
@@ -199,7 +199,7 @@ Ext.ns('Tine', 'Tine.Setup');
                 Tine.Setup.registry.replace('checkDB', true);
             }
         });
-    	/*
+        /*
         this.action_installApplications = new Ext.Action({
             text: this.app.i18n._('Install application'),
             handler: this.onAlterApplications,

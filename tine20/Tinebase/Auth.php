@@ -113,7 +113,7 @@ class Tinebase_Auth
      */
     private static $_backendConfigurationDefaults = array(
         self::SQL => array(
-        	'tryUsernameSplit' => '1',
+            'tryUsernameSplit' => '1',
             'accountCanonicalForm' => '2',
             'accountDomainName' => '',
             'accountDomainNameShort' => '',
@@ -194,6 +194,11 @@ class Tinebase_Auth
         $this->_backend->setIdentity($_username);
         $this->_backend->setCredential($_password);
         
+        if (Zend_Session::isStarted()) {
+            Zend_Auth::getInstance()->setStorage(new Zend_Auth_Storage_Session());
+        } else {
+            Zend_Auth::getInstance()->setStorage(new Zend_Auth_Storage_NonPersistent());
+        }
         $result = Zend_Auth::getInstance()->authenticate($this->_backend);
         
         if($result->isValid()) {
@@ -235,9 +240,9 @@ class Tinebase_Auth
     {
         if (!isset(self::$_backendType)) {
             if (Setup_Controller::getInstance()->isInstalled('Tinebase')) {
-                self::setBackendType(Tinebase_Config::getInstance()->getConfig(Tinebase_Config::AUTHENTICATIONBACKENDTYPE, null, self::SQL)->value);
+                self::setBackendType(Tinebase_Config::getInstance()->get(Tinebase_Config::AUTHENTICATIONBACKENDTYPE, self::SQL));
             } else {
-                self::setBackendType(self::SQL); 
+                self::setBackendType(self::SQL);
             }
         }
         
@@ -251,7 +256,7 @@ class Tinebase_Auth
     {
         $backendType = self::getConfiguredBackend();
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .' authentication backend: ' . $backendType);
-        $this->_backend = Tinebase_Auth_Factory::factory($backendType);        
+        $this->_backend = Tinebase_Auth_Factory::factory($backendType);
     }
     
     /**
@@ -323,8 +328,8 @@ class Tinebase_Auth
      */
     public static function saveBackendConfiguration()
     {
-        Tinebase_Config::getInstance()->setConfigForApplication(Tinebase_Config::AUTHENTICATIONBACKEND, Zend_Json::encode(self::getBackendConfiguration()));
-        Tinebase_Config::getInstance()->setConfigForApplication(Tinebase_Config::AUTHENTICATIONBACKENDTYPE, self::getConfiguredBackend());
+        Tinebase_Config::getInstance()->set(Tinebase_Config::AUTHENTICATIONBACKEND, self::getBackendConfiguration());
+        Tinebase_Config::getInstance()->set(Tinebase_Config::AUTHENTICATIONBACKENDTYPE, self::getConfiguredBackend());
     }
     
     /**
@@ -338,7 +343,7 @@ class Tinebase_Auth
         //lazy loading for $_backendConfiguration
         if (!isset(self::$_backendConfiguration)) {
             if (Setup_Controller::getInstance()->isInstalled('Tinebase')) {
-                $rawBackendConfiguration = Tinebase_Config::getInstance()->getConfig(Tinebase_Config::AUTHENTICATIONBACKEND, null, array())->value;
+                $rawBackendConfiguration = Tinebase_Config::getInstance()->get(Tinebase_Config::AUTHENTICATIONBACKEND, new Tinebase_Config_Struct())->toArray();
             } else {
                 $rawBackendConfiguration = array();
             }
@@ -346,7 +351,7 @@ class Tinebase_Auth
         }
 
         if (isset($_key)) {
-            return array_key_exists($_key, self::$_backendConfiguration) ? self::$_backendConfiguration[$_key] : $_default; 
+            return array_key_exists($_key, self::$_backendConfiguration) ? self::$_backendConfiguration[$_key] : $_default;
         } else {
             return self::$_backendConfiguration;
         }
@@ -390,7 +395,7 @@ class Tinebase_Auth
             if (!array_key_exists($_backendType, self::$_backendConfigurationDefaults)) {
                 throw new Tinebase_Exception_InvalidArgument("Unknown backend type '$_backendType'");
             }
-            return self::$_backendConfigurationDefaults[$_backendType]; 
+            return self::$_backendConfigurationDefaults[$_backendType];
         } else {
             return self::$_backendConfigurationDefaults;
         }

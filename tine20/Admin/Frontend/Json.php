@@ -51,15 +51,15 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     {
         // manage samba sam?
         if(isset(Tinebase_Core::getConfig()->samba)) {
-            $this->_manageSAM = Tinebase_Core::getConfig()->samba->get('manageSAM', false); 
+            $this->_manageSAM = Tinebase_Core::getConfig()->samba->get('manageSAM', false);
         }
         
         // manage email user settings
         if (Tinebase_EmailUser::manages(Tinebase_Config::IMAP)) {
-            $this->_manageImapEmailUser = TRUE; 
+            $this->_manageImapEmailUser = TRUE;
         }
         if (Tinebase_EmailUser::manages(Tinebase_Config::SMTP)) {
-            $this->_manageSmtpEmailUser = TRUE; 
+            $this->_manageSmtpEmailUser = TRUE;
         }
     }
     
@@ -70,9 +70,9 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      * @return mixed array 'variable name' => 'data'
      */
     public function getRegistryData()
-    {   
+    {
         $appConfigDefaults = Admin_Controller::getInstance()->getConfigSettings();
-        $smtpConfig = Tinebase_Config::getInstance()->getConfigAsArray(Tinebase_Config::SMTP);
+        $smtpConfig = Tinebase_Config::getInstance()->get(Tinebase_Config::SMTP, new Tinebase_Config_Struct())->toArray();
         
         $registryData = array(
             'manageSAM'                     => $this->_manageSAM,
@@ -84,8 +84,8 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             'defaultInternalAddressbook'    => ($appConfigDefaults[Admin_Model_Config::DEFAULTINTERNALADDRESSBOOK] !== NULL) 
                 ? Tinebase_Container::getInstance()->get($appConfigDefaults[Admin_Model_Config::DEFAULTINTERNALADDRESSBOOK])->toArray() 
                 : NULL,
-        );        
-        return $registryData;    
+        );
+        return $registryData;
     }
     
     /******************************* Access Log *******************************/
@@ -322,7 +322,6 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         return $result;
     }
     
-    
     /**
      * save user
      *
@@ -339,7 +338,7 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         unset($recordData['accountFullName']);
         
         try {
-            $account->setFromArray($recordData);
+            $account->setFromJsonInUsersTimezone($recordData);
             if (isset($recordData['sambaSAM'])) {
                 $account->sambaSAM = new Tinebase_Model_SAMUser($recordData['sambaSAM']);
             }
@@ -360,24 +359,14 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             return $result;
         }
         
+        // this needs long 3execution time because cache invalidation may take long
+        // @todo remove this when "0007266: make groups / group memberships cache cleaning more efficient" is resolved 
+        $oldMaxExcecutionTime = Tinebase_Core::setExecutionLifeTime(300); // 5 minutes
+        
         if ($account->getId() == NULL) {
-            if(!Tinebase_User_Registration::getInstance()->checkUniqueUsername($account->accountLoginName)) {
-                $result = array(
-                    'errors'            => 'invalid username',
-                    'errorMessage'      => 'Username already used.',
-                    'status'            => 'failure'
-                );
-                return $result;
-            }
-            
             $account = Admin_Controller_User::getInstance()->create($account, $password, $password);
         } else {
             $account = Admin_Controller_User::getInstance()->update($account, $password, $password);
-        }
-        
-        // after user update or creation add user to selected roles
-        if (isset($recordData['accountRoles']) && $recordData['accountRoles']) {
-            Tinebase_Acl_Roles::getInstance()->setRoleMemberships(array('id' => $account->accountId, 'type' => Tinebase_Acl_Rights::ACCOUNT_TYPE_USER), $recordData['accountRoles']);
         }
         
         $result = $this->_recordToJson($account);
@@ -392,7 +381,7 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         $userRoles = Tinebase_Acl_Roles::getInstance()->getMultiple(Tinebase_Acl_Roles::getInstance()->getRoleMemberships($account->accountId))->toArray();
         
         // encode the account array
-        $result['accountPrimaryGroup'] = $group;
+        $result['accountPrimaryGroup'] = $group->toArray();
         
         // encode the groups array
         $result['groups'] = array(
@@ -405,6 +394,8 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             'results'         => $userRoles,
             'totalcount'     => count($userRoles)
         );
+        
+        Tinebase_Core::setExecutionLifeTime($oldMaxExcecutionTime);
         
         return $result;
     }
@@ -471,7 +462,6 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         return $result;
     }
     
-    
     /**
      * adds the name of the account to each item in the name property
      * 
@@ -492,10 +482,18 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         foreach ($_items as $num => $item) {
             switch ($item[$prefix . 'type']) {
                 case Tinebase_Acl_Rights::ACCOUNT_TYPE_USER:
-                    $item[$prefix . 'name'] = Tinebase_User::getInstance()->getUserById($item[$prefix . 'id'])->accountDisplayName;
+                    try {
+                        $item[$prefix . 'name'] = Tinebase_User::getInstance()->getUserById($item[$prefix . 'id'])->accountDisplayName;
+                    } catch (Tinebase_Exception_NotFound $tenf) {
+                        $item[$prefix . 'name'] = 'Unknown user';
+                    }
                     break;
                 case Tinebase_Acl_Rights::ACCOUNT_TYPE_GROUP:
-                    $item[$prefix . 'name'] = Tinebase_Group::getInstance()->getGroupById($item[$prefix . 'id'])->name;
+                    try {
+                        $item[$prefix . 'name'] = Tinebase_Group::getInstance()->getGroupById($item[$prefix . 'id'])->name;
+                    } catch (Tinebase_Exception_Record_NotDefined $ternd) {
+                        $item[$prefix . 'name'] = 'Unknown group';
+                    }
                     break;
                 case Tinebase_Acl_Rights::ACCOUNT_TYPE_ANYONE:
                     $item[$prefix . 'name'] = 'Anyone';
@@ -614,7 +612,7 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
                     'id'        => $accountId,
                     'type'      => Tinebase_Acl_Rights::ACCOUNT_TYPE_USER,
                     'name'      => $account->accountDisplayName,
-                ); 
+                );
             }
                     
             $result['totalcount'] = count($result['results']);
@@ -641,16 +639,21 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         $group = new Tinebase_Model_Group($groupData);
         $group->members = $groupMembers;
         
+        // this needs long 3execution time because cache invalidation may take long
+        // @todo remove this when "0007266: make groups / group memberships cache cleaning more efficient" is resolved 
+        $oldMaxExcecutionTime = Tinebase_Core::setExecutionLifeTime(300); // 5 minutes
+        
         if ( empty($group->id) ) {
             $group = Admin_Controller_Group::getInstance()->create($group);
         } else {
             $group = Admin_Controller_Group::getInstance()->update($group);
         }
-
+        
+        Tinebase_Core::setExecutionLifeTime($oldMaxExcecutionTime);
+        
         return $this->getGroup($group->getId());
-        
-    }    
-        
+    }
+   
     /**
      * delete multiple groups
      *
@@ -713,7 +716,7 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     public function saveSambaMachine($recordData)
     {
         try {
-            $result = $this->_save($recordData, Admin_Controller_SambaMachine::getInstance(), 'SambaMachine', 'accountId'); 
+            $result = $this->_save($recordData, Admin_Controller_SambaMachine::getInstance(), 'SambaMachine', 'accountId');
         } catch (Admin_Exception $ae) {
             Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ . ' Error while saving samba machine: ' . $ae->getMessage());
             $result = array('success' => FALSE);
@@ -1005,7 +1008,7 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
                     "text"      => $description['text'],
                     "qtip"      => $description['description'],
                     "right"     => $right,
-                ); 
+                );
             }
 
             $result[] = $rightsForApplication;
@@ -1126,6 +1129,39 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         return $this->_delete($ids, Admin_Controller_Customfield::getInstance());
     }   
 
+    /****************************** other *******************************/
+    
+    /**
+     * returns phpinfo() output
+     * 
+     * @return array
+     */
+    public function getServerInfo()
+    {
+        if (! Tinebase_Core::getUser()->hasRight('Admin', Admin_Acl_Rights::RUN)) {
+            return FALSE;
+        }
+        
+        ob_start();
+        phpinfo();
+        $out = ob_get_clean();
+        
+        // only return body
+        $dom = new DOMDocument('1.0', 'UTF-8');
+        try {
+            $dom->loadHTML($out);
+            $body = $dom->getElementsByTagName('body');
+            $phpinfo = $dom->saveXml($body->item(0));
+        } catch (Exception $e) {
+            // no html (CLI)
+            $phpinfo = $out;
+        }
+        
+        return array(
+            'html' => $phpinfo
+        );
+    }
+    
     /****************************** common ******************************/
     
     /**
@@ -1150,9 +1186,10 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      *
      * @param Tinebase_Record_RecordSet $_records Tinebase_Record_Abstract
      * @param Tinebase_Model_Filter_FilterGroup $_filter
+     * @param Tinebase_Model_Pagination $_pagination
      * @return array data
      */
-    protected function _multipleRecordsToJson(Tinebase_Record_RecordSet $_records, $_filter = NULL)
+    protected function _multipleRecordsToJson(Tinebase_Record_RecordSet $_records, $_filter = NULL, $_pagination = NULL)
     {
         switch ($_records->getRecordClassName()) {
             case 'Tinebase_Model_AccessLog':
@@ -1179,7 +1216,6 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
                 break;
         }
         
-        $result = parent::_multipleRecordsToJson($_records, $_filter);
-        return $result;
+        return parent::_multipleRecordsToJson($_records, $_filter, $_pagination);
     }
 }

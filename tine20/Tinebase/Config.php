@@ -5,7 +5,7 @@
  * @package     Tinebase
  * @subpackage  Config
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  * 
  */
@@ -15,6 +15,8 @@
  * 
  * @package     Tinebase
  * @subpackage  Config
+ * 
+ * @todo remove all deprecated stuff
  */
 class Tinebase_Config extends Tinebase_Config_Abstract
 {
@@ -94,7 +96,7 @@ class Tinebase_Config extends Tinebase_Config_Abstract
      * @var string
      */
     const REDIRECTURL = 'redirectUrl';
-    
+   
     /**
      * redirect always
      * 
@@ -157,6 +159,90 @@ class Tinebase_Config extends Tinebase_Config_Abstract
      * @var string
      */
     const APPDEFAULTS = 'appdefaults';
+    
+    /**
+    * PASSWORD_CHANGE
+    *
+    * @var string
+    */
+    const PASSWORD_CHANGE = 'changepw';
+    
+    /**
+     * PASSWORD_POLICY_ACTIVE
+     *
+     * @var string
+     */
+    const PASSWORD_POLICY_ACTIVE = 'pwPolicyActive';
+    
+    /**
+     * PASSWORD_POLICY_ONLYASCII
+     *
+     * @var string
+     */
+    const PASSWORD_POLICY_ONLYASCII = 'pwPolicyOnlyASCII';
+    
+    /**
+     * PASSWORD_POLICY_MIN_LENGTH
+     *
+     * @var string
+     */
+    const PASSWORD_POLICY_MIN_LENGTH = 'pwPolicyMinLength';
+    
+    /**
+     * PASSWORD_POLICY_MIN_WORD_CHARS
+     *
+     * @var string
+     */
+    const PASSWORD_POLICY_MIN_WORD_CHARS = 'pwPolicyMinWordChars';
+    
+    /**
+     * PASSWORD_POLICY_MIN_UPPERCASE_CHARS
+     *
+     * @var string
+     */
+    const PASSWORD_POLICY_MIN_UPPERCASE_CHARS = 'pwPolicyMinUppercaseChars';
+    
+    /**
+     * PASSWORD_POLICY_MIN_SPECIAL_CHARS
+     *
+     * @var string
+     */
+    const PASSWORD_POLICY_MIN_SPECIAL_CHARS = 'pwPolicyMinSpecialChars';
+    
+    /**
+     * PASSWORD_POLICY_MIN_NUMBERS
+     *
+     * @var string
+     */
+    const PASSWORD_POLICY_MIN_NUMBERS = 'pwPolicyMinNumbers';
+    
+    /**
+     * PASSWORD_POLICY_FORBID_USERNAME
+     *
+     * @var string
+     */
+    const PASSWORD_POLICY_FORBID_USERNAME = 'pwPolicyForbidUsername';
+    
+    /**
+     * AUTOMATIC_BUGREPORTS
+     *
+     * @var string
+     */
+    const AUTOMATIC_BUGREPORTS = 'automaticBugreports';
+    
+    /**
+     * LAST_SESSIONS_CLEANUP_RUN
+     *
+     * @var string
+     */
+    const LAST_SESSIONS_CLEANUP_RUN = 'lastSessionsCleanupRun';
+    
+    /**
+     * MAX_LOGIN_FAILURES
+     *
+     * @var string
+     */
+    const MAX_LOGIN_FAILURES = 'maxLoginFailures';
     
     /**
      * (non-PHPdoc)
@@ -338,7 +424,127 @@ class Tinebase_Config extends Tinebase_Config_Abstract
             'setByAdminModule'      => FALSE,
             'setBySetupModule'      => TRUE,
         ),
-    );
+        self::PASSWORD_CHANGE => array(
+        //_('User may change password')
+            'label'                 => 'User may change password',
+        //_('User may change password')
+            'description'           => 'User may change password',
+            'type'                  => 'bool',
+            'clientRegistryInclude' => TRUE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => TRUE,
+        ),
+        self::PASSWORD_POLICY_ACTIVE => array(
+        //_('Enable password policy')
+            'label'                 => 'Enable password policy',
+        //_('Enable password policy')
+            'description'           => 'Enable password policy',
+            'type'                  => 'bool',
+            'clientRegistryInclude' => FALSE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => TRUE,
+        ),
+        self::PASSWORD_POLICY_ONLYASCII => array(
+        //_('Only ASCII')
+            'label'                 => 'Only ASCII',
+        //_('Only ASCII characters are allowed in passwords.')
+            'description'           => 'Only ASCII characters are allowed in passwords.',
+            'type'                  => 'bool',
+            'clientRegistryInclude' => FALSE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => TRUE,
+        ),
+        self::PASSWORD_POLICY_MIN_LENGTH => array(
+        //_('Minimum length')
+            'label'                 => 'Minimum length',
+        //_('Minimum password length')
+            'description'           => 'Minimum password length.',
+            'type'                  => 'int',
+            'clientRegistryInclude' => FALSE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => TRUE,
+        ),
+        self::PASSWORD_POLICY_MIN_WORD_CHARS => array(
+        //_('Minimum word chars')
+            'label'                 => 'Minimum word chars',
+        //_('Minimum word chars in password')
+            'description'           => 'Minimum word chars in password',
+            'type'                  => 'int',
+            'clientRegistryInclude' => FALSE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => TRUE,
+        ),
+        self::PASSWORD_POLICY_MIN_UPPERCASE_CHARS => array(
+        //_('Minimum uppercase chars')
+            'label'                 => 'Minimum uppercase chars',
+        //_('Minimum uppercase chars in password')
+            'description'           => 'Minimum uppercase chars in password',
+            'type'                  => 'int',
+            'clientRegistryInclude' => FALSE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => TRUE,
+        ),
+        self::PASSWORD_POLICY_MIN_SPECIAL_CHARS => array(
+        //_('Minimum special chars')
+            'label'                 => 'Minimum special chars',
+        //_('Minimum special chars in password')
+            'description'           => 'Minimum special chars in password',
+            'type'                  => 'int',
+            'clientRegistryInclude' => FALSE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => TRUE,
+        ),
+        self::PASSWORD_POLICY_MIN_NUMBERS => array(
+        //_('Minimum numbers')
+            'label'                 => 'Minimum numbers',
+        //_('Minimum numbers in password')
+            'description'           => 'Minimum numbers in password',
+            'type'                  => 'int',
+            'clientRegistryInclude' => FALSE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => TRUE,
+        ),
+        self::PASSWORD_POLICY_FORBID_USERNAME => array(
+        //_('Forbid part of username')
+            'label'                 => 'Forbid part of username',
+        //_('Forbid part of username in password')
+            'description'           => 'Forbid part of username in password',
+            'type'                  => 'bool',
+            'clientRegistryInclude' => FALSE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => TRUE,
+        ),
+        self::AUTOMATIC_BUGREPORTS => array(
+                                   //_('Automatic bugreports')
+            'label'                 => 'Automatic bugreports',
+                                   //_('Always send bugreports, even on timeouts and other exceptions / failures.')
+            'description'           => 'Always send bugreports, even on timeouts and other exceptions / failures.',
+            'type'                  => 'bool',
+            'clientRegistryInclude' => TRUE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => TRUE,
+        ),
+        self::LAST_SESSIONS_CLEANUP_RUN => array(
+                                   //_('Last sessions cleanup run')
+            'label'                 => 'Last sessions cleanup run',
+                                   //_('Stores the timestamp of the last sessions cleanup task run.')
+            'description'           => 'Stores the timestamp of the last sessions cleanup task run.',
+            'type'                  => self::TYPE_DATETIME,
+            'clientRegistryInclude' => FALSE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => FALSE,
+        ),
+        self::MAX_LOGIN_FAILURES => array(
+        //_('Maximum login failures')
+            'label'                 => 'Maximum login failures',
+        //_('Maximum allowed login failures before blocking account')
+            'description'           => 'Maximum allowed login failures before blocking account',
+            'type'                  => 'int',
+            'clientRegistryInclude' => FALSE,
+            'setByAdminModule'      => FALSE,
+            'setBySetupModule'      => TRUE,
+        ),
+        );
     
     /**
      * (non-PHPdoc)
@@ -402,30 +608,28 @@ class Tinebase_Config extends Tinebase_Config_Abstract
         $filters = array();
         $userApplications = Tinebase_Core::getUser()->getApplications(TRUE);
         foreach ($userApplications as $application) {
-            $config = $this->{$application->name};
-            if ($config instanceof Tinebase_Config_Abstract) {
+            $config = Tinebase_Config_Abstract::factory($application->name);
+            if ($config) {
                 $clientProperties[$application->name] = new Tinebase_Config_Struct(array());
                 $properties = $config->getProperties();
                 foreach( (array) $properties as $name => $definition) {
                     if (array_key_exists('clientRegistryInclude', $definition) && $definition['clientRegistryInclude'] === TRUE) {
                         // might not be too bad as we have a cache
-                        $clientProperties[$application->name][$name] = new Tinebase_Config_Struct(array(
+                        $configRegistryItem = new Tinebase_Config_Struct(array(
                             'value'         => $config->{$name},
                             // add definition here till we have a better palce
                             'definition'    => new Tinebase_Config_Struct($definition),
                         ));
-//                        $clientProperties[$application->name][$name] = $definition;
+                        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ 
+                            . ' ' . print_r($configRegistryItem->toArray(), TRUE));
+                        $clientProperties[$application->name][$name] = $configRegistryItem;
                     }
                 }
-                
-//                if (isset($clientProperties[$application->name])) {
-//                    $filters[] = array('condition' => 'AND', 'filters' => array(
-//                        array('field' => 'application_id', 'operator' => 'equals', 'value' => $application->getId()),
-//                        array('field' => 'name',           'operator' => 'in',     'value' => array_keys((array) $clientProperties[$application->name])),
-//                    ));
-//                }
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                    . ' Got ' . count($clientProperties[$application->name]) . ' config items for ' . $application->name . '.');
             }
         }
+        
         
 //        // get all configs at once
 //        $clientRecords = $this->_getBackend()->search(new Tinebase_Model_ConfigFilter(array(array('condition' => 'OR', 'filters' => $filters))));
@@ -454,118 +658,27 @@ class Tinebase_Config extends Tinebase_Config_Abstract
     }
     
     /**
-     * returns one config value identified by config name and application id
-     * -> value in config.inc.php overwrites value in db if $_fromFile is TRUE
+     * get application config
+     *
+     * @param  string  $applicationName Application name
+     * @return string  $configClassName
      * 
-     * @deprecated
-     * @param   string      $_name config name/key
-     * @param   string      $_applicationId application id [optional]
-     * @param   mixed       $_default the default value [optional]
-     * @param   boolean     $_fromFile get from config.inc.php [optional]
-     * @return  Tinebase_Model_Config  the config record
-     * @throws  Tinebase_Exception_NotFound
+     * @todo shouldn't this return a config object??
      */
-    public function getConfig($_name, $_applicationId = NULL, $_default = NULL, $_fromFile = TRUE)
+    public static function getAppConfig($applicationName)
     {
-        $applicationId = ($_applicationId !== NULL ) 
-            ? Tinebase_Model_Application::convertApplicationIdToInt($_applicationId) 
-            : Tinebase_Application::getInstance()->getApplicationByName('Tinebase')->getId();
-            
-        
-        $result = $this->_loadConfig($_name, $applicationId);
-        if (! $result) {
-            $result = new Tinebase_Model_Config(array(
-                'application_id'    => $applicationId,
-                'name'              => $_name,
-                'value'             => $_default,
-            ), TRUE);
-        }
-            
-        // check config.inc.php and get value from there
-        $configFileData = $this->_getConfigFileData();
-        if ($_fromFile && array_key_exists($_name, $configFileData)) {
-            Setup_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Overwriting config setting "' . $_name . '" with value from config.inc.php.');
-            $result->value = $configFileData[$_name];
-        } 
-        
-        return $result;
-    }
-
-    /**
-     * returns one config value identified by config name and application name as array (it was json encoded in db)
-     * 
-     * @deprecated 
-     * @param   string      $_name config name/key
-     * @param   string      $_applicationName
-     * @param   array       $_default the default value
-     * @return  array       the config array
-     * @throws Tinebase_Exception_NotFound
-     */
-    public function getConfigAsArray($_name, $_applicationName = 'Tinebase', $_default = array())
-    {
-        $config = $this->getConfig($_name, Tinebase_Application::getInstance()->getApplicationByName($_applicationName)->getId(), $_default);
-        
-        if (! is_object($config)) {
-            throw new Tinebase_Exception_NotFound('Config object ' . $_name . ' not found or is not an object!');
+        $configClassName = $applicationName . '_Config';
+        if (@class_exists($configClassName)) {
+            return $configClassName;
+        } else {
+            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
+                . ' Application ' . $applicationName . ' has no config.');
+            return NULL;
         }
         
         $result = (is_array($config->value)) ? $config->value : Zend_Json::decode($config->value);
         
         return $result;
-    }
-    
-    /**
-     * set config for application
-     *
-     * @deprecated use set / __set (if $_applicationName !== 'Tinebase' this needs a $_applicationName_Config class)
-     * @param string $_name
-     * @param string $_value
-     * @param string $_applicationName [optional]
-     * @return Tinebase_Model_Config
-     */
-    public function setConfigForApplication($_name, $_value, $_applicationName = 'Tinebase')
-    {
-        $value = (is_array($_value)) ? Zend_Json::encode($_value) : $_value;
-        
-        $configRecord = new Tinebase_Model_Config(array(
-            "application_id"    => Tinebase_Application::getInstance()->getApplicationByName($_applicationName)->getId(),
-            "name"              => $_name,
-            "value"             => $value,              
-        ));
-        
-        return $this->_saveConfig($configRecord);
-    }
-
-    /**
-     * deletes one config setting
-     * 
-     * @deprecated
-     * @param   Tinebase_Model_Config $_config record to delete
-     * @return void
-     */
-    public function deleteConfig(Tinebase_Model_Config $_config)
-    {
-        $this->_getBackend()->delete($_config->getId());
-        
-        Tinebase_Core::getCache()->clean(Zend_Cache::CLEANING_MODE_MATCHING_TAG, array('config'));
-    }
-    
-    /**
-     * Delete config for application (simplified deleteConfig())
-     *
-     * @deprecated
-     * @param string $_name
-     * @param string $_applicationName [optional]
-     * @return void
-     */
-    public function deleteConfigForApplication($_name, $_applicationName = 'Tinebase')
-    {
-        try {
-            $configRecord = $this->getConfig($_name, Tinebase_Application::getInstance()->getApplicationByName($_applicationName)->getId());
-            $this->deleteConfig($configRecord);
-        } catch (Tinebase_Exception_NotFound $e) {
-            //no config found => nothing to delete
-        }
     }
     
     /**
@@ -588,5 +701,45 @@ class Tinebase_Config extends Tinebase_Config_Abstract
         $result = (isset($option[$_label])) ? $option[$_label] : '';
         
         return $result;
-    }    
+    }
+        
+    public function getConfigAsArray($_name, $_applicationName = 'Tinebase', $_default = array())
+    {
+        $config = $this->getConfig($_name, Tinebase_Application::getInstance()->getApplicationByName($_applicationName)->getId(), $_default);
+        
+        if (! is_object($config)) {
+            throw new Tinebase_Exception_NotFound('Config object ' . $_name . ' not found or is not an object!');
+        }
+        Setup_Core::getLogger()->debug('/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\');
+        Setup_Core::getLogger()->debug($config);
+        Setup_Core::getLogger()->debug('/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\');
+        $result = (is_array($config->value)) ? $config->value : Zend_Json::decode($config->value);
+        
+        return $result;
+    }
+                
+    public function setConfig(Tinebase_Model_Config $_config)
+    {
+        Setup_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Setting config ' . $_config->name);
+                
+        try {
+            $config = $this->getConfig($_config->name, $_config->application_id, NULL, FALSE);
+            Setup_Core::getLogger()->debug('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+            Setup_Core::getLogger()->debug($config);
+            Setup_Core::getLogger()->debug('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+            // update
+            $config->value = $_config->value;
+            $result = $this->_backend->update($config);
+            Setup_Core::getLogger()->debug('00000000000000000000000000000000000');
+            Setup_Core::getLogger()->debug($config);
+            Setup_Core::getLogger()->debug('00000000000000000000000000000000000');
+        } catch (Tinebase_Exception_NotFound $e) {
+            // create new
+            $result = $this->_backend->create($_config);
+        }
+        
+        $this->_cache->clean(Zend_Cache::CLEANING_MODE_MATCHING_TAG, array('config'));
+        
+        return $result;
+    }
 }

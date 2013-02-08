@@ -42,6 +42,14 @@
           "path": "../library/OpenLayers/"
         },
         {
+          "text": "core.js",
+          "path": "../library/CryptoJS/"
+        },
+        {
+          "text": "sha1.js",
+          "path": "../library/CryptoJS/"
+        },
+        {
           "text": "GeoExt.js",
           "path": "../library/GeoExt/script/"
         },
@@ -56,6 +64,10 @@
         {
           "text": "RecordPickerManager.js",
           "path": "js/widgets/form/"
+        },
+        {
+          "text": "AddToRecordPanel.js",
+          "path": "js/widgets/dialog/"
         },
         {
           "text": "FieldLabeler.js",
@@ -88,6 +100,10 @@
         {
           "text": "Percentage.js",
           "path": "js/ux/"
+        },
+        {
+          "text": "ApplicationStarter.js",
+          "path": "js/"
         },
         {
           "text": "PopupWindow.js",
@@ -226,6 +242,10 @@
           "path": "js/ux/form/"
         },
         {
+          "text": "ComboBoxRecentsPlugin.js",
+          "path": "js/ux/form/"
+        },
+        {
           "text": "HorizontalFitLayout.js",
           "path": "js/ux/layout/"
         },
@@ -274,6 +294,10 @@
           "path": "js/ux/"
         },
         {
+          "text": "Function.deferByTickets.js",
+          "path": "js/ux/"
+        },
+        {
           "text": "Printer.js",
           "path": "js/ux/Printer/"
         },
@@ -304,6 +328,10 @@
         {
           "text": "AbstractBackend.js",
           "path": "js/data/"
+        },
+        {
+          "text": "RecentsManager.js",
+          "path": "js/"
         },
         {
           "text": "StateProvider.js",
@@ -374,6 +402,10 @@
           "path": "js/widgets/dialog/"
         },
         {
+          "text": "AddRelationsEditDialogPlugin.js",
+          "path": "js/widgets/dialog/"
+        },
+        {
           "text": "MultipleEditResultSummary.js",
           "path": "js/widgets/dialog/"
         },
@@ -415,10 +447,6 @@
         },
         {
           "text": "ExportDialog.js",
-          "path": "js/widgets/dialog/"
-        },
-        {
-          "text": "LinkPanel.js",
           "path": "js/widgets/dialog/"
         },
         {
@@ -515,6 +543,10 @@
         },
         {
             "text": "Manager.js",
+            "path": "js/widgets/relation/"
+        },
+        {
+            "text": "MenuItemManager.js",
             "path": "js/widgets/relation/"
         },
         {
@@ -634,6 +666,14 @@
           "path": "js/widgets/"
         },
         {
+          "text": "LicenseScreen.js",
+          "path": "js/"
+        },
+        {
+          "text": "CreditsScreen.js",
+          "path": "js/"
+        },
+        {
           "text": "CountryCombo.js",
           "path": "js/widgets/"
         },
@@ -646,6 +686,10 @@
           "path": "js/widgets/form/"
         },
         {
+          "text": "PickerCombo.js",
+          "path": "js/widgets/relation/"
+        },
+        {
           "text": "ConfigPanel.js",
           "path": "js/widgets/form/"
         },
@@ -655,6 +699,10 @@
         },
         {
           "text": "FileUploadButton.js",
+          "path": "js/widgets/form/"
+        },
+        {
+          "text": "UidTriggerField.js",
           "path": "js/widgets/form/"
         },
         {
@@ -809,7 +857,15 @@
           "path": "css/ux/display/"
         },
         {
+          "text": "CenterLayout.css",
+          "path": "css/ux/layout/"
+        },
+        {
           "text": "LockCombo.css",
+          "path": "css/ux/"
+        },
+        {
+          "text": "LockTextField.css",
           "path": "css/ux/"
         },
         {
@@ -842,6 +898,10 @@
         },
         {
           "text": "PreferencesPanel.css",
+          "path": "css/widgets/"
+        },
+        {
+          "text": "UidTriggerField.css",
           "path": "css/widgets/"
         },
         {

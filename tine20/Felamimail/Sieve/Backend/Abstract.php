@@ -138,8 +138,13 @@ abstract class Felamimail_Sieve_Backend_Abstract
         
         if (! empty($this->_vacation) && $this->_vacation->isEnabled() === true) {
             $require[] = '"vacation"';
-        }
             
+            if ($this->_vacation->useDates()) {
+                $require[] = '"date"';
+                $require[] = '"relational"';
+            }
+        }
+        
         return $require;
     }
 
@@ -152,6 +157,7 @@ abstract class Felamimail_Sieve_Backend_Abstract
     {
         $rules = '';
         
+        ksort($this->_rules);
         foreach ($this->_rules as $rule) {
             if ($rule->isEnabled() === true) {
                 $rules .= sprintf("%s %s", (empty($rules)) ? 'if' : 'elsif', $rule);

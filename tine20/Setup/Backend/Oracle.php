@@ -34,7 +34,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
             'defaultLength' => 1),
         'text' => array(
             'lengthTypes' => array(
-                4000 => 'VARCHAR2',
+                4000 => 'VARCHAR2',  
                 4294967295 => 'CLOB'),
             'defaultType' => 'CLOB',
             'defaultLength' => null),
@@ -50,6 +50,9 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
             'defaultLength' => 25),
         'date' => array(
             'defaultType' => 'date'),
+        'time' => array(
+            'defaultType' => 'VARCHAR2',
+            'defaultLength' => 10),
         'blob' => array(
             'defaultType' => 'BLOB'),
         'clob' => array(
@@ -67,10 +70,10 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
     CONST CONSTRAINT_TYPE_UNIQUE    = 'U';
     
     protected $_table ='';
-   
+    
     protected $_autoincrementId = '';
     
-    protected static $_sequence_postfix = '_seq';
+    protected static $_sequence_postfix = '_s';
     
     /**
      * takes the xml stream and creates a table
@@ -93,7 +96,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
             unset($this->_autoincrementId);
         }
         
-       foreach ($_table->indices as $index) {    
+       foreach ($_table->indices as $index) {
             if (empty($index->primary) && empty($index->unique) && !$index->foreign) {
                $this->addIndex($_table->name, $index);
             }
@@ -110,11 +113,12 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
     
     protected function _getIncrementSequenceName($_tableName)
     {
-        return SQL_TABLE_PREFIX . substr($_tableName, 0, 20) . self::$_sequence_postfix;
+        return SQL_TABLE_PREFIX . substr($_tableName, 0, 25) . self::$_sequence_postfix;
+        return $this->sequencename;
     }
     
     public function getIncrementSequence($_tableName) 
-    { 
+    {
         $statement = 'CREATE SEQUENCE ' . $this->_db->quoteIdentifier($this->_getIncrementSequenceName($_tableName)) . ' 
             MINVALUE 1
             MAXVALUE 999999999999999999999999999 
@@ -131,7 +135,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
     
     protected function _getIncrementTriggerName($_tableName) 
     {
-        return SQL_TABLE_PREFIX . substr($_tableName, 0, 20) . '_tri';
+        return SQL_TABLE_PREFIX . substr($_tableName, 0, 25) . '_t';
     }
     
     public function getIncrementTrigger($_tableName) 
@@ -140,7 +144,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
             BEFORE INSERT ON "' .  SQL_TABLE_PREFIX . $_tableName . '"
             FOR EACH ROW
             BEGIN
-            SELECT "' . SQL_TABLE_PREFIX .  substr($_tableName, 0, 20) . '_seq".NEXTVAL INTO :NEW."' . $this->_autoincrementId .'" FROM DUAL;
+            SELECT "' . SQL_TABLE_PREFIX .  substr($_tableName, 0, 25) . self::$_sequence_postfix .'".NEXTVAL INTO :NEW."' . $this->_autoincrementId .'" FROM DUAL;
             END;
         ';
     
@@ -157,7 +161,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
            $statementSnippets[] = $this->getFieldDeclarations($field, $_table->name);
         }
 
-        foreach ($_table->indices as $index) {    
+        foreach ($_table->indices as $index) {
             if ($index->foreign) {
                $statementSnippets[] = $this->getForeignKeyDeclarations($index, $_table->name);
             } else if ($index->primary || $index->unique) {
@@ -167,19 +171,45 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
         
         if (isset($_table->comment)) {
             //@todo support comments
-            //Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ . '  ignoring comment because comments are currently not supported by oracle adapter.');
+            Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ . '  ignoring comment because comments are currently not supported by oracle adapter.');
         }
         
         $statement .= implode(",\n", $statementSnippets) . "\n)";
-        
+        // remove ON DELETE RESTRICT, which is on default
+        $statement = str_replace('ON DELETE RESTRICT', '', $statement);
         // auto shutup by cweiss: echo "<pre>$statement</pre>";
         
         return $statement;
     }
     
+    /**
+     * (non-PHPdoc)
+     * @see Setup_Backend_Interface::getExistingForeignKeys()
+     * @todo implement Oracle specific logic
+     */
+    public function getExistingForeignKeys($tableName)
+    {
+        return array();
+        
+        $select = $this->_db->select()
+            ->from('information_schema.table_constraints', array('constraint_name'))
+            ->where($this->_db->quoteIdentifier('constraint_catalog') . ' = ?', $this->_config->database->dbname)
+            ->where($this->_db->quoteIdentifier('constraint_type') . ' = ?', 'FOREIGN KEY')
+            ->where($this->_db->quoteIdentifier('table_name') . ' = ?', $tableName);
+        
+        $stmt = $select->query();
+        $foreignKeyNames = $stmt->fetchColumn();
+        
+        Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . 
+            ' existing foreign keys: ' . print_r($foreignKeyNames, true));
+        
+        return $foreignKeyNames;
+    }
+    
+    
     public function getExistingSchema($_tableName)
     {
-        $tableInfo = $this->_getTableInfo($_tableName);       
+        $tableInfo = $this->_getTableInfo($_tableName);
         $existingTable = Setup_Backend_Schema_Table_Factory::factory('Oracle', $tableInfo);
         foreach ($tableInfo as $index => $tableColumn) {
             $field = Setup_Backend_Schema_Field_Factory::factory('Oracle', $tableColumn);
@@ -203,7 +233,8 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
     protected function _getTableInfo($_tableName)
     {
         $tableName = SQL_TABLE_PREFIX . $_tableName;
-        $tableInfo = $this->_db->describeTable($tableName);
+        $tableInfo = Tinebase_Db_Table::getTableDescriptionFromCache($tableName, $this->_db);
+
         $trigger = $this->_db->fetchRow("SELECT * FROM USER_TRIGGERS WHERE TRIGGER_NAME=?", array($this->_getIncrementTriggerName($_tableName)));
         $fieldComments = $this->_getFieldComments($_tableName);
         
@@ -217,7 +248,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
                         $field['DATA_TYPE'] = 'enum';
                         //extract allowed enum values to $field['TYPE_SPECIAL']
                         preg_match('/.* IN \((.*)\)$/', $constraint, $matches);
-                        $field['TYPE_SPECIAL'] = $matches[1]; 
+                        $field['TYPE_SPECIAL'] = $matches[1];
                     }
                     break;
             }
@@ -228,7 +259,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
                {
                 $field['EXTRA'] = 'auto_increment';
             }
-            //@todo aggregate more information liek auto_increment, indices, constraints etc. that have not been returned by describeTable
+            //@todo aggregate more information like auto_increment, indices, constraints etc. that have not been returned by describeTable
             
             $tableInfo[$index] = $field;
         }
@@ -308,7 +339,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
     public function setFieldComment($_tableName, $_fieldName, $_comment)
     {
         $statement = "COMMENT ON COLUMN " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName) . "." . $this->_db->quoteIdentifier($_fieldName) . " IS " . $this->_db->quote($_comment);
-        $this->execQueryVoid($statement); 
+        $this->execQueryVoid($statement);
     }
     
     public function getFieldComment($_tableName, $_fieldName)
@@ -318,7 +349,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
                 'table_name' => SQL_TABLE_PREFIX . $_tableName,
                 'column_name' => $_fieldName
             )
-        ); 
+        );
     }
     
     protected function _getFieldComments($_tableName)
@@ -354,7 +385,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
         }
         
         $statement .= $this->getFieldDeclarations($_declaration, $_tableName);
-        $this->execQueryVoid($statement);    
+        $this->execQueryVoid($statement);
     }
     
     /**
@@ -367,7 +398,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
     protected function _renameCol($_tableName, $_oldName, $_newName)
     {
         $statement = "ALTER TABLE " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName) . " RENAME  COLUMN " . $this->_db->quoteIdentifier($_oldName) . ' TO ' . $this->_db->quoteIdentifier($_newName);
-        $this->execQueryVoid($statement);    
+        $this->execQueryVoid($statement);
     }
     
     /**
@@ -399,7 +430,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
             $statement = "ALTER TABLE " . $this->_db->quoteIdentifier(SQL_TABLE_PREFIX . $_tableName) . " ADD " . $statement;
         }
         
-        $this->execQueryVoid($statement);    
+        $this->execQueryVoid($statement);
     }
     
     protected function _getConstraintEnumName($_tableName, $_fieldName)
@@ -506,7 +537,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
         
         $buffer[] = 'VARCHAR2(' . $length . ')';
         
-        $additional = ''; 
+        $additional = '';
         if ($_field->notnull === true) {
             $additional .= ' NOT NULL ';
         }
@@ -532,7 +563,7 @@ class Setup_Backend_Oracle extends Setup_Backend_Abstract
      * @throws  Setup_Exception_NotFound
      */
     public function getIndexDeclarations(Setup_Backend_Schema_Index_Abstract $_key, $_tableName = '')
-    {   
+    {
         if (empty($_tableName)) {
             throw new Tinebase_Exception_InvalidArgument('Missing required argument $_tableName');
         }

@@ -41,9 +41,9 @@ class Tinebase_Frontend_Json_ContainerTest extends PHPUnit_Framework_TestCase
      */
     public static function main()
     {
-		$suite  = new PHPUnit_Framework_TestSuite('Tinebase_Frontend_Json_ContainerTest');
+        $suite  = new PHPUnit_Framework_TestSuite('Tinebase_Frontend_Json_ContainerTest');
         PHPUnit_TextUI_TestRunner::run($suite);
-	}
+    }
 
     /**
      * Sets up the fixture.
@@ -71,7 +71,7 @@ class Tinebase_Frontend_Json_ContainerTest extends PHPUnit_Framework_TestCase
      */
     protected function tearDown()
     {
-	
+    
     }
     
     /**
@@ -83,6 +83,7 @@ class Tinebase_Frontend_Json_ContainerTest extends PHPUnit_Framework_TestCase
         $container = $this->_backend->addContainer('Addressbook', 'Tine 2.0 Unittest', Tinebase_Model_Container::TYPE_PERSONAL);
 
         $this->assertEquals('Tine 2.0 Unittest', $container['name']);
+        $this->assertEquals('Addressbook_Model_Contact', $container['model']);
         $this->assertTrue($container['account_grants'][Tinebase_Model_Grants::GRANT_ADMIN]);
 
         Tinebase_Container::getInstance()->deleteContainer($container['id']);
@@ -97,7 +98,7 @@ class Tinebase_Frontend_Json_ContainerTest extends PHPUnit_Framework_TestCase
         $container = $this->_backend->addContainer('Addressbook', 'Tine 2.0 Unittest', Tinebase_Model_Container::TYPE_PERSONAL);
 
         $this->assertEquals('Tine 2.0 Unittest', $container['name']);
-
+        $this->assertEquals('Addressbook_Model_Contact', $container['model']);
         $this->_backend->deleteContainer($container['id']);
         
         $this->setExpectedException('Tinebase_Exception_NotFound');
@@ -120,13 +121,13 @@ class Tinebase_Frontend_Json_ContainerTest extends PHPUnit_Framework_TestCase
         $container = $this->_backend->renameContainer($container['id'], 'Tine 2.0 Unittest renamed');
 
         $this->assertEquals('Tine 2.0 Unittest renamed', $container['name']);
+        $this->assertEquals('Addressbook_Model_Contact', $container['model']);
 
-        
         $this->_backend->deleteContainer($container['id']);
         
         $this->setExpectedException('Tinebase_Exception_NotFound');
         
-        $container = Tinebase_Container::getInstance()->getContainerById($container['id']);    
+        $container = Tinebase_Container::getInstance()->getContainerById($container['id']);
     }
     
     /**
@@ -189,8 +190,8 @@ class Tinebase_Frontend_Json_ContainerTest extends PHPUnit_Framework_TestCase
 
         $container = Tinebase_Container::getInstance()->getContainerById($container['id']);
     }
-}		
-	
+}        
+    
 
 if (PHPUnit_MAIN_METHOD == 'Tinebase_Frontend_Json_ContainerTest::main') {
     Tinebase_Frontend_Json_ContainerTest::main();

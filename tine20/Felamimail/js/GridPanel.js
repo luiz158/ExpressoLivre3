@@ -28,18 +28,18 @@ Ext.namespace('Tine.Felamimail');
  * Create a new Tine.Felamimail.GridPanel
  */
 Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
-	/**
-	 * record class
-	 * @cfg {Tine.Felamimail.Model.Message} recordClass
-	 */
+    /**
+     * record class
+     * @cfg {Tine.Felamimail.Model.Message} recordClass
+     */
     recordClass: Tine.Felamimail.Model.Message,
     
-	/**
-	 * message detail panel
-	 * 
-	 * @type Tine.Felamimail.GridDetailsPanel
-	 * @property detailsPanel
-	 */
+    /**
+     * message detail panel
+     * 
+     * @type Tine.Felamimail.GridDetailsPanel
+     * @property detailsPanel
+     */
     detailsPanel: null,
     
     /**
@@ -55,12 +55,14 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
      */
     movingOrDeleting: false,
     
+    manualRefresh: false,
+    
     /**
      * @private model cfg
      */
     evalGrants: false,
     filterSelectionDelete: true,
-    // autoRefresh is done via onFolderStoreUpdate
+    // autoRefresh is done via onUpdateFolderStore
     autoRefreshInterval: false,
     
     /**
@@ -208,7 +210,8 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
                 if (refresh && this.noDeleteRequestInProgress()) {
                     Tine.log.debug('Refresh grid because of folder update.');
                     this.loadGridData({
-                        removeStrategy: 'keepBuffered'
+                        removeStrategy: 'keepBuffered',
+                        autoRefresh: true
                     });
                 }
             }
@@ -566,7 +569,7 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
             renderer: Ext.util.Format.fileSize
         }];
     },
-    
+
     /**
      * Smime renderer
      *
@@ -655,17 +658,17 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
             result = '';
             
         if (record.hasFlag('\\Answered')) {
-            icons.push({src: 'images/oxygen/16x16/actions/mail-reply-sender.png', qtip: _('Answered')});
+            icons.push({src: 'images/oxygen/16x16/actions/mail-reply-sender.png', qtip: Ext.util.Format.htmlEncode(_('Answered'))});
         }   
         if (record.hasFlag('Passed')) {
-            icons.push({src: 'images/oxygen/16x16/actions/mail-forward.png', qtip: _('Forwarded')});
+            icons.push({src: 'images/oxygen/16x16/actions/mail-forward.png', qtip: Ext.util.Format.htmlEncode(_('Forwarded'))});
         }   
 //        if (record.hasFlag('\\Recent')) {
 //            icons.push({src: 'images/oxygen/16x16/actions/knewstuff.png', qtip: _('Recent')});
 //        }   
         
         Ext.each(icons, function(icon) {
-            result += '<img class="FelamimailFlagIcon" src="' + icon.src + '" ext:qtip="' + icon.qtip + '">';
+            result += '<img class="FelamimailFlagIcon" src="' + icon.src + '" ext:qtip="' + Tine.Tinebase.common.doubleEncode(icon.qtip) + '">';
         }, this);
         
         return result;
@@ -713,19 +716,19 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
      * executed when user clicks refresh btn
      */
     doRefresh: function() {
-        var tree = this.app.getMainScreen().getTreePanel(),
-            node = tree ? tree.getSelectionModel().getSelectedNode() : null,
-            folder = node ? this.app.getFolderStore().getById(node.id) : null,
+        var folder = this.getCurrentFolderFromTree(),
             refresh = this.pagingToolbar.refresh;
             
         // refresh is explicit
         this.editBuffer = [];
-            
+        this.manualRefresh = true;
+        
         if (folder) {
             refresh.disable();
-            Tine.log.info('user forced mail check for folder "' + folder.get('localname') + '"');
+            Tine.log.info('User forced mail check for folder "' + folder.get('localname') + '"');
             this.app.checkMails(folder, function() {
                 refresh.enable();
+                this.manualRefresh = false;
             });
         } else {
             this.filterToolbar.onFilterChange();
@@ -733,6 +736,18 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
     },
     
     /**
+     * get currently selected folder from tree
+     * @return {Tine.Felamimail.Model.Folder}
+     */
+    getCurrentFolderFromTree: function() {
+        var tree = this.app.getMainScreen().getTreePanel(),
+            node = tree ? tree.getSelectionModel().getSelectedNode() : null,
+            folder = node ? this.app.getFolderStore().getById(node.id) : null;
+        
+        return folder;
+    },
+
+    /*
      * Export messages handler
      * 
      * @return {void}
@@ -760,7 +775,6 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
                 messageId: msgsIds
             }
         }).start(); 
-
     },
     
     /**
@@ -785,7 +799,12 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         }
         else
             {
-                return (Tine.Felamimail.registry.get('preferences').get('confirmUseTrash') == '1' && (trash && ! trash.isCurrentSelection()) || (! trash && trashConfigured)) ? this.moveSelectedMessages(trash, true) : this.deleteSelectedMessages();
+                var account = this.app.getActiveAccount(),
+                trashId = (account) ? account.getTrashFolderId() : null,
+                trash = trashId ? this.app.getFolderStore().getById(trashId) : null,
+                trashConfigured = (account.get('trash_folder'));
+
+            return (trash && ! trash.isCurrentSelection()) || (! trash && trashConfigured) ? this.moveSelectedMessages(trash, true) : this.deleteSelectedMessages();
             }
     },
     
@@ -834,8 +853,9 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         
         var sm = this.getGrid().getSelectionModel(),
             filter = sm.getSelectionFilter(),
-            msgsIds = [];
-
+            msgsIds = [],
+            foldersNeedUpdate = false;
+        
         if (sm.isFilterSelect) {
             var msgs = this.getStore(),
                 nextRecord = null;
@@ -849,23 +869,39 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
             var isSeen = msg.hasFlag('\\Seen'),
                 currFolder = this.app.getFolderStore().getById(msg.get('folder_id')),
                 diff = isSeen ? 0 : 1;
-                
+            
             if (currFolder) {
                 currFolder.set('cache_unreadcount', currFolder.get('cache_unreadcount') - diff);
                 currFolder.set('cache_totalcount', currFolder.get('cache_totalcount') - 1);
+                if (sm.isFilterSelect && sm.getCount() > 50 && currFolder.get('cache_status') !== 'pending') {
+                    Tine.log.debug('Tine.Felamimail.GridPanel::moveOrDeleteMessages - Set cache status to pending for folder ' + currFolder.get('globalname'));
+                    currFolder.set('cache_status', 'pending');
+                    foldersNeedUpdate = true;
+                }
+                currFolder.commit();
             }
             if (folder) {
                 increaseUnreadCountInTargetFolder += diff;
             }
            
             msgsIds.push(msg.id);
-            this.getStore().remove(msg);    
+            this.getStore().remove(msg);
         },  this);
         
         if (folder && increaseUnreadCountInTargetFolder > 0) {
             // update unread count of target folder (only when moving)
             folder.set('cache_unreadcount', folder.get('cache_unreadcount') + increaseUnreadCountInTargetFolder);
-        }            
+            if (foldersNeedUpdate) {
+                Tine.log.debug('Tine.Felamimail.GridPanel::moveOrDeleteMessages - Set cache status to pending for target folder ' + folder.get('globalname'));
+                folder.set('cache_status', 'pending');
+            }
+            folder.commit();
+        }
+        
+        if (foldersNeedUpdate) {
+            Tine.log.debug('Tine.Felamimail.GridPanel::moveOrDeleteMessages - update message cache for "pending" folders');
+            this.app.checkMailsDelayedTask.delay(1000);
+        }
         
         this.deleteQueue = this.deleteQueue.concat(msgsIds);
         this.pagingToolbar.refresh.disable();
@@ -878,12 +914,12 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         if (folder !== null || toTrash) {
             // move
             var targetFolderId = (toTrash) ? '_trash_' : folder.id;
-            this.deleteTransactionId = Tine.Felamimail.messageBackend.moveMessages(filter, targetFolderId, { 
+            this.deleteTransactionId = Tine.Felamimail.messageBackend.moveMessages(filter, targetFolderId, {
                 callback: callbackFn
-            }); 
+            });
         } else {
             // delete
-            this.deleteTransactionId = Tine.Felamimail.messageBackend.addFlags(filter, '\\Deleted', { 
+            this.deleteTransactionId = Tine.Felamimail.messageBackend.addFlags(filter, '\\Deleted', {
                 callback: callbackFn
             });
         }
@@ -955,12 +991,12 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
                 if (['reply', 'forward'].indexOf(action) !== -1) {
                     msg.addFlag(action === 'reply' ? '\\Answered' : 'Passed');
                 } else if (action == 'senddraft') {
-                    this.deleteTransactionId = Tine.Felamimail.messageBackend.addFlags(msg.id, '\\Deleted', { 
+                    this.deleteTransactionId = Tine.Felamimail.messageBackend.addFlags(msg.id, '\\Deleted', {
                         callback: this.onAfterDelete.createDelegate(this, [[msg.id]])
                     });
                 }
             }, this);
-		} 
+        } 
     },
     
     /**
@@ -977,7 +1013,8 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         if (this.noDeleteRequestInProgress()) {
             Tine.log.debug('Loading grid data after delete.');
             this.loadGridData({
-                removeStrategy: 'keepBuffered'
+                removeStrategy: 'keepBuffered',
+                autoRefresh: true
             });
         }
     },
@@ -1085,8 +1122,8 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
             folder = this.app.getFolderStore().getById(record.get('folder_id')),
             account = this.app.getAccountStore().getById(folder.get('account_id')),
             action = (folder.get('globalname') == account.get('drafts_folder')) ? 'senddraft' :
-                     folder.get('globalname') == account.get('templates_folder') ? 'sendtemplate' : null,
-           	win;
+                      folder.get('globalname') == account.get('templates_folder') ? 'sendtemplate' : null,
+            win;
         
         // check folder to determine if mail should be opened in compose dlg
         if (action !== null) {
@@ -1099,7 +1136,7 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
             });
         } else {
             win = Tine.Felamimail.MessageDisplayDialog.openWindow({
-                record: record,
+                record: Ext.encode(record.data),
                 listeners: {
                     scope: this,
                     'update': this.onAfterCompose.createDelegate(this, ['compose', []], 1),
@@ -1192,9 +1229,13 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
                     folder = this.app.getFolderStore().getById(msg.get('folder_id')),
                     diff = (action === 'clear' && isSeen) ? 1 :
                            (action === 'add' && ! isSeen) ? -1 : 0;
-                           
+                
                 if (folder) {
                     folder.set('cache_unreadcount', folder.get('cache_unreadcount') + diff);
+                    if (sm.isFilterSelect && sm.getCount() > 50 && folder.get('cache_status') !== 'pending') {
+                        Tine.log.debug('Tine.Felamimail.GridPanel::moveOrDeleteMessages - Set cache status to pending for folder ' + folder.get('globalname'));
+                        folder.set('cache_status', 'pending');
+                    }
                     folder.commit();
                 }
             }
@@ -1203,6 +1244,11 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
             
             this.addToEditBuffer(msg);
         }, this);
+        
+        if (sm.isFilterSelect && sm.getCount() > 50) {
+            Tine.log.debug('Tine.Felamimail.GridPanel::moveOrDeleteMessages - Update message cache for "pending" folders');
+            this.app.checkMailsDelayedTask.delay(1000);
+        }
         
         // do request
         Tine.Felamimail.messageBackend[action+ 'Flags'](filter, flag);
@@ -1231,6 +1277,15 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         this.supr().onStoreLoad.apply(this, arguments);
         
         Tine.log.debug('Tine.Felamimail.GridPanel::onStoreLoad(): store loaded new records.');
+        
+        var folder = this.getCurrentFolderFromTree();
+        if (folder && records.length < folder.get('cache_totalcount')) {
+            Tine.log.debug('Tine.Felamimail.GridPanel::onStoreLoad() - Count mismatch: got ' + records.length + ' records for folder ' + folder.get('globalname'));
+            Tine.log.debug(folder);
+            folder.set('cache_status', 'pending');
+            folder.commit();
+            this.app.checkMailsDelayedTask.delay(1000);
+        }
         
         this.updateQuotaBar();
     },
@@ -1367,7 +1422,7 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
                     treePanel.accountStore.add([account]);
                 }
             }
-        });        
+        });
     },
     
     /**
@@ -1406,7 +1461,7 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         doc.write(content);
         doc.close();
         
-        frame.contentWindow.focus(); 
+        frame.contentWindow.focus();
         frame.contentWindow.print();
         
         // removeing frame chrashes chrome

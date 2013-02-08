@@ -5,7 +5,7 @@
  * @package     Tinebase
  * @subpackage  User
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2010-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2010-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  */
 
@@ -47,7 +47,7 @@ class Tinebase_EmailUser_Imap_Cyrus extends Tinebase_User_Plugin_Abstract
     public function __construct(array $_options = array())
     {
         // get cyrus imap config options (host, username, password, port)
-        $imapConfig = Tinebase_Config::getInstance()->getConfigAsArray(Tinebase_Config::IMAP);
+        $imapConfig = Tinebase_Config::getInstance()->get(Tinebase_Config::IMAP, new Tinebase_Config_Struct())->toArray();
         
         // merge _config and dovecot imap
         $this->_config = array_merge($this->_config, $imapConfig['cyrus']);
@@ -58,7 +58,8 @@ class Tinebase_EmailUser_Imap_Cyrus extends Tinebase_User_Plugin_Abstract
         $this->_config['port']   = !empty($imapConfig['port']) ? $imapConfig['port'] : 143;
         $this->_config['ssl']    = $imapConfig['ssl'] != 'none' ? $imapConfig['ssl'] : false;
         
-        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' cyrus imap config: ' . print_r($this->_config, true));
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ 
+            . ' cyrus imap config: ' . print_r($this->_config, true));
     }
     
     /**
@@ -70,7 +71,7 @@ class Tinebase_EmailUser_Imap_Cyrus extends Tinebase_User_Plugin_Abstract
     public function getNewUser(Tinebase_Model_FullUser $_user)
     {
         $result = new Tinebase_Model_EmailUser(array(
-            'emailUserId' 	=> $this->_appendDomain($_user->accountLoginName),
+            'emailUserId'     => $this->_appendDomain($_user->accountLoginName),
             'emailUsername' => $this->_appendDomain($_user->accountLoginName)
         ));
         
@@ -138,8 +139,9 @@ class Tinebase_EmailUser_Imap_Cyrus extends Tinebase_User_Plugin_Abstract
      * 
      * @param  string  $_userId
      * @param  string  $_password
+     * @param  bool    $_encrypt encrypt password
      */
-    public function inspectSetPassword($_userId, $_password)
+    public function inspectSetPassword($_userId, $_password, $_encrypt = TRUE)
     {
         // nothing to be done for cyrus imap server
     }
@@ -195,7 +197,7 @@ class Tinebase_EmailUser_Imap_Cyrus extends Tinebase_User_Plugin_Abstract
         $imap = ($_imap !== NULL) ? $_imap : $this->_getImapConnection();
         $mailboxString = ($_mailboxString !== NULL) ? $_mailboxString : $this->_getUserMailbox($_user->accountLoginName);
         
-        $limit = $_user->imapUser->emailMailQuota > 0 ? convertToBytes($_user->imapUser->emailMailQuota . 'M') / 1024 : null;
+        $limit = (isset($_user->imapUser) && $_user->imapUser->emailMailQuota) > 0 ? convertToBytes($_user->imapUser->emailMailQuota . 'M') / 1024 : null;
         $imap->setQuota($mailboxString, 'STORAGE', $limit);
     }
     
@@ -222,7 +224,7 @@ class Tinebase_EmailUser_Imap_Cyrus extends Tinebase_User_Plugin_Abstract
      * get mailbox string for users aka user.loginname
      * 
      * @param  string  $_username  the imap account name
-     * @throws Tinebase_Exception_InvalidArgument
+     * @throws Tinebase_Exception_NotFound
      * @return string
      */
     protected function _getUserMailbox($_username)
@@ -232,7 +234,7 @@ class Tinebase_EmailUser_Imap_Cyrus extends Tinebase_User_Plugin_Abstract
         $namespaces = $imap->getNamespace();
         
         if (!isset($namespaces['other'])) {
-            throw new Tinebase_Exception_InvalidArgument('other namespace not found');
+            throw new Tinebase_Exception_NotFound('other namespace not found');
         }
         
         $mailboxString = $namespaces['other']['name'] . $this->_appendDomain($_username);
@@ -256,13 +258,19 @@ class Tinebase_EmailUser_Imap_Cyrus extends Tinebase_User_Plugin_Abstract
      * check if user exists already in dovecot user table
      * 
      * @param  Tinebase_Model_FullUser  $_user
+     * @return boolean
      */
     protected function _userExists(Tinebase_Model_FullUser $_user)
     {
+        try {
+            $mailboxString = $this->_getUserMailbox($_user->accountLoginName);
+        } catch (Tinebase_Exception_NotFound $tenf) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
+                . " Mailbox of user " . $_user->accountLoginName . " not found: " . $tenf->getMessage());
+            return false;
+        }
+        
         $imap = $this->_getImapConnection();
-        
-        $mailboxString = $this->_getUserMailbox($_user->accountLoginName);
-        
         $mailboxes = $imap->listMailbox('', $mailboxString);
         
         if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . " search for {$mailboxString} in " . print_r($mailboxes, true));

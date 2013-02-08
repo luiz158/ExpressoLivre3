@@ -18,7 +18,7 @@
  * @subpackage  Record
  */
 class Crm_Model_Config extends Tinebase_Record_Abstract 
-{   
+{
     /**
      * lead states config
      * 
@@ -95,7 +95,8 @@ class Crm_Model_Config extends Tinebase_Record_Abstract
      * @param bool $_onlyIds
      * @return array
      */
-    public function getEndedLeadstates($_onlyIds = FALSE) {
+    public function getEndedLeadstates($_onlyIds = FALSE)
+    {
         $result = array();
         foreach($this->leadstates as $leadstate) {
             if ($leadstate['endslead']) {
@@ -105,5 +106,4 @@ class Crm_Model_Config extends Tinebase_Record_Abstract
         
         return $result;
     }
-    
-} // end of Crm_Model_Config
+}

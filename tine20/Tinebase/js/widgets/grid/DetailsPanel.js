@@ -193,7 +193,9 @@ Tine.widgets.grid.DetailsPanel = Ext.extend(Ext.Panel, {
     onDetailsUpdate: function(sm) {
         var count = sm.getCount();
         if (count === 0 || sm.isFilterSelect) {
-            this.layout.setActiveItem(this.getDefaultInfosPanel());
+            if(this.layout && Ext.isFunction(this.layout.setActiveItem)) {
+                this.layout.setActiveItem(this.getDefaultInfosPanel());
+            }
             this.showDefault(this.getDefaultInfosPanel().body);
             this.record = null;
         } else if (count === 1) {
@@ -203,7 +205,7 @@ Tine.widgets.grid.DetailsPanel = Ext.extend(Ext.Panel, {
         } else if (count > 1) {
             this.layout.setActiveItem(this.getMultiRecordsPanel());
             this.record = sm.getSelected();
-        	this.showMulti(sm, this.getMultiRecordsPanel().body);
+            this.showMulti(sm, this.getMultiRecordsPanel().body);
         }
     },
     
@@ -218,5 +220,48 @@ Tine.widgets.grid.DetailsPanel = Ext.extend(Ext.Panel, {
         }
         
         return this.loadMask;
+    },
+    
+    /**
+     * Wraps the items with default layout
+     * 
+     * @param {Array} items
+     * @return {Object}
+     */
+    wrapPanel: function(items, labelWidth) {
+        return {
+            layout: 'fit',
+            border: false,
+            items: [{
+                layout: 'vbox',
+                border: false,
+                layoutConfig: {
+                    align:'stretch'
+                },
+                items: [{
+                    layout: 'hbox',
+                    flex: 1,
+                    border: false,
+                    layoutConfig: {
+                        padding:'5',
+                        align:'stretch'
+                    },
+                    defaults:{
+                        margins:'0 5 0 0'
+                    },
+                    items: [{
+                        flex: 2,
+                        layout: 'ux.display',
+                        labelWidth: labelWidth,
+                        padding: 10,
+                        layoutConfig: {
+                            background: 'solid',
+                            margins: '0 5 0 0'
+                        },
+                        items: items
+                    }]
+                }]
+            }]
+        }
     }
 });

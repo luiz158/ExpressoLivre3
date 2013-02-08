@@ -44,7 +44,7 @@ class Felamimail_Controller_Folder
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -61,4 +61,5 @@ class Felamimail_Controller_Folder
         
         return self::$_instance;
     }
+
 }

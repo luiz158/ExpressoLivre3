@@ -3,7 +3,7 @@
  * Tinebase Csv Export class
  *
  * @package     Tinebase
- * @subpackage	Export
+ * @subpackage    Export
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
  * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
@@ -15,7 +15,7 @@
  * Tinebase Csv Export class
  * 
  * @package     Tinebase
- * @subpackage	Export
+ * @subpackage    Export
  */
 class Tinebase_Export_Csv extends Tinebase_Export_Abstract implements Tinebase_Record_IteratableInterface
 {
@@ -25,6 +25,13 @@ class Tinebase_Export_Csv extends Tinebase_Export_Abstract implements Tinebase_R
      * @var array
      */
     protected $_relationsTypes = array();
+    
+    /**
+     * relation subfields
+     * 
+     * @var array
+     */
+    protected $_relationFields = array();
     
     /**
      * special fields
@@ -91,7 +98,7 @@ class Tinebase_Export_Csv extends Tinebase_Export_Abstract implements Tinebase_R
         $string = "";
         $writeDelimiter = false;
         foreach($dataArray as $dataElement) {
-            if ($writeDelimiter) { 
+            if ($writeDelimiter) {
                 $string .= $delimiter;
             }
             $escapedDataElement = (! is_array($dataElement)) ? preg_replace("/$enclosure/", $escapeEnclosure . $enclosure , $dataElement) : '';
@@ -139,9 +146,15 @@ class Tinebase_Export_Csv extends Tinebase_Export_Abstract implements Tinebase_R
             
             $fields = array();
             foreach ($record->getFields() as $key) {
-                $fields[] = $key;
-                if (in_array($key, array_keys($this->_specialFields))) {
-                    $fields[] = $this->_specialFields[$key];
+                if ($key === 'customfields') {
+                    foreach ($this->_getCustomFieldNames() as $cfName) {
+                        $fields[] = $cfName;
+                    }
+                } else {
+                    $fields[] = $key;
+                    if (in_array($key, array_keys($this->_specialFields))) {
+                        $fields[] = $this->_specialFields[$key];
+                    }
                 }
             }
             
@@ -149,13 +162,34 @@ class Tinebase_Export_Csv extends Tinebase_Export_Abstract implements Tinebase_R
                 $fields[] = 'tags';
             }
             $fields = array_diff($fields, $this->_skipFields);
-            $fields = array_merge($fields, $this->_relationsTypes);
+            $fields = array_merge($fields, $this->_getRelationFields());
             $this->_fields = $fields;
             
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' fields to export: ' . implode(', ', $fields));
         }
         
         return $this->_fields;
+    }
+    
+    /**
+     * get relation fields
+     * 
+     * @return array
+     */
+    protected function _getRelationFields()
+    {
+        $result = array();
+        foreach ($this->_relationsTypes as $relationType) {
+            if (isset($this->_relationFields[$relationType])) {
+                foreach ($this->_relationFields[$relationType] as $relationField) {
+                    $result[] = $relationType . '-' . $relationField;
+                }
+            } else {
+                $result[] = $relationType;
+            }
+        }
+        
+        return $result;
     }
     
     /**
@@ -172,15 +206,22 @@ class Tinebase_Export_Csv extends Tinebase_Export_Abstract implements Tinebase_R
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Exporting ' . count($_records) . ' records ...');
         
         $this->_resolveRecords($_records);
-        $_records->setTimezone(Tinebase_Core::get('userTimeZone'));
     
         if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . print_r($_records->toArray(), TRUE));
         
         foreach ($_records as $record) {
             $csvArray = array();
             foreach ($this->_getFields() as $fieldName) {
-                if (in_array($fieldName, $this->_relationsTypes)) {
-                    $csvArray[] = $this->_addRelations($record, $fieldName);
+                if (in_array($fieldName, $this->_relationsTypes)
+                    || (! empty($this->_relationsTypes) && preg_match('/^' . implode('|', $this->_relationsTypes) . '-/', $fieldName))
+                ) {
+                    if (strpos($fieldName, '-') !== FALSE) {
+                        list($relationType, $recordField) = explode('-', $fieldName);
+                    } else {
+                        $relationType = $fieldName;
+                        $recordField = NULL;
+                    }
+                    $csvArray[] = $this->_addRelations($record, $relationType, $recordField, TRUE);
                 } else if (in_array($fieldName, $this->_specialFields)) {
                     $arrayFlipped = array_flip($this->_specialFields);
                     $csvArray[] = $this->_addSpecialValue($record, $arrayFlipped[$fieldName]);
@@ -190,6 +231,8 @@ class Tinebase_Export_Csv extends Tinebase_Export_Abstract implements Tinebase_R
                     $csvArray[] = $this->_addNotes($record);
                 } else if ($fieldName == 'container_id') {
                     $csvArray[] = $this->_getContainer($record, 'id');
+                } else if (in_array($fieldName, $this->_getCustomFieldNames())) {
+                    $csvArray[] = $record->customfields[$fieldName];
                 } else {
                     $csvArray[] = $record->{$fieldName};
                 }

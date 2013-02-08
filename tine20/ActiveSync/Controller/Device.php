@@ -4,11 +4,8 @@
  *
  * @package     ActiveSync
  * @subpackage  Controller
- * @license     http://www.tine20.org/licenses/agpl-nonus.txt AGPL Version 1 (Non-US)
- *              NOTE: According to sec. 8 of the AFFERO GENERAL PUBLIC LICENSE (AGPL), 
- *              Version 1, the distribution of the Tine 2.0 ActiveSync module in or to the 
- *              United States of America is excluded from the scope of this license.
- * @copyright   Copyright (c) 2010 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @copyright   Copyright (c) 2010-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  */
 
@@ -62,7 +59,6 @@ class ActiveSync_Controller_Device extends Tinebase_Controller_Record_Abstract
      */
     private function __construct() {
         $this->_backend         = new ActiveSync_Backend_Device();
-        $this->_currentAccount  = Tinebase_Core::getUser();
     }
     
     /**
@@ -70,7 +66,7 @@ class ActiveSync_Controller_Device extends Tinebase_Controller_Record_Abstract
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -119,26 +115,26 @@ class ActiveSync_Controller_Device extends Tinebase_Controller_Record_Abstract
     {
         $device = $this->_backend->get($_deviceId);
         
-        if($device->owner_id != $this->_currentAccount->getId()) {
+        if($device->owner_id != Tinebase_Core::getUser()->getId()) {
             throw new Tinebase_Exception_AccessDenied('not owner of device ' . $_deviceId);
         }
         
         $filterId = empty($_filterId) ? null : $_filterId;
         
         switch($_class) {
-            case ActiveSync_Controller::CLASS_CALENDAR:
+            case Syncroton_Data_Factory::CLASS_CALENDAR:
                 $device->calendarfilter_id = $filterId;
                 break;
                 
-            case ActiveSync_Controller::CLASS_CONTACTS:
+            case Syncroton_Data_Factory::CLASS_CONTACTS:
                 $device->contactsfilter_id = $filterId;
                 break;
                 
-            case ActiveSync_Controller::CLASS_EMAIL:
+            case Syncroton_Data_Factory::CLASS_EMAIL:
                 $device->emailfilter_id = $filterId;
                 break;
                 
-            case ActiveSync_Controller::CLASS_TASKS:
+            case Syncroton_Data_Factory::CLASS_TASKS:
                 $device->tasksfilter_id = $filterId;
                 break;
                 

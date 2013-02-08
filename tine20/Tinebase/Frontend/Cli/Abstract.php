@@ -61,7 +61,7 @@ class Tinebase_Frontend_Cli_Abstract
         }
         
         if (! $this->_checkAdminRight()) {
-            return FALSE; 
+            return FALSE;
         }
         
         $application = Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName);
@@ -87,7 +87,7 @@ class Tinebase_Frontend_Cli_Abstract
     public function setContainerGrants(Zend_Console_Getopt $_opts)
     {
         if (! $this->_checkAdminRight()) {
-            return FALSE; 
+            return FALSE;
         }
         
         $data = $this->_parseArgs($_opts, array('accountId', 'grants'));
@@ -108,6 +108,58 @@ class Tinebase_Frontend_Cli_Abstract
         }
         
         return TRUE;
+    }
+    
+    /**
+     * create demo data
+     * 
+     * example usages: 
+     * (1) $ php tine20.php --method=Calendar.createDemoData --username=admin --password=xyz locale=de users=pwulf,rwright // Creates demo events for pwulf and rwright with the locale de, just de and en is supported at the moment
+     * (2) $ php tine20.php --method=Calendar.createDemoData --username=admin --password=xyz models=Calendar,Event sharedonly // Creates shared calendars and events with the default locale en                
+     * (3) $ php tine20.php --method=Calendar.createDemoData --username=admin --password=xyz // Creates all demo calendars and events for all users
+     * 
+     * @param Zend_Console_Getopt $_opts
+     */
+    
+    public function createDemoData($_opts)
+    {
+        // just admins can perform this action
+        if (! $this->_checkAdminRight()) {
+            return FALSE;
+        }
+        $args = $this->_parseArgs($_opts, array());
+
+        $createUsers = in_array('sharedonly', $args['other']) ? false : true;
+        $createShared = in_array('noshared', $args['other']) ? false : true;
+        
+        $locale     = isset($args['locale']) ? $args['locale'] : 'en';
+        
+        if(isset($args['users'])) {
+            $users = is_array($args['users']) ? $args['users'] : array($args['users']);
+        } else {
+            $users = null;
+        }
+        
+        if(isset($args['models'])) {
+            $models = is_array($args['models']) ? $args['models'] : array($args['models']);
+        } else {
+            $models = null;
+        }
+        $className = $this->_applicationName . '_Setup_DemoData';
+        
+        if(class_exists($className)) {
+//             echo chr(10);
+//             echo 'Creating Demo Data for Application ' . $this->_applicationName . ' ...' . chr(10);
+            if($className::getInstance()->createDemoData($locale, $models, $users, $createShared, $createUsers)) {
+                echo 'Demo Data was created successfully' . chr(10) . chr(10);
+            } else {
+                echo 'No Demo Data has been created' . chr(10) . chr(10);
+            }
+        } else {
+            echo chr(10);
+            echo 'Creating Demo Data is not implemented yet for this Application!' . chr(10);
+            echo chr(10);
+        }
     }
     
     /**
@@ -195,6 +247,7 @@ class Tinebase_Frontend_Cli_Abstract
      * import records
      *
      * @param Zend_Console_Getopt   $_opts
+     * @return array import result
      */
     protected function _import($_opts)
     {
@@ -202,14 +255,17 @@ class Tinebase_Frontend_Cli_Abstract
         
         if ($_opts->d) {
             $args['dryrun'] = 1;
+            if ($_opts->v) {
+                echo "Doing dry run.\n";
+            }
         }
         
-        if (array_key_exists('definition', $args))  {       
+        if (array_key_exists('definition', $args))  {
             if (preg_match("/\.xml/", $args['definition'])) {
                 $definition = Tinebase_ImportExportDefinition::getInstance()->getFromFile(
                     $args['definition'],
                     Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName)->getId()
-                ); 
+                );
             } else {
                 $definition = Tinebase_ImportExportDefinition::getInstance()->getByName($args['definition']);
             }
@@ -223,13 +279,14 @@ class Tinebase_Frontend_Cli_Abstract
         }
         
         // loop files in argv
+        $result = array();
         foreach ((array) $args['filename'] as $filename) {
             // read file
             if ($_opts->v) {
                 echo "reading file $filename ...";
             }
             try {
-                $result = $importer->importFile($filename);
+                $result[$filename] = $importer->importFile($filename);
                 if ($_opts->v) {
                     echo "done.\n";
                 }
@@ -244,16 +301,22 @@ class Tinebase_Frontend_Cli_Abstract
                 continue;
             }
             
-            echo "Imported " . $result['totalcount'] . " records. Import failed for " . $result['failcount'] . " records. \n";
-            if (isset($result['duplicatecount']) && ! empty($result['duplicatecount'])) {
-                echo "Found " . $result['duplicatecount'] . " duplicates.\n";
+            echo "Imported " . $result[$filename]['totalcount'] . " records. Import failed for " . $result[$filename]['failcount'] . " records. \n";
+            if (isset($result[$filename]['duplicatecount']) && ! empty($result[$filename]['duplicatecount'])) {
+                echo "Found " . $result[$filename]['duplicatecount'] . " duplicates.\n";
             }
-                        
+            
             // import (check if dry run)
-            if ($_opts->d) {
-                print_r($result['results']->toArray());
+            if ($_opts->d && $_opts->v) {
+                print_r($result[$filename]['results']->toArray());
+                
+                if ($result[$filename]['failcount'] > 0) {
+                    print_r($result[$filename]['exceptions']->toArray());
+                }
             } 
         }
+        
+        return $result;
     }
 
     /**
@@ -292,5 +355,51 @@ class Tinebase_Frontend_Cli_Abstract
         }
         
         return $results;
+    }
+    
+    /**
+     * import from egroupware
+     *
+     * @param Zend_Console_Getopt $_opts
+     */
+    public function importegw14($_opts)
+    {
+        $args = $_opts->getRemainingArgs();
+        
+        if (count($args) < 1 || ! is_readable($args[0])) {
+            echo "can not open config file \n";
+            echo "see tine20.org/wiki/EGW_Migration_Howto for details \n\n";
+            echo "usage: ./tine20.php --method=Appname.importegw14 /path/to/config.ini  (see Tinebase/Setup/Import/Egw14/config.ini)\n\n";
+            exit(1);
+        }
+        
+        try {
+            $config = new Zend_Config_Ini($args[0]);
+            if ($config->{strtolower($this->_applicationName)}) {
+                $config = $config->{strtolower($this->_applicationName)};
+            }
+        } catch (Zend_Config_Exception $e) {
+            fwrite(STDERR, "Error while parsing config file($args[0]) " .  $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+        
+        $writer = new Zend_Log_Writer_Stream('php://output');
+        $logger = new Zend_Log($writer);
+        
+        $filter = new Zend_Log_Filter_Priority((int) $config->loglevel);
+        $logger->addFilter($filter);
+        
+        $class_name = $this->_applicationName . '_Setup_Import_Egw14';
+        if (! class_exists($class_name)) {
+            $logger->ERR(__METHOD__ . '::' . __LINE__ . " no import for {$this->_applicationName} available");
+            continue;
+        }
+        
+        try {
+            $importer = new $class_name($config, $logger);
+            $importer->import();
+        } catch (Exception $e) {
+            $logger->ERR(__METHOD__ . '::' . __LINE__ . " import for {$this->_applicationName} failed ". $e->getMessage());
+        }
     }
 }

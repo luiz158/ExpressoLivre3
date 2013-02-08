@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <application>
     <name>Felamimail</name>
-    <version>5.8</version>
+    <version>7.3</version>
     <order>30</order>
     <status>enabled</status>
     <tables>
         <table>
             <name>felamimail_account</name>
-            <version>17</version>
+            <version>19</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -89,10 +89,7 @@
                 <field>
                     <name>has_children_support</name>
                     <type>boolean</type>
-                </field>
-                <field> <!-- deprecated, remove with next schema update -->
-                    <name>sort_folders</name>
-                    <type>boolean</type>
+                    <default>true</default>
                 </field>
                 <field>
                     <name>delimiter</name>
@@ -168,6 +165,7 @@
                 <field>
                     <name>sieve_vacation_active</name>
                     <type>boolean</type>
+                    <default>false</default>
                 </field>
                 <field>
                     <name>sieve_ssl</name>
@@ -202,10 +200,16 @@
                     <name>deleted_by</name>
                     <type>text</type>
                     <length>40</length>
-                </field>            
+                </field>
                 <field>
                     <name>deleted_time</name>
                     <type>datetime</type>
+                </field>
+                <field>
+                    <name>seq</name>
+                    <type>integer</type>
+                    <notnull>true</notnull>
+                    <default>0</default>
                 </field>
                 <index>
                     <name>id</name>
@@ -235,7 +239,7 @@
         </table>
         <table>
             <name>felamimail_folder</name>
-            <version>10</version>
+            <version>11</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -271,17 +275,17 @@
                 <field>
                     <name>is_selectable</name>
                     <type>boolean</type>
-                    <default>1</default>
+                    <default>true</default>
                 </field>
                 <field>
                     <name>has_children</name>
                     <type>boolean</type>
-                    <default>0</default>
+                    <default>false</default>
                 </field>
                 <field>
                     <name>system_folder</name>
                     <type>boolean</type>
-                    <default>0</default>
+                    <default>false</default>
                 </field>
                 <field>
                     <name>imap_status</name>
@@ -420,11 +424,6 @@
                     <length>256</length>
                 </field>
                 <field>
-                    <name>structure</name>
-                    <type>blob</type>
-                    <notnull>true</notnull>
-                </field>
-                <field>
                     <name>has_attachment</name>
                     <type>boolean</type>
                     <default>false</default>
@@ -459,7 +458,7 @@
                 <field>
                     <name>timestamp</name>
                     <type>datetime</type>
-                </field>                
+                </field>
                 <field>
                     <name>smime</name>
                     <type>integer</type>
@@ -517,7 +516,7 @@
             </declaration>
         </table>
         <table>
-            <name>felamimail_cache_message_flag</name>
+            <name>felamimail_cache_msg_flag</name>
             <version>1</version>
             <declaration>
                 <field>
@@ -673,13 +672,11 @@
         </table>
         <table>
             <name>felamimail_sieve_rule</name>
-            <version>1</version>
+            <version>2</version>
             <declaration>
                 <field>
                     <name>id</name>
-                    <type>text</type>
-                    <length>40</length>
-                    <notnull>true</notnull>
+                    <type>integer</type>
                 </field>
                 <field>
                     <name>account_id</name>
@@ -721,7 +718,7 @@
         </table>
         <table>
             <name>felamimail_sieve_vacation</name>
-            <version>1</version>
+            <version>2</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -761,6 +758,14 @@
                 <field>
                     <name>addresses</name>
                     <type>text</type>
+                </field>
+                <field>
+                    <name>start_date</name>
+                    <type>datetime</type>
+                </field>
+                <field>
+                    <name>end_date</name>
+                    <type>datetime</type>
                 </field>
                 <field>
                     <name>enabled</name>

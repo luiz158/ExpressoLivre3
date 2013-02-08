@@ -31,8 +31,7 @@ class Felamimail_Controller_Message_Move extends Felamimail_Controller_Message_A
      */
     private function __construct() 
     {
-        $this->_backend = Felamimail_Backend_Message::getInstance();
-        $this->_currentAccount = Tinebase_Core::getUser();
+        $this->_backend = new Felamimail_Backend_Cache_Sql_Message();
     }
     
     /**
@@ -40,7 +39,7 @@ class Felamimail_Controller_Message_Move extends Felamimail_Controller_Message_A
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -50,7 +49,7 @@ class Felamimail_Controller_Message_Move extends Felamimail_Controller_Message_A
      */
     public static function getInstance() 
     {
-        if (self::$_instance === NULL) {            
+        if (self::$_instance === NULL) {
             self::$_instance = new Felamimail_Controller_Message_Move();
         }
         
@@ -75,9 +74,9 @@ class Felamimail_Controller_Message_Move extends Felamimail_Controller_Message_A
         if ($_messages instanceof Tinebase_Model_Filter_FilterGroup) {
             $iterator = new Tinebase_Record_Iterator(array(
                 'iteratable' => $this,
-            	'controller' => $this, 
-            	'filter'     => $_messages,
-            	'function'   => 'processMoveIteration',
+                'controller' => $this, 
+                'filter'     => $_messages,
+                'function'   => 'processMoveIteration',
             ));
             $iterateResult = $iterator->iterate($targetFolder);
             
@@ -85,7 +84,7 @@ class Felamimail_Controller_Message_Move extends Felamimail_Controller_Message_A
                 . ' Moved ' . $iterateResult['totalcount'] . ' message(s).');
             
             // @todo return all results?
-            $result = array_pop($iterateResult['results']);
+            $result = (! empty($iterateResult['results'])) ? array_pop($iterateResult['results']) : new Tinebase_Record_RecordSet('Felamimail_Model_Folder');
         } else {
             $messages = $this->_convertToRecordSet($_messages, TRUE);
             $result = $this->processMoveIteration($messages, $targetFolder);
@@ -103,6 +102,10 @@ class Felamimail_Controller_Message_Move extends Felamimail_Controller_Message_A
      */
     public function processMoveIteration($_messages, $_targetFolder)
     {
+        $folderName = ($_targetFolder instanceof Felamimail_Model_Folder ? $_targetFolder->globalname : $_targetFolder);
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+            . ' About to move ' . count($_messages) . ' messages to ' . $folderName);
+        
         $_messages->addIndices(array('folder_id'));
         
         $movedMessages = FALSE;
@@ -115,8 +118,13 @@ class Felamimail_Controller_Message_Move extends Felamimail_Controller_Message_A
             $result = new Tinebase_Record_RecordSet('Felamimail_Model_Folder');
         } else {
             // delete messages in local cache
-            $number = $this->_backend->delete($_messages->getArrayOfIds());
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Deleted ' . $number .' messages from cache');
+            try {
+                $number = $this->_backend->delete($_messages->getArrayOfIds());
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Deleted ' . $number .' messages from cache');
+            } catch (Zend_Db_Statement_Exception $zdse) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ .
+                    ' Error deleting cached messages from folder ' . $folderName . ': ' . $zdse);
+            }
         
             $result = $this->_updateCountsAfterMove($_messages);
         }
@@ -201,8 +209,8 @@ class Felamimail_Controller_Message_Move extends Felamimail_Controller_Message_A
         
         $firstMessage = $_messages->getFirstRecord();
         $folder = Felamimail_Controller_Folder::getInstance()->get($firstMessage->folder_id);
-        $imapBackend = Felamimail_Backend_ImapFactory::factory($firstMessage->account_id);
-        $imapBackend->selectFolder(Felamimail_Model_Folder::encodeFolderName($folder->globalname));
+        
+        $imapBackend = $this->_getBackendAndSelectFolder(NULL, $folder);
         
         $imapMessageUids = array();
         foreach ($_messages as $message) {
@@ -228,7 +236,7 @@ class Felamimail_Controller_Message_Move extends Felamimail_Controller_Message_A
      */
     protected function _moveMessagesToAnotherAccount(Tinebase_Record_RecordSet $_messages, Felamimail_Model_Folder $_targetFolder)
     {
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . 
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . 
             ' Move ' . count($_messages) . ' message(s) to ' . $_targetFolder->globalname . ' in account ' . $_targetFolder->account_id
         );
         
@@ -274,7 +282,7 @@ class Felamimail_Controller_Message_Move extends Felamimail_Controller_Message_A
      * @param string $_targetFolderName
      * @param Felamimail_Backend_ImapProxy $_imap
      * 
-     * @todo perhaps we should check the existance of the messages on the imap instead of catching the exception here
+     * @todo perhaps we should check the existance of the messages on the imap instead of catching the exceptions here
      */
     protected function _moveBatchOfMessages($_uids, $_targetFolderName, Felamimail_Backend_ImapProxy $_imap)
     {
@@ -287,6 +295,8 @@ class Felamimail_Controller_Message_Move extends Felamimail_Controller_Message_A
         } catch (Zend_Mail_Storage_Exception $zmse) {
             if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' ' . $zmse->getMessage());
             throw new Felamimail_Exception_IMAP($zmse->getMessage());
-        }
+        } catch (Felamimail_Exception_IMAP $fei) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' ' . $fei);
         }
     }
+}

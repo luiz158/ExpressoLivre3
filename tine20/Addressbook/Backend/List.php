@@ -37,7 +37,14 @@ class Addressbook_Backend_List extends Tinebase_Backend_Sql_Abstract
      * @var boolean
      */
     protected $_modlogActive = TRUE;
-    
+
+    /**
+     * default column(s) for count
+     *
+     * @var string
+     */
+    protected $_defaultCountCol = 'id';
+
     /**
      * foreign tables 
      * name => array(table, joinOn, field)
@@ -123,7 +130,7 @@ class Addressbook_Backend_List extends Tinebase_Backend_Sql_Abstract
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Deleting ' . count($lists) .' lists');
         
         if(count($lists) > 0) {
-            $this->delete($lists->getArrayOfIds());        
+            $this->delete($lists->getArrayOfIds());
         }
     }
     
@@ -150,9 +157,9 @@ class Addressbook_Backend_List extends Tinebase_Backend_Sql_Abstract
         
         if (!empty($idsToRemove)) {
             $where = '(' . 
-                $this->_db->quoteInto($this->_tablePrefix . $this->_foreignTables['members']['table'] . '.' . $this->_foreignTables['members']['joinOn'] . ' = ?', $listId) . 
-                ' AND ' . 
-                $this->_db->quoteInto($this->_tablePrefix . $this->_foreignTables['members']['table'] . '.' . $this->_foreignTables['members']['field'] . ' IN (?)', $idsToRemove) . 
+                $this->_db->quoteInto($this->_db->quoteIdentifier($this->_tablePrefix . $this->_foreignTables['members']['table'] . '.' . $this->_foreignTables['members']['joinOn']) . ' = ?', $listId) .
+                ' AND ' .
+                $this->_db->quoteInto($this->_db->quoteIdentifier($this->_tablePrefix . $this->_foreignTables['members']['table'] . '.' . $this->_foreignTables['members']['field']) . ' IN (?)', $idsToRemove) .
             ')';
                 
             $this->_db->delete($this->_tablePrefix . $this->_foreignTables['members']['table'], $where);
@@ -225,5 +232,23 @@ class Addressbook_Backend_List extends Tinebase_Backend_Sql_Abstract
         }
         
         return $result;
+    }
+    
+    /**
+     * get list by group name
+     * 
+     * @param string $groupName
+     * @return NULL|Addressbook_Model_List
+     */
+    public function getByGroupName($groupName)
+    {
+        $filter = new Addressbook_Model_ListFilter(array(
+            array('field' => 'name', 'operator' => 'equals', 'value' => $groupName),
+            array('field' => 'type', 'operator' => 'equals', 'value' => Addressbook_Model_List::LISTTYPE_GROUP)
+        ));
+        
+        $existingLists = $this->search($filter);
+        
+        return $existingLists->getFirstRecord();
     }
 }

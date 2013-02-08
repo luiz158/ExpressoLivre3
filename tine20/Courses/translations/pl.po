@@ -1,122 +1,175 @@
+# 
+# Translators:
+# Wojciech Kaczmarek <wojciech_kaczmarek@wp.pl>, 2012.
 msgid ""
 msgstr ""
-"Project-Id-Version: Tine 2.0 - Courses\n"
-"Report-Msgid-Bugs-To: \n"
+"Project-Id-Version: Tine 2.0\n"
 "POT-Creation-Date: 2008-05-17 22:12+0100\n"
-"PO-Revision-Date: 2012-02-10 12:00+0000\n"
-"Last-Translator: Wojciech Kaczmarek <Unknown>\n"
-"Language-Team: Tine 2.0 Translators\n"
-"Language: \n"
+"PO-Revision-Date: 2012-10-11 18:54+0000\n"
+"Last-Translator: Wojciech Kaczmarek <wojciech_kaczmarek@wp.pl>\n"
+"Language-Team: Polish (http://www.transifex.com/projects/p/tine20/language/pl/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
-"|| n%100>=20) ? 1 : 2;\n"
-"X-Launchpad-Export-Date: 2012-03-02 09:32+0000\n"
-"X-Generator: Launchpad (build 14886)\n"
-"X-Poedit-Language: Polish\n"
+"Language: pl\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"X-Poedit-Country: GB\n"
+"X-Poedit-Language: en\n"
 "X-Poedit-SourceCharset: utf-8\n"
 
-#: Controller/Course.php:107
-msgid "teacher"
-msgstr "nauczyciel"
+#: Acl/Rights.php:99
+msgid "Add new user"
+msgstr "Dodaj nowego użytkownika"
 
-#: Controller/Course.php:115
-msgid "Teacher"
-msgstr "Nauczyciel"
+#: Acl/Rights.php:100
+msgid "Add new user as member to a course"
+msgstr "Dodaj nowego użytkownika jako uczestnika kursu"
 
-#: Controller/Course.php:116
-msgid "Teacher Account"
-msgstr "Konto nauczyciela"
+#: Acl/Rights.php:103
+msgid "Add existing user"
+msgstr "Dodaj istniejącego użytkownika"
 
-#: Frontend/Json.php:254 js/CourseEditDialog.js:141 js/Models.js:41
+#: Acl/Rights.php:104
+msgid "Add existing user as member to a course"
+msgstr "Dodaj istniejącego użytkownika jako uczestnika kursu"
+
+#: Config.php:75 js/CourseEditDialog.js:227 js/Models.js:72
+msgid "Internet Access"
+msgstr "Internet"
+
+#: Config.php:77
+msgid "Internet access options."
+msgstr "Opcje dostępu do Internetu."
+
+#: Config.php:84 Config.php:86
+msgid "Internet Access Group (ON)"
+msgstr "Grupa dostępu do Internetu (ON)"
+
+#: Config.php:92 Config.php:94
+msgid "Internet Access Group (FILTERED)"
+msgstr "Grupa dostępu do Internetu (FILTERED)"
+
+#: Config.php:100 Config.php:102
+msgid "Students Group"
+msgstr "Grupa studentów"
+
+#: Config.php:108 Config.php:110
+msgid "Students Import Definition"
+msgstr "Definicja importu studentów"
+
+#: Config.php:116
+msgid "Students login name prefix"
+msgstr "Prefiks loginu studentów"
+
+#: Config.php:123 Config.php:125
+msgid "Samba user settings"
+msgstr "Ustawienia użytkownika Samby"
+
+#: Setup/setup.xml:4
+msgid "Courses"
+msgstr "Kursy"
+
+#: Setup/Update/Release5.php:30 Setup/Initialize.php:35 Preference.php:24
+#: Preference.php:60
+msgid "All courses"
+msgstr "Wszystkie kursy"
+
+#: Setup/Initialize.php:66
+msgid "On"
+msgstr "Wł"
+
+#: Setup/Initialize.php:67
+msgid "Off"
+msgstr "Wył"
+
+#: Setup/Initialize.php:68
+msgid "Filtered"
+msgstr "Przefiltrowana"
+
+#: Preference.php:61
+msgid "The default favorite which is loaded on Classes startup"
+msgstr "Domyślny ulubiony, wczytywany podczas uruchamiania klas"
+
+#: js/CourseEditDialog.js:33
+msgid "Import course members"
+msgstr "Importuj uczestników kursu"
+
+#: js/CourseEditDialog.js:42
+msgid "Add new member"
+msgstr "Dodaj nowego użytkownika"
+
+#: js/CourseEditDialog.js:187 js/Models.js:41 Controller/Course.php:121
 msgid "Course"
 msgid_plural "Courses"
 msgstr[0] "Kurs"
 msgstr[1] "kursy"
 msgstr[2] "kursy"
 
-#: js/CourseEditDialog.js:31
-msgid "Import course members"
-msgstr "Importuj uczestników kursu"
-
-#: js/CourseEditDialog.js:157
+#: js/CourseEditDialog.js:203
 msgid "Course Name"
 msgstr "Nazwa kursu"
 
-#: js/CourseEditDialog.js:164
+#: js/CourseEditDialog.js:210
 msgid "Course / School Type"
 msgstr "Kurs / Typ szkoły"
 
-#: js/CourseEditDialog.js:175
+#: js/CourseEditDialog.js:221
 msgid "Description"
 msgstr "Opis"
 
-#: js/CourseEditDialog.js:184 js/CourseGridPanel.js:85
-msgid "Internet Access"
-msgstr "Internet"
-
-#: js/CourseEditDialog.js:190 js/CourseGridPanel.js:93
+#: js/CourseEditDialog.js:237
 msgid "Fileserver Access"
 msgstr "Serwer plików"
 
-#: js/CourseEditDialog.js:222
+#: js/CourseEditDialog.js:269
 msgid "Members"
 msgstr "Uczestnicy"
 
-#: js/CourseEditDialog.js:248
+#: js/CourseEditDialog.js:296
 msgid "Login"
 msgstr "Login"
 
-#: js/CourseEditDialog.js:252
+#: js/CourseEditDialog.js:300
 msgid "unknown"
 msgstr "nieznany"
 
-#: js/CourseEditDialog.js:257
+#: js/CourseEditDialog.js:305
 msgid "Reset Password"
 msgstr "Zresetuj hasło"
 
-#: js/CourseEditDialog.js:275
-msgid "Set new password"
-msgstr "Ustaw nowe hasło"
+#: js/AddMemberDialog.js:63
+msgid "First Name"
+msgstr "Imię"
 
-#: js/CourseEditDialog.js:275
-msgid "Please enter the new password:"
-msgstr "Proszę wprowadzić nowe hasło:"
+#: js/AddMemberDialog.js:67
+msgid "Last Name"
+msgstr "Nazwisko"
 
-#: js/CourseGridPanel.js:48
-msgid "Quick search"
-msgstr "Szybkie wyszukiwanie"
+#: js/AddMemberDialog.js:86
+msgid "Add new member to course"
+msgstr "Dodaj nowego uczestnika do kursu"
 
-#: js/CourseGridPanel.js:70
+#: js/AddMemberDialog.js:118
+msgid "Errors"
+msgstr "Błędy"
+
+#: js/AddMemberDialog.js:118
+msgid "Please fix the errors noted."
+msgstr "Proszę poprawić zgłoszone błędy"
+
+#: js/CourseGridPanel.js:48 js/Models.js:70
 msgid "Name"
 msgstr "Nazwa"
 
-#: js/CourseGridPanel.js:76
+#: js/CourseGridPanel.js:54
 msgid "Type"
 msgstr "Typ"
 
-#: js/CourseGridPanel.js:124
-msgid "Internet Access On"
-msgstr "Internet włączony"
-
-#: js/CourseGridPanel.js:135
-msgid "Internet Access Off"
-msgstr "Internet wyłączony"
-
-#: js/CourseGridPanel.js:146
-msgid "Fileserver Access On"
-msgstr "Serwer plików włączony"
-
-#: js/CourseGridPanel.js:157
-msgid "Fileserver Access Off"
-msgstr "Serwer plików wyłączony"
-
-#: js/CourseGridPanel.js:217
+#: js/CourseGridPanel.js:99
 msgid "Failed"
 msgstr "Błąd"
 
-#: js/CourseGridPanel.js:218
+#: js/CourseGridPanel.js:100
 msgid "Some error occured while trying to update the courses."
 msgstr "Podczas próby aktualizacji kursów wystąpił błąd."
 
@@ -127,25 +180,25 @@ msgstr[0] "Lista kursów"
 msgstr[1] "listy kursów"
 msgstr[2] "listy kursów"
 
-#: js/Models.js:74
+#: js/Models.js:69
+msgid "Quick search"
+msgstr "Szybkie wyszukiwanie"
+
+#: js/Models.js:107
 msgid "Course Type"
 msgid_plural "Course Types"
 msgstr[0] "Rodzaj kursu"
 msgstr[1] "rodzaje kursu"
 msgstr[2] "rodzaje kursu"
 
-#: Preference.php:24 Preference.php:60 Setup/Initialize.php:35
-#: Setup/Update/Release5.php:30
-msgid "All courses"
-msgstr ""
+#: Controller/Course.php:247 Controller/Course.php:291
+msgid "Teacher"
+msgstr "Nauczyciel"
 
-#: Preference.php:61
-msgid "The default favorite which is loaded on Classes startup"
-msgstr ""
+#: Controller/Course.php:248
+msgid "Teacher Account"
+msgstr "Konto nauczyciela"
 
-#: Setup/setup.xml:4
-msgid "Courses"
-msgstr "Kursy"
-
-#~ msgid "All Courses"
-#~ msgstr "Wszystkie kursy"
+#: Controller/Course.php:308
+msgid "My course"
+msgstr "Moje lekcje"

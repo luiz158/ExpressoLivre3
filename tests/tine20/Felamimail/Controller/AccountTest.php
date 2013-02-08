@@ -44,9 +44,9 @@ class Felamimail_Controller_AccountTest extends PHPUnit_Framework_TestCase
      */
     public static function main()
     {
-		$suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Felamimail Account Controller Tests');
+        $suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Felamimail Account Controller Tests');
         PHPUnit_TextUI_TestRunner::run($suite);
-	}
+    }
 
     /**
      * Sets up the fixture.
@@ -70,8 +70,6 @@ class Felamimail_Controller_AccountTest extends PHPUnit_Framework_TestCase
      */
     protected function tearDown()
     {
-        Tinebase_TransactionManager::getInstance()->rollBack();
-        
         foreach ($this->_foldersToDelete as $foldername) {
             try {
                 Felamimail_Controller_Folder::getInstance()->delete($this->_account->getId(), $foldername);
@@ -79,6 +77,8 @@ class Felamimail_Controller_AccountTest extends PHPUnit_Framework_TestCase
                 // do nothing
             }
         }
+        
+        Tinebase_TransactionManager::getInstance()->rollBack();
     }
     
     /**
@@ -133,7 +133,7 @@ class Felamimail_Controller_AccountTest extends PHPUnit_Framework_TestCase
             'no IMAP4(rev1) capability found in ' . print_r($capabilities['capabilities'], TRUE));
         $this->assertTrue(in_array('QUOTA', $capabilities['capabilities']), 'no QUOTA capability found in ' . print_r($capabilities['capabilities'], TRUE));
         
-        $this->assertEquals($capabilities, $_SESSION['Felamimail'][$this->_account->getId()]); 
+        $this->assertEquals($capabilities, array_value($this->_account->getId(), Tinebase_Core::getSession()->Felamimail));
     }
 
     /**
@@ -148,9 +148,25 @@ class Felamimail_Controller_AccountTest extends PHPUnit_Framework_TestCase
         $account->type = Felamimail_Model_Account::TYPE_USER;
         $this->_controller->update($account);
         
-        $this->assertFalse(array_key_exists($this->_account->getId(), $_SESSION['Felamimail']), print_r($_SESSION['Felamimail'], TRUE));
+        $this->assertFalse(array_key_exists($this->_account->getId(), Tinebase_Core::getSession()->Felamimail), print_r(Tinebase_Core::getSession()->Felamimail, TRUE));
     }
     
+    /**
+     * test create trash on the fly
+     */
+    public function testCreateTrashOnTheFly()
+    {
+        // make sure that the delimiter is correct / fetched from server
+        $capabilities = $this->_controller->updateCapabilities($this->_account);
+        
+        // set another trash folder
+        $this->_account->trash_folder = 'newtrash';
+        $this->_foldersToDelete[] = 'newtrash';
+        $accountBackend = new Felamimail_Backend_Account();
+        $account = $accountBackend->update($this->_account);
+        $newtrash = $this->_controller->getSystemFolder($account, Felamimail_Model_Folder::FOLDER_TRASH);
+    }
+
     /**
      * test change pw + credential cache
      */
@@ -162,7 +178,7 @@ class Felamimail_Controller_AccountTest extends PHPUnit_Framework_TestCase
         unset($account->id);
         $account->type = Felamimail_Model_Account::TYPE_USER;
         $account->user = $testConfig->username;
-        $imapConfig = Tinebase_Config::getInstance()->getConfigAsArray(Tinebase_Config::IMAP);
+        $imapConfig = Tinebase_Config::getInstance()->get(Tinebase_Config::IMAP, new Tinebase_Config_Struct())->toArray();
         if (isset($imapConfig['domain']) && ! empty($imapConfig['domain'])) {
             $account->user .= '@' . $imapConfig['domain'];
         }
@@ -189,15 +205,15 @@ class Felamimail_Controller_AccountTest extends PHPUnit_Framework_TestCase
     }
     
     /**
-     * test create trash on the fly
+     * testEmptySignature
+     * 
+     * @see 0006666: Signature delimeter not removed if no Signature is used
      */
-    public function testCreateTrashOnTheFly()
+    public function testEmptySignature()
     {
-        // set another trash folder
-        $this->_account->trash_folder = 'newtrash';
-        $this->_foldersToDelete[] = 'newtrash';
-        $accountBackend = new Felamimail_Backend_Account();
-        $account = $accountBackend->update($this->_account);
-        $newtrash = $this->_controller->getSystemFolder($account, Felamimail_Model_Folder::FOLDER_TRASH);
+        $this->_account->signature = '<html><body><div><br /></div><p>   </p>&nbsp;<br /></body></html>';
+        $account = $this->_controller->update($this->_account);
+        
+        $this->assertEquals('', $account->signature, 'did not save empty signature');
     }
 }

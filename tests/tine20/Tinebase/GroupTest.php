@@ -57,12 +57,12 @@ class Tinebase_GroupTest extends PHPUnit_Framework_TestCase
             'id'            => 'testgrouplkfdshew7fdfwo8efw',
             'name'          => 'tine20phpunit updated',
             'description'   => 'updated group'
-        )); 
+        ));
         
         $this->objects['noIdGroup'] = new Tinebase_Model_Group(array(
             'name'          => 'tine20phpunit noid',
             'description'   => 'noid group'
-        )); 
+        ));
         
         // add accounts for group member tests
         $this->objects['account1'] = new Tinebase_Model_FullUser(array(
@@ -73,8 +73,9 @@ class Tinebase_GroupTest extends PHPUnit_Framework_TestCase
             'accountPrimaryGroup'   => Tinebase_Group::getInstance()->getGroupByName('Users')->id,
             'accountLastName'       => 'Tine 2.0',
             'accountFirstName'      => 'PHPUnit',
-            'accountEmailAddress'   => 'phpunit@metaways.de'
-        )); 
+            'accountEmailAddress'   => 'phpunit@metaways.de',
+            'visibility'            => Tinebase_Model_User::VISIBILITY_DISPLAYED,
+        ));
         
         $this->objects['account2'] = new Tinebase_Model_FullUser(array(
             'accountId'             => 'testaccountdsjdsud8hjd11',
@@ -85,7 +86,7 @@ class Tinebase_GroupTest extends PHPUnit_Framework_TestCase
             'accountLastName'       => 'Tine 2.0 2',
             'accountFirstName'      => 'PHPUnit 2',
             'accountEmailAddress'   => 'phpunit@tine20.org'
-        )); 
+        ));
 
         $this->objects['account3'] = new Tinebase_Model_FullUser(array(
             'accountId'             => 'testaccountdsjdsud8hjd12',
@@ -97,9 +98,9 @@ class Tinebase_GroupTest extends PHPUnit_Framework_TestCase
             'accountFirstName'      => 'PHPUnit 3',
             'accountEmailAddress'   => 'phpunit@tine20.org'
         ));
-        Tinebase_User::getInstance()->addUser($this->objects['account1']);
-        Tinebase_User::getInstance()->addUser($this->objects['account2']);
-        Tinebase_User::getInstance()->addUser($this->objects['account3']);
+        foreach (array('account1', 'account2', 'account3') as $user) {
+            Admin_Controller_User::getInstance()->create($this->objects[$user], NULL, NULL);
+        }
     }
 
     /**
@@ -181,12 +182,11 @@ class Tinebase_GroupTest extends PHPUnit_Framework_TestCase
         
         $getGroupMembersArray = Tinebase_Group::getInstance()->getGroupMembers($this->objects['initialGroup']->id);
         
-        $this->assertEquals($setGroupMembersArray, $getGroupMembersArray);
+        $this->assertEquals(sort($setGroupMembersArray), sort($getGroupMembersArray));
     }
 
     /**
      * try to add a group member
-     *
      */
     public function testAddGroupMember()
     {
@@ -197,12 +197,12 @@ class Tinebase_GroupTest extends PHPUnit_Framework_TestCase
 
         $getGroupMembersArray = Tinebase_Group::getInstance()->getGroupMembers($this->objects['initialGroup']->id);
         
-        $this->assertEquals ( array($this->objects['account1']->accountId, $this->objects['account2']->accountId, $this->objects['account3']->accountId), $getGroupMembersArray);
-    }        
+        $expectedValues = array($this->objects['account1']->accountId, $this->objects['account2']->accountId, $this->objects['account3']->accountId);
+        $this->assertEquals(sort($expectedValues), sort($getGroupMembersArray));
+    }
     
     /**
      * try to remove a group member
-     *
      */
     public function testRemoveGroupMember()
     {
@@ -213,9 +213,9 @@ class Tinebase_GroupTest extends PHPUnit_Framework_TestCase
         
         $getGroupMembersArray = Tinebase_Group::getInstance()->getGroupMembers($this->objects['initialGroup']->id);
         
-        $this->assertEquals ( 2, count($getGroupMembersArray) );
-        $this->assertEquals ( array($this->objects['account1']->accountId, $this->objects['account2']->accountId), $getGroupMembersArray);
-
+        $this->assertEquals(2, count($getGroupMembersArray));
+        $expectedValues = array($this->objects['account1']->accountId, $this->objects['account2']->accountId);
+        $this->assertEquals(sort($expectedValues), sort($getGroupMembersArray));
     }
 
     /**
@@ -290,7 +290,7 @@ class Tinebase_GroupTest extends PHPUnit_Framework_TestCase
     /**
      * testSyncLists
      * 
-     * @see http://forge.tine20.org/mantisbt/view.php?id=5768
+     * @see 0005768: create addressbook lists when migrating users
      */
     public function testSyncLists()
     {
@@ -306,16 +306,24 @@ class Tinebase_GroupTest extends PHPUnit_Framework_TestCase
         $list = Addressbook_Controller_List::getInstance()->get($group->list_id);
         $this->assertEquals($group->getId(), $list->group_id);
         $this->assertEquals($group->name, $list->name);
-        $this->assertTrue(! empty($list->members), 'list members empty: ' . print_r($list->toArray(), TRUE));
+        $this->assertTrue(! empty($list->members), 'list members empty: ' . print_r($list->toArray(), TRUE) 
+            . ' should contain: ' . print_r($this->objects['account1']->toArray(), TRUE));
         $this->assertEquals($this->objects['account1']->contact_id, $list->members[0]);
         
         $appConfigDefaults = Admin_Controller::getInstance()->getConfigSettings();
+        $this->assertTrue(! empty($appConfigDefaults), 'app config defaults empty');
         $internal = $appConfigDefaults[Admin_Model_Config::DEFAULTINTERNALADDRESSBOOK];
-        $this->assertEquals($internal, $list->container_id);
+        $this->assertEquals($internal, $list->container_id, 'did not get correct internal container');
         
         // sync again -> should not change anything
         Tinebase_Group::syncListsOfUserContact(array($group->getId()), $this->objects['account1']->contact_id);
         $listAgain = Addressbook_Controller_List::getInstance()->get($group->list_id);
         $this->assertEquals($list->toArray(), $listAgain->toArray());
+        
+        // change list id -> should get list by (group) name
+        $group->list_id = NULL;
+        $group = Tinebase_Group::getInstance()->updateGroup($group);
+        Tinebase_Group::syncListsOfUserContact(array($group->getId()), $this->objects['account1']->contact_id);
+        $this->assertEquals($list->getId(), Tinebase_Group::getInstance()->getGroupById($group)->list_id);
     }
 }

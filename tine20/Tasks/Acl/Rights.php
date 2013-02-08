@@ -18,6 +18,13 @@
 class Tasks_Acl_Rights extends Tinebase_Acl_Rights_Abstract
 {
     /**
+     * the right to manage shared task favorites
+     * 
+     * @staticvar string
+     */
+    const MANAGE_SHARED_TASK_FAVORITES = 'manage_shared_task_favorites';
+    
+    /**
      * holds the instance of the singleton
      *
      * @var Tasks_Acl_Rights
@@ -30,7 +37,7 @@ class Tasks_Acl_Rights extends Tinebase_Acl_Rights_Abstract
      * disabled. use the singleton
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -68,7 +75,7 @@ class Tasks_Acl_Rights extends Tinebase_Acl_Rights_Abstract
         
         $addRights = array(
             Tinebase_Acl_Rights::MANAGE_SHARED_FOLDERS,
-            Tinebase_Acl_Rights::MANAGE_SHARED_FAVORITES,
+            self::MANAGE_SHARED_TASK_FAVORITES,
         );
         $allRights = array_merge($allRights, $addRights);
         
@@ -89,7 +96,7 @@ class Tasks_Acl_Rights extends Tinebase_Acl_Rights_Abstract
                 'text'          => $translate->_('manage shared task lists'),
                 'description'   => $translate->_('Create new shared tasks lists'),
             ),
-            Tinebase_Acl_Rights::MANAGE_SHARED_FAVORITES => array(
+            self::MANAGE_SHARED_TASK_FAVORITES => array(
                 'text'          => $translate->_('manage shared tasks favorites'),
                 'description'   => $translate->_('Create or update shared tasks favorites'),
             ),

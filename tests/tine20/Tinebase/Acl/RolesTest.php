@@ -5,8 +5,8 @@
  * @package     Tinebase
  * @subpackage  Acl
  * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2008 Metaways Infosystems GmbH (http://www.metaways.de)
- * @author      Philipp Schuele <p.schuele@metaways.de>
+ * @copyright   Copyright (c) 2008-2012 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @author      Philipp Schüle <p.schuele@metaways.de>
  * 
  * @todo        add test for addSingleRight
  */
@@ -15,10 +15,6 @@
  * Test helper
  */
 require_once dirname(dirname(dirname(__FILE__))) . DIRECTORY_SEPARATOR . 'TestHelper.php';
-
-if (!defined('PHPUnit_MAIN_METHOD')) {
-    define('PHPUnit_MAIN_METHOD', 'Tinebase_Acl_RolesTest::main');
-}
 
 /**
  * Test class for Tinebase_Acl_Roles
@@ -38,9 +34,9 @@ class Tinebase_Acl_RolesTest extends PHPUnit_Framework_TestCase
      */
     public static function main()
     {
-		$suite  = new PHPUnit_Framework_TestSuite('Tinebase_Acl_RolesTest');
+        $suite  = new PHPUnit_Framework_TestSuite('Tinebase_Acl_RolesTest');
         PHPUnit_TextUI_TestRunner::run($suite);
-	}
+    }
 
     /**
      * Sets up the fixture.
@@ -61,7 +57,7 @@ class Tinebase_Acl_RolesTest extends PHPUnit_Framework_TestCase
             'accountLastName'       => 'Tine 2.0',
             'accountFirstName'      => 'PHPUnit',
             'accountEmailAddress'   => 'phpunit@metaways.de'
-        )); 
+        ));
         $this->objects['role'] = new Tinebase_Model_Role(array(
             'id'                    => 10,
             'name'                  => 'phpunitrole',
@@ -84,7 +80,7 @@ class Tinebase_Acl_RolesTest extends PHPUnit_Framework_TestCase
             Tinebase_Group::getInstance()->addGroupMember($user->accountPrimaryGroup, $user);
         }
                 
-        return;        
+        return;
     }
 
     /**
@@ -96,7 +92,7 @@ class Tinebase_Acl_RolesTest extends PHPUnit_Framework_TestCase
     protected function tearDown()
     {
         // remove account
-        Tinebase_User::getInstance()->deleteUser(  $this->objects['user']->accountId );             
+        Tinebase_User::getInstance()->deleteUser(  $this->objects['user']->accountId );
     }
 
     /**
@@ -134,11 +130,11 @@ class Tinebase_Acl_RolesTest extends PHPUnit_Framework_TestCase
      */
     public function removeRoleMember()
     {
-    	Tinebase_Acl_Roles::getInstance()->removeRoleMember(10, $this->objects['user']);
-    	
-    	$members = Tinebase_Acl_Roles::getInstance()->getRoleMembers($this->objects['role']->getId());
-    	
-    	$this->assertEquals(0, count($members));
+        Tinebase_Acl_Roles::getInstance()->removeRoleMember(10, $this->objects['user']);
+        
+        $members = Tinebase_Acl_Roles::getInstance()->getRoleMembers($this->objects['role']->getId());
+        
+        $this->assertEquals(0, count($members));
     }
     
     /**
@@ -146,12 +142,12 @@ class Tinebase_Acl_RolesTest extends PHPUnit_Framework_TestCase
      */
     public function testAddRoleMember()
     {
-    	Tinebase_Acl_Roles::getInstance()->addRoleMember($this->objects['role']->getId(), array(
-    		'type' 	=> 'user',
-    		'id'	=> $this->objects['user']->getId()
-    	));
-    	
-    	$members = Tinebase_Acl_Roles::getInstance()->getRoleMembers($this->objects['role']->getId());
+        Tinebase_Acl_Roles::getInstance()->addRoleMember($this->objects['role']->getId(), array(
+            'type'     => 'user',
+            'id'    => $this->objects['user']->getId()
+        ));
+        
+        $members = Tinebase_Acl_Roles::getInstance()->getRoleMembers($this->objects['role']->getId());
         
         $this->assertGreaterThan(0, count($members));
     }
@@ -161,23 +157,23 @@ class Tinebase_Acl_RolesTest extends PHPUnit_Framework_TestCase
      */
     public function testSetRoleMemberships()
     {
-    	// create role 2 for test
-    	$role2 = Tinebase_Acl_Roles::getInstance()->createRole($this->objects['role_2']);
-    	
-    	// remove role members
+        // create role 2 for test
+        $role2 = Tinebase_Acl_Roles::getInstance()->createRole($this->objects['role_2']);
+        
+        // remove role members
         Tinebase_Acl_Roles::getInstance()->setRoleMembers($this->objects['role']->getId(), array());
         Tinebase_Acl_Roles::getInstance()->setRoleMembers($this->objects['role_2']->getId(), array());
         
         Tinebase_Acl_Roles::getInstance()->setRoleMemberships(
-        	array(
-				'type' 	=> 'user', 
-				'id' 	=> $this->objects['user']->getId()
-			), 
-			array(
-				$this->objects['role']->getId(), 
-				$this->objects['role_2']->getId()
-			)
-		);
+            array(
+                'type'     => 'user', 
+                'id'     => $this->objects['user']->getId()
+            ), 
+            array(
+                $this->objects['role']->getId(), 
+                $this->objects['role_2']->getId()
+            )
+        );
         
         $members = Tinebase_Acl_Roles::getInstance()->getRoleMembers($this->objects['role']->getId());
         $members_2 = Tinebase_Acl_Roles::getInstance()->getRoleMembers($this->objects['role_2']->getId());
@@ -274,19 +270,12 @@ class Tinebase_Acl_RolesTest extends PHPUnit_Framework_TestCase
         // remove role members and rights first
         Tinebase_Acl_Roles::getInstance()->setRoleRights($this->objects['role']->getId(), array());
         
-        Tinebase_Acl_Roles::getInstance()->setRoleMembers($this->objects['role']->getId(), array());        
+        Tinebase_Acl_Roles::getInstance()->setRoleMembers($this->objects['role']->getId(), array());
         Tinebase_Acl_Roles::getInstance()->setRoleMembers($this->objects['role_2']->getId(), array());
         
         Tinebase_Acl_Roles::getInstance()->deleteRoles(array($this->objects['role']->getId(), $this->objects['role_2']->getId()));
-                      
-        $this->setExpectedException('Exception');
-        
+      
+        $this->setExpectedException('Tinebase_Exception_NotFound');
         Tinebase_Acl_Roles::getInstance()->getRoleById($this->objects['role']->getId());
-    }    
-    
-}		
-	
-
-if (PHPUnit_MAIN_METHOD == 'Tinebase_Acl_RolesTest::main') {
-    Tinebase_Acl_RolesTest::main();
+    }
 }

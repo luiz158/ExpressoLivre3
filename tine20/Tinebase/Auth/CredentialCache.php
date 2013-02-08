@@ -48,6 +48,8 @@ class Tinebase_Auth_CredentialCache extends Tinebase_Backend_Sql_Abstract implem
      */
     private static $_instance = NULL;
     
+    const SESSION_NAMESPACE = 'credentialCache';
+    
     /**
      * don't clone. Use the singleton.
      *
@@ -93,7 +95,8 @@ class Tinebase_Auth_CredentialCache extends Tinebase_Backend_Sql_Abstract implem
     {
         $adapterClass = 'Tinebase_Auth_CredentialCache_Adapter_' . $_adapter;
         
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Using credential cache apapter: ' . $adapterClass);
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+            . ' Using credential cache adapter: ' . $adapterClass);
         $this->_cacheAdapter = new $adapterClass();
     }
     
@@ -113,32 +116,59 @@ class Tinebase_Auth_CredentialCache extends Tinebase_Backend_Sql_Abstract implem
      * @param  string $_username
      * @param  string $_password
      * @param  string $_key [optional]
+     * @param  boolean $_saveInSession
      * @return Tinebase_Model_CredentialCache
      */
-    public function cacheCredentials($_username, $_password, $_key = NULL)
+    public function cacheCredentials($username, $password, $key = NULL, $persist = FALSE)
     {
-        $key = ($_key !== NULL) ? $_key : $this->_cacheAdapter->getDefaultKey();
+        $key = ($key !== NULL) ? $key : $this->_cacheAdapter->getDefaultKey();
         
         $cache = new Tinebase_Model_CredentialCache(array(
             'id'            => $this->_cacheAdapter->getDefaultId(),
             'key'           => substr($key, 0, 24),
-            'username'      => $_username,
-            'password'      => $_password,
+            'username'      => $username,
+            'password'      => $password,
             'creation_time' => Tinebase_DateTime::now(),
             'valid_until'   => Tinebase_DateTime::now()->addMonth(1)
         ), true, false);
         $cache->convertDates = true;
         
         $this->_encrypt($cache);
+        $this->_saveInSession($cache);
+        if ($persist) {
+            $this->_persistCache($cache);
+        }
         
-        // need to check if entry exists (some adapters can have static ids)
+        return $cache;
+    }
+    
+    /**
+     * save cache record in session
+     * 
+     * @param Tinebase_Model_CredentialCache $cache
+     */
+    protected function _saveInSession(Tinebase_Model_CredentialCache $cache)
+    {
+        $session = Tinebase_Core::getSession();
+        if ($session && is_object($session)) {
+            $session->{self::SESSION_NAMESPACE}[$cache->getId()] = $cache;
+        }
+    }
+    
+    /**
+     * persist cache record (in db)
+     * -> needs to check if entry exists (some adapters can have static ids)
+     * 
+     * @param Tinebase_Model_CredentialCache $cache
+     * @param boolean $_saveInSession
+     */
+    protected function _persistCache(Tinebase_Model_CredentialCache $cache, $_saveInSession = TRUE)
+    {
         try {
             $this->create($cache);
         } catch (Zend_Db_Statement_Exception $zdse) {
             $this->update($cache);
         }
-        
-        return $cache;
     }
     
     /**
@@ -155,9 +185,30 @@ class Tinebase_Auth_CredentialCache extends Tinebase_Backend_Sql_Abstract implem
         }
         
         if (! ($_cache->username && $_cache->password)) {
-            $_cache->setFromArray($this->get($_cache->getId())->toArray());
+            $savedCache = $this->_getCache($_cache->getId());
+            $_cache->setFromArray($savedCache->toArray());
             $this->_decrypt($_cache);
         }
+    }
+    
+    /**
+     * get cache record (try to find in session first, then DB)
+     * 
+     * @param string $id
+     * @return Tinebase_Model_CredentialCache
+     */
+    protected function _getCache($id)
+    {
+        $session = Tinebase_Core::getSession();
+        $credentialSessionCache = ($session && is_object($session)) ? $session->{self::SESSION_NAMESPACE} : NULL;
+        if (isset($credentialSessionCache) && isset($credentialSessionCache[$id])) {
+            $result = $credentialSessionCache[$id];
+        } else {
+            $result = $this->get($id);
+            $this->_saveInSession($result);
+        }
+        
+        return $result;
     }
     
     /**
@@ -214,15 +265,15 @@ class Tinebase_Auth_CredentialCache extends Tinebase_Backend_Sql_Abstract implem
     {
         $dateString = ($_date instanceof Tinebase_DateTime) ? $_date->format(Tinebase_Record_Abstract::ISO8601LONG) : $_date;
         $dateWhere = ($dateString === NULL) 
-            ? $this->_db->quoteInto('valid_until < ?', Tinebase_DateTime::now()->format(Tinebase_Record_Abstract::ISO8601LONG)) 
-            : $this->_db->quoteInto('creation_time < ?', $dateString);
+            ? $this->_db->quoteInto($this->_db->quoteIdentifier('valid_until') . ' < ?', Tinebase_DateTime::now()->format(Tinebase_Record_Abstract::ISO8601LONG)) 
+            : $this->_db->quoteInto($this->_db->quoteIdentifier('creation_time') . ' < ?', $dateString);
         $where = array($dateWhere);
-            
+             
         if (Setup_Controller::getInstance()->isInstalled('Felamimail')) {
             // delete only records that are not related to email accounts
             $fmailIds = $this->_getFelamimailCredentialIds();
             if (! empty($fmailIds)) {
-                $where[] = $this->_db->quoteInto('id NOT IN (?)', $fmailIds);
+                $where[] = $this->_db->quoteInto($this->_db->quoteIdentifier('id') .' NOT IN (?)', $fmailIds);
             }
         }
         

@@ -8,7 +8,7 @@
  * @author      Cornelius Weiss <c.weiss@metaways.de>
  * @copyright   Copyright (c) 2010-2011 Metaways Infosystems GmbH (http://www.metaways.de)
  * 
- * @todo		add test for this export
+ * @todo        add test for this export
  */
 
 /**
@@ -16,6 +16,8 @@
  * 
  * @package     Addressbook
  * @subpackage  Export
+ * 
+ * @deprecated this is no longer supported 
  */
 class Addressbook_Export_FritzBox extends Tinebase_Export_Abstract implements Tinebase_Record_IteratableInterface
 {

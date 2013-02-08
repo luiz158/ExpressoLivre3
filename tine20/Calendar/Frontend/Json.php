@@ -6,7 +6,7 @@
  * @subpackage  Frontend
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2013 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 
 /**
@@ -17,12 +17,17 @@
  */
 class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
 {
+    /**
+     * app name
+     * 
+     * @var string
+     */
     protected $_applicationName = 'Calendar';
     
     /**
      * creates an exception instance of a recurring event
      *
-     * NOTE: deleting persistent exceptions is done via a normal delte action
+     * NOTE: deleting persistent exceptions is done via a normal delete action
      *       and handled in the controller
      * 
      * @param  array       $recordData
@@ -30,6 +35,9 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      * @param  bool        $deleteAllFollowing
      * @param  bool        $checkBusyConflicts
      * @return array       exception Event | updated baseEvent
+     * 
+     * @todo replace $_allFollowing param with $range
+     * @deprecated replace with create/update/delete
      */
     public function createRecurException($recordData, $deleteInstance, $deleteAllFollowing, $checkBusyConflicts = FALSE)
     {
@@ -44,12 +52,13 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     /**
      * deletes existing events
      *
-     * @param array $_ids 
+     * @param array $_ids
+     * @param string $range
      * @return string
      */
-    public function deleteEvents($ids)
+    public function deleteEvents($ids, $range = Calendar_Model_Event::RANGE_THIS)
     {
-        return $this->_delete($ids, Calendar_Controller_Event::getInstance());
+        return $this->_delete($ids, Calendar_Controller_Event::getInstance(), array($range));
     }
     
     /**
@@ -141,14 +150,22 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         $clientFilter = $filter = $this->_decodeFilter($filter, 'Calendar_Model_EventFilter');
         
         // add fixed calendar on demand
-        $fixedCalendars = Tinebase_Config::getInstance()->getConfigAsArray('fixedCalendars', 'Calendar');
+        $fixedCalendars = Calendar_Config::getInstance()->get(Calendar_Config::FIXED_CALENDARS, new Tinebase_Config_Struct(array()))->toArray();
         if (is_array($fixedCalendars) && ! empty($fixedCalendars)) {
             $fixed = new Calendar_Model_EventFilter(array(), 'AND');
             $fixed->addFilter( new Tinebase_Model_Filter_Text('container_id', 'in', $fixedCalendars));
+            
             $periodFilter = $filter->getFilter('period');
-            if ($periodFilter) {
-                $fixed->addFilter($periodFilter);
+            
+            // add period filter per default to prevent endless search
+            if (!$periodFilter) {
+                $now = new Tinebase_DateTime();
+                $inAmonth = clone $now;
+                $inAmonth->addMonth(1);
+                $periodFilter = new Calendar_Model_PeriodFilter(array('field' => 'period', 'operator' => 'within', 'value' => array("from" => $now, "until" => $inAmonth)));
             }
+            
+            $fixed->addFilter($periodFilter);
             
             $og = new Calendar_Model_EventFilter(array(), 'OR');
             $og->addFilterGroup($fixed);
@@ -182,7 +199,7 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     }
     
     /**
-     * creates/updates an event
+     * creates/updates an event / recur
      *
      * @param   array   $recordData
      * @param   bool    $checkBusyConflicts
@@ -277,47 +294,5 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         $iMIPFrontend->process($iMIPMessage, $status);
         
         return $this->iMIPPrepare($iMIPMessage);
-    }
-    
-    /**
-     * returns multiple records prepared for json transport
-     *
-     * @param Tinebase_Record_RecordSet $_records Tinebase_Record_Abstract
-     * @param Tinebase_Model_Filter_FilterGroup $_filter
-     * @param Tinebase_Model_Pagination $_pagination needed for sorting
-     * @return array data
-     * 
-     * @todo perhaps we need to resolveContainerTagsUsers() before  mergeAndRemoveNonMatchingRecurrences(), but i'm not sure about that
-     * @todo use Calendar_Convert_Event_Json
-     */
-    protected function _multipleRecordsToJson(Tinebase_Record_RecordSet $_records, $_filter = NULL, $_pagination = NULL)
-    {
-    	if ($_records->getRecordClassName() == 'Calendar_Model_Event') {
-	    	if (is_null($_filter)) {
-	    		throw new Tinebase_Exception_InvalidArgument('Required argument $_filter is missing');
-	    	}
-	        
-	        Tinebase_Notes::getInstance()->getMultipleNotesOfRecords($_records);
-	        
-	        Calendar_Model_Attender::resolveAttendee($_records->attendee, TRUE, $_records);
-	        Calendar_Convert_Event_Json::resolveOrganizer($_records);
-	        Calendar_Convert_Event_Json::resolveRrule($_records);
-            Calendar_Controller_Event::getInstance()->getAlarms($_records);
-            
-            Calendar_Model_Rrule::mergeAndRemoveNonMatchingRecurrences($_records, $_filter);
-            
-            $_records->sortByPagination($_pagination);
-            $eventsData = parent::_multipleRecordsToJson($_records);
-	        foreach ($eventsData as $eventData) {
-	            if (! array_key_exists(Tinebase_Model_Grants::GRANT_READ, $eventData) || ! $eventData[Tinebase_Model_Grants::GRANT_READ]) {
-	                $eventData['notes'] = array();
-	                $eventData['tags'] = array();
-	            }
-	        }
-	        
-	        return $eventsData;
-    	}
-          
-        return parent::_multipleRecordsToJson($_records);
     }
 }

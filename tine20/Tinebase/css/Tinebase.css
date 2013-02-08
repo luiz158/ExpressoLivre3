@@ -466,7 +466,7 @@ html, body {
 .tb-about-img {
     margin-top: 10px;
 }
-.tb-about-version{
+.tb-about-version {
     margin-top: 50px;
     font-weight: bold;
 }
@@ -475,6 +475,15 @@ html, body {
 }
 .tb-about-copyright {
     margin-top: 50px;
+}
+
+.tb-about-credits-license {
+    margin-top: 10px;
+}
+
+.tb-about-whatsnew p {
+    background: transparent url(../../images/oxygen/16x16/actions/dialog-information.png) left top no-repeat;
+    padding: 2px 0 2px 20px;
 }
 
 /* -------- tags renderer ------------------------------------------------------------*/
@@ -491,6 +500,14 @@ html, body {
 .ext-gecko .tb-grid-tags {
     -moz-border-radius: 5px;
     margin-top: 2px;
+}
+
+.x-menu-item-text .tb-grid-tags {
+    margin-top: 4px;
+}
+
+.x-menu-item-text .x-widget-tag-tagitem-text {
+    line-height: 16px;
 }
 
 /* ----- account renderer ------------------------------------------------------------*/
@@ -729,6 +746,10 @@ html, body {
     background-image:url("../../library/ExtJS/resources/images/default/s.gif");
 }
 
+.tine-editorgrid-row-invalid {
+    border: 1px dotted red;
+}
+
 .tine-duplicateresolve-keepvalue {
     color: #006600;
 }
@@ -739,6 +760,15 @@ html, body {
 
 .tine-duplicateresolve-adoptedvalue {
     color: #666666;
+}
+
+.tine-recordclass-gridicon {
+    background-repeat: no-repeat;
+    display: block;
+    height: 16px;
+    width: 16px;
+    margin: -2px 5px -2px 0;
+    float:left;
 }
 
 /******** downloads ***********/
@@ -880,14 +910,14 @@ textarea.tinebase-editmultipledialog-noneedit {
 .tinebase-editmultipledialog-dirtycheck {
     background-color: #F4F1D3; /* #F9F9A3 */
     border: 1px solid #B5B8C8;
-    padding: 0px 2px 3px 2px;
+    padding: 2px 2px 1px 2px;
     border-radius: 3px;
 }
 
 .tine-wordbox {
     border: 1px solid gray;
     margin-left: 3px;
-    border-radius: 50px;
+    border-radius: 2px;
     padding: 0px 5px;
     background-color: white;
 }

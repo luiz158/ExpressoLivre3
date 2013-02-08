@@ -83,11 +83,21 @@ class Calendar_Import_ICalTest extends Calendar_TestCase
         ));
         
         $importer->importFile(dirname(__FILE__) . '/files/horde.ics');
+        $this->_checkHordeImport();
+    }
+    
+    /**
+     * asserts succesful horde import
+     * 
+     * @param string $failMessage
+     */
+    protected function _checkHordeImport($failMessage = '')
+    {
         $events = Calendar_Controller_Event::getInstance()->search(new Calendar_Model_EventFilter(array(
             array('field' => 'container_id', 'operator' => 'equals', 'value' => $this->_testCalendar->getId())
         )), NULL);
         
-        $this->assertEquals(1, $events->count(), 'events where not imported');
+        $this->assertEquals(1, $events->count(), 'events where not imported ' . $failMessage);
     }
     
     /**
@@ -115,5 +125,25 @@ class Calendar_Import_ICalTest extends Calendar_TestCase
         )), NULL);
         
         $this->assertEquals(1, $events->count(), 'events where not imported');
+    }
+    
+    /**
+     * test ical cli import
+     * 
+     * @see 0007104: Calender Import Crashes
+     */
+    public function testCliImport()
+    {
+        $this->_testNeedsTransaction();
+        
+        $cmd = realpath(__DIR__ . "/../../../../tine20/tine20.php") . ' --method Calendar.import ' .
+            'plugin=Calendar_Import_Ical importContainerId=' . $this->_testCalendar->getId() .
+            ' ' . dirname(__FILE__) . '/files/horde.ics';
+        
+        $cmd = TestServer::assembleCliCommand($cmd, TRUE);
+        
+        exec($cmd, $output);
+        $failMessage = print_r($output, TRUE);
+        $this->_checkHordeImport($failMessage);
     }
 }

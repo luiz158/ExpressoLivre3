@@ -21,16 +21,16 @@
  */
 class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAccess
 {
-	/**
-	 * class name of records this instance can hold
-	 * @var string
-	 */
-	protected $_recordClass;
-	
-	/**
-	 * Holds records
-	 * @var array
-	 */
+    /**
+     * class name of records this instance can hold
+     * @var string
+     */
+    protected $_recordClass;
+    
+    /**
+     * Holds records
+     * @var array
+     */
     protected $_listOfRecords = array();
     
     /**
@@ -72,8 +72,8 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
         $this->_recordClass = $_className;
 
         foreach($_records as $record) {
-        	$toAdd = is_array($record) ? new $this->_recordClass($record, $_bypassFilters, $_convertDates) : $record;
-        	$this->addRecord($toAdd);
+            $toAdd = is_array($record) ? new $this->_recordClass($record, $_bypassFilters, $_convertDates) : $record;
+            $this->addRecord($toAdd);
         }
     }
     
@@ -124,7 +124,7 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
         foreach ($this->_indices as $name => &$propertyIndex) {
             $propertyIndex[$index] = $_record->$name;
         }
-		
+        
         return $index;
     }
     
@@ -183,7 +183,7 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
     {
         foreach ($this->_listOfRecords as $index => $record) {
             if (!$record->isValid()) {
-            	$this->_validationErrors[$index] = $record->getValidationErrors();
+                $this->_validationErrors[$index] = $record->getValidationErrors();
             }
         }
         return !(bool)count($this->_validationErrors);
@@ -196,7 +196,7 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
      */
     public function getValidationErrors()
     {
-    	return $this->_validationErrors;
+        return $this->_validationErrors;
     }
     
     /**
@@ -238,6 +238,17 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
         
         return $idx !== false ? $this[$idx] : false;
     }
+
+    /**
+     * returns record identified by its id
+     * 
+     * @param  integer $index of record
+     * @return Tinebase_Record_Abstract::|bool    record or false if not in set
+     */
+    public function getByIndex($index)
+    {
+        return (isset($this->_listOfRecords[$index])) ? $this->_listOfRecords[$index] : false;
+    }
     
     /**
      * returns array of ids
@@ -252,15 +263,13 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
      */
     public function getArrayOfIdsAsString()
     {
-    	$ids = array_keys($this->_idMap);
-    	foreach($ids as $key => $id)
-    	{
-    		$ids[$key] = (string) $id;
-    	}
-    	return $ids;
-    } 
-   
-    
+        $ids = array_keys($this->_idMap);
+        foreach($ids as $key => $id) {
+            $ids[$key] = (string) $id;
+        }
+        return $ids;
+    }
+
     /**
      * returns array with idless (new) records in this set
      * 
@@ -312,9 +321,9 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
      */
     public function __set($_name, $_value)
     {
-    	foreach ($this->_listOfRecords as $record) {
-    		$record->$_name = $_value;
-    	}
+        foreach ($this->_listOfRecords as $record) {
+            $record->$_name = $_value;
+        }
         if (array_key_exists($_name, $this->_indices)) {
             foreach ($this->_indices[$_name] as $key => $oldvalue) {
                 $this->_indices[$_name][$key] = $_value;
@@ -327,10 +336,13 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
      * 
      * @param  string $_name property
      * @return array index => property
+     * 
+     * @todo reactivate indices (@see 0007558: reactivate indices in Tinebase_Record_RecordSet)
      */
     public function __get($_name)
     {
-        if (array_key_exists($_name, $this->_indices)) {
+        // NOTE: indices may lead to wrong results if a record is changed after build of indices
+        if (FALSE && array_key_exists($_name, $this->_indices)) {
             $propertiesArray = $this->_indices[$_name];
         } else {
             $propertiesArray = array();
@@ -378,17 +390,17 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
         return count($this->_listOfRecords);
     }
 
-	/**
+    /**
      * required by IteratorAggregate interface
      * 
      * @return iterator
      */
     public function getIterator()
     {
-        return new ArrayIterator($this->_listOfRecords);    
+        return new ArrayIterator($this->_listOfRecords);
     }
 
-	/**
+    /**
      * required by ArrayAccess interface
      */
     public function offsetExists($_offset)
@@ -421,26 +433,26 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
         }
         
         if (!is_int($_offset)) {
-        	$this->addRecord($_value);
+            $this->addRecord($_value);
         } else {
             if (!array_key_exists($_offset, $this->_listOfRecords)) {
                 throw new Tinebase_Exception_Record_NotAllowed('adding a record is only allowd via the addRecord method');
             }
-        	$this->_listOfRecords[$_offset] = $_value;
-        	$id = $_value->getId();
-        	if ($id) {
-        	    if(! array_key_exists($id, $this->_idMap)) {
-        	        $this->_idMap[$id] = $_offset;
-        	        $idLessIdx = array_search($_offset, $this->_idLess);
+            $this->_listOfRecords[$_offset] = $_value;
+            $id = $_value->getId();
+            if ($id) {
+                if(! array_key_exists($id, $this->_idMap)) {
+                    $this->_idMap[$id] = $_offset;
+                    $idLessIdx = array_search($_offset, $this->_idLess);
                     unset($this->_idLess[$idLessIdx]);
-        	    }
-        	} else {
-        	    if (array_search($_offset, $this->_idLess) === false) {
-        	        $this->_idLess[] = $_offset;
-        	        $idMapIdx = array_search($_offset, $this->_idMap);
-        	        unset($this->_idMap[$idMapIdx]);
-        	    }
-        	}
+                }
+            } else {
+                if (array_search($_offset, $this->_idLess) === false) {
+                    $this->_idLess[] = $_offset;
+                    $idMapIdx = array_search($_offset, $this->_idMap);
+                    unset($this->_idMap[$idMapIdx]);
+                }
+            }
         }
     }
     
@@ -465,14 +477,17 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
      *
      * @param array $_toCompareWithRecordsIds Array to compare this record sets ids with
      * @return array An array with sub array indices 'toDeleteIds', 'toCreateIds' and 'toUpdateIds'
+     * 
+     * @deprecated please use diff() as this returns wrong result when idless records have been added
+     * @see 0007492: replace getMigration() with diff() when comparing Tinebase_Record_RecordSets
      */
     public function getMigration(array $_toCompareWithRecordsIds)
     {
-    	$existingRecordsIds = $this->getArrayOfIds();
-    	
+        $existingRecordsIds = $this->getArrayOfIds();
+        
         $result = array();
         
-    	$result['toDeleteIds'] = array_diff($existingRecordsIds, $_toCompareWithRecordsIds);
+        $result['toDeleteIds'] = array_diff($existingRecordsIds, $_toCompareWithRecordsIds);
         $result['toCreateIds'] = array_diff($_toCompareWithRecordsIds, $existingRecordsIds);
         $result['toUpdateIds'] = array_intersect($existingRecordsIds, $_toCompareWithRecordsIds);
         
@@ -523,7 +538,6 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
     {
         $matchingRecords = $this->_getMatchingRecords($_field, $_value, $_valueIsRegExp);
         
-        
         $result = new Tinebase_Record_RecordSet($this->_recordClass, $matchingRecords);
         $result->addIndices(array_keys($this->_indices));
         
@@ -549,14 +563,17 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
      * @param string $_field
      * @param string $_value
      * @return array
+     * 
+     * @todo reactivate indices (@see 0007558: reactivate indices in Tinebase_Record_RecordSet)
      */
     protected function _getMatchingRecords($_field, $_value, $_valueIsRegExp = FALSE)
     {
-        if (array_key_exists($_field, $this->_indices)) {
-            //if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . 'filtering with indices, expecting fast results ;-)');
+        // NOTE: indices may lead to wrong results if a record is changed after build of indices
+        if (FALSE && array_key_exists($_field, $this->_indices)) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Filtering with indices, expecting fast results ;-)');
             $valueMap = $this->_indices[$_field];
         } else {
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . "filtering field '$_field' of '{$this->_recordClass}' without indices, expecting slow results");
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . " Filtering field '$_field' of '{$this->_recordClass}' without indices, expecting slow results");
             $valueMap = $this->$_field;
         }
         
@@ -592,45 +609,59 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
      *  - added    -> all records that are in $_recordSet but not in $this
      *  - modified -> array of diffs  for all different records that are in both record sets
      * 
-     * @param Tinebase_Record_RecordSet $_recordSet
-     * @return array
+     * @param Tinebase_Record_RecordSet $recordSet
+     * @return Tinebase_Record_RecordSetDiff
      */
-    public function diff($_recordSet)
+    public function diff($recordSet)
     {
-        if (! $_recordSet instanceof Tinebase_Record_RecordSet) {
+        if (! $recordSet instanceof Tinebase_Record_RecordSet) {
             if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' ' 
                 . ' Did not get Tinebase_Record_RecordSet, skipping diff()');
             return array();
         }
         
-        if ($this->getRecordClassName() !== $_recordSet->getRecordClassName()) {
+        if ($this->getRecordClassName() !== $recordSet->getRecordClassName()) {
             throw new Tinebase_Exception_InvalidArgument('can only compare recordsets with the same type of records');
         }
+        
+        $existingRecordsIds = $this->getArrayOfIds();
+        $toCompareWithRecordsIds = $recordSet->getArrayOfIds();
+        
+        $removedIds = array_diff($existingRecordsIds, $toCompareWithRecordsIds);
+        $addedIds = array_diff($toCompareWithRecordsIds, $existingRecordsIds);
+        $modifiedIds = array_intersect($existingRecordsIds, $toCompareWithRecordsIds);
+        
         $removed = new Tinebase_Record_RecordSet($this->getRecordClassName());
         $added = new Tinebase_Record_RecordSet($this->getRecordClassName());
-        $modified = array();
+        $modified = new Tinebase_Record_RecordSet('Tinebase_Record_Diff');
         
-        $result = array();
-        
-        $migration = $this->getMigration($_recordSet->getArrayOfIds());
-        foreach ($migration['toDeleteIds'] as $id) {
-            $added->addRecord($this->getById($id));
+        foreach ($addedIds as $id) {
+            $added->addRecord($recordSet->getById($id));
         }
-        foreach ($migration['toCreateIds'] as $id) {
-            $removed->addRecord($_recordSet->getById($id));
+        // consider records without id, too
+        foreach ($recordSet->getIdLessIndexes() as $index) {
+            $added->addRecord($recordSet->getByIndex($index));
         }
-        foreach ($migration['toUpdateIds'] as $id) {
-            $diff = $this->getById($id)->diff($_recordSet->getById($id));
-            if (! empty($diff)) {
-                $modified[$id] = $diff;
+        foreach ($removedIds as $id) {
+            $removed->addRecord($this->getById($id));
+        }
+        // consider records without id, too
+        foreach ($this->getIdLessIndexes() as $index) {
+            $removed->addRecord($this->getByIndex($index));
+        }
+        foreach ($modifiedIds as $id) {
+            $diff = $this->getById($id)->diff($recordSet->getById($id));
+            if (! $diff->isEmpty()) {
+                $modified->addRecord($diff);
             }
         }
         
-        foreach (array('removed', 'added', 'modified') as $subresult) {
-            if (count($$subresult) > 0) {
-                $result[$subresult] = $$subresult;
-            }
-        }
+        $result = new Tinebase_Record_RecordSetDiff(array(
+            'model'    => $this->getRecordClassName(),
+            'added'    => $added,
+            'removed'  => $removed,
+            'modified' => $modified,
+        ));
         
         return $result;
     }
@@ -705,6 +736,25 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
             $this->sort($sortField, ($_pagination->dir) ? $_pagination->dir : 'ASC', 'natcasesort');
         }
         
+        return $this;
+    }
+    
+    /**
+     * limits this recordset by pagination
+     * sorting should always be applied before to get the desired sequence
+     * @param Tinebase_Model_Pagination $_pagination
+     * @return $this
+     */
+    public function limitByPagination($_pagination)
+    {
+        if ($_pagination !== NULL && $_pagination->limit) {
+            $indices = range($_pagination->start, $_pagination->start + $_pagination->limit - 1);
+            foreach($this as $index => &$record) {
+                if(! in_array($index, $indices)) {
+                    $this->offsetUnset($index);
+                }
+            }
+        }
         return $this;
     }
     

@@ -18,7 +18,7 @@
  * @subpackage  Controller
  */
 class Admin_Controller_Application extends Tinebase_Controller_Abstract
-{   
+{
     /**
      * holds the instance of the singleton
      *
@@ -33,7 +33,6 @@ class Admin_Controller_Application extends Tinebase_Controller_Abstract
      */
     private function __construct() 
     {
-        $this->_currentAccount = Tinebase_Core::getUser();
         $this->_applicationName = 'Admin';
     }
 
@@ -42,7 +41,7 @@ class Admin_Controller_Application extends Tinebase_Controller_Abstract
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -86,7 +85,7 @@ class Admin_Controller_Application extends Tinebase_Controller_Abstract
      */
     public function get($_applicationId)
     {
-        $this->checkRight('VIEW_APPS');        
+        $this->checkRight('VIEW_APPS');
         
         $tineApplications = Tinebase_Application::getInstance();
         
@@ -114,7 +113,7 @@ class Admin_Controller_Application extends Tinebase_Controller_Abstract
      */
     public function setApplicationState($_applicationIds, $_state)
     {
-        $this->checkRight('MANAGE_APPS');        
+        $this->checkRight('MANAGE_APPS');
         
         $tineApplications = Tinebase_Application::getInstance();
         

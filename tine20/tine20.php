@@ -13,34 +13,7 @@ if (php_sapi_name() != 'cli') {
     die('Not allowed: wrong sapi name!');
 }
 
-$paths = array(
-    realpath(dirname(__FILE__)),
-    realpath(dirname(__FILE__) . '/library'),
-    get_include_path()
-);
-set_include_path(implode(PATH_SEPARATOR, $paths));
-
-require_once 'Zend/Loader/Autoloader.php';
-$autoloader = Zend_Loader_Autoloader::getInstance();
-$autoloader->setFallbackAutoloader(true);
-Tinebase_Autoloader::initialize($autoloader);
-
-/**
- * path to tine 2.0 checkout
- */
-$tine20path = dirname(__FILE__);
-
-/**
- * anonymous methods (no pw/user required)
- */
-$anonymousMethods = array(
-    'Tinebase.triggerAsyncEvents',
-    'Tinebase.processQueue',
-    'Tinebase.monitoringCheckDB',
-    'Tinebase.monitoringCheckConfig',
-    'Tinebase.monitoringCheckCron',
-    'Tinebase.monitoringLoginNumber',
-);
+require_once 'bootstrap.php';
 
 /**
  * options
@@ -50,6 +23,7 @@ try {
     array(
         'help|h'                => 'Display this help Message',
         'verbose|v'             => 'Output messages',
+        'config|c=s'            => 'Path to config.inc.php file',
         'dry|d'                 => "Dry run - don't change anything",    
         'info|i'                => 'Get usage description of method',
     
@@ -70,8 +44,14 @@ if (count($opts->toArray()) === 0 || $opts->h || empty($opts->method)) {
     exit;
 }
 
+if ($opts->config) {
+    // add path to config.inc.php to include path
+    $path = strstr($opts->config, 'config.inc.php') !== false ? dirname($opts->config) : $opts->config;
+    set_include_path($path . PATH_SEPARATOR . get_include_path());
+}
+
 // get username / password if not already set
-if (! in_array($opts->method, $anonymousMethods)) {
+if (! in_array($opts->method, Tinebase_Server_Cli::getAnonymousMethods())) {
     if (empty($opts->username)) {
         $opts->username = Tinebase_Server_Cli::promptInput('username');
     }

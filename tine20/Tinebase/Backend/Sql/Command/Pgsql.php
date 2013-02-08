@@ -19,91 +19,108 @@ class Tinebase_Backend_Sql_Command_Pgsql implements Tinebase_Backend_Sql_Command
 {
     /**
      * 
-     * @param $adapter Zend_Db_Adapter_Abstract
-     * @param $on boolean
+     * @var Zend_Db_Adapter_Abstract
      */
-    public static function setAutocommit($adapter, $on)
+    protected $_adapter;
+    
+    /**
+     * @param Zend_Db_Adapter_Abstract $adapter
+     */
+    public function __construct(Zend_Db_Adapter_Abstract $adapter)
     {
-        // SET AUTOCOMMIT=0 is not supported for PostgreSQL
-        if ($on) {
-            $adapter->query('SET AUTOCOMMIT=1;');
-        }
+        $this->_adapter = $adapter;
     }
     
     /**
-     * 
-     * @param Zend_Db_Adapter_Abstract $adapter
      * @param string $field
      * @return string
      */
-    public static function getAggregateFunction($adapter, $field)
+    public function getAggregate($field)
     {
-        return "array_to_string(ARRAY(SELECT unnest(array_agg($field)) 
-                                               ORDER BY 1),',')";   	
+        $quotedField = $this->_adapter->quoteIdentifier($field);
+        
+        // since 9.0
+        #return new Zend_Db_Expr("string_agg(DISTINCT $quotedField, ',')");
+        
+        // before 9.0
+        return new Zend_Db_Expr("array_to_string(ARRAY(SELECT DISTINCT unnest(array_agg($quotedField)) ORDER BY 1),',')");
     }
 
     /**
-     * 
-     * @param Zend_Db_Adapter_Abstract $adapter
      * @param string $field
      * @param mixed $returnIfTrue
      * @param mixed $returnIfFalse
-     * @return string 
+     * @return string
      */
-    public static function getIfIsNull($adapter, $field, $returnIfTrue, $returnIfFalse)
+    public function getIfIsNull($field, $returnIfTrue, $returnIfFalse)
     {
-        return "(CASE WHEN $field IS NULL THEN " . (string) $returnIfTrue . " ELSE " . (string) $returnIfFalse . " END)";
-    }    
-    
-    /**
-      * 
-      * @param Zend_Db_Adapter_Abstract $adapter
-      * @return string
-      */
-    public static function getLike($adapter)
-    {
-        return 'iLIKE';
-    }
-    
-    /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param string $date
-     * @return string 
-     */
-    public static function setDate($adapter, $date)
-    {
-    	return "DATE({$date})";
-    }  
+        $quotedField = $this->_adapter->quoteIdentifier($field);
         
-    /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param string $value
-     * @return string 
-     */
-    public static function setDateValue($adapter, $value)
-    {
-    	return $value;
-    } 
+        return new Zend_Db_Expr("(CASE WHEN $quotedField IS NULL THEN $returnIfTrue ELSE $returnIfFalse END)");
+    }
 
     /**
      *
      * @param Zend_Db_Adapter_Abstract $adapter
-     * @return mixed
+     * @param string $condition
+     * @param string $returnIfTrue
+     * @param string $returnIfFalse
+     * @return string
      */
-    public static function getFalseValue($adapter = null)
-    {    
-    	return 'FALSE';
+    public function getIfElse($condition, $returnIfTrue, $returnIfFalse)
+    {
+        return new Zend_Db_Expr("(CASE WHEN $condition THEN $returnIfTrue ELSE $returnIfFalse END)");
     }
     
     /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
+     * @param string $date
+     * @return string
+     */
+    public function setDate($date)
+    {
+        return "DATE({$date})";
+    }
+
+    /**
+     * @param string $value
+     * @return string
+     */
+    public function setDateValue($value)
+    {
+        return $this->_adapter->quote($value);
+    }
+
+    /**
      * @return mixed
      */
-    public static function getTrueValue($adapter = null)
-    {  
-    	return 'TRUE';
-    }    
+    public function getFalseValue()
+    {
+        return 'FALSE';
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getTrueValue()
+    {
+        return 'TRUE';
+    }
+
+    /**
+     * @return string
+     */
+    public function setDatabaseJokerCharacters()
+    {
+        return array('%', '\_');
+    }
+    
+    /**
+     * get like keyword
+     * 
+     * @return string
+     */
+    public function getLike()
+    {
+        return 'iLIKE';
+    }
 }

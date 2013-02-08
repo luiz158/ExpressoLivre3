@@ -1,7 +1,7 @@
 <?php
 /**
  * Tine 2.0
- *
+ * 
  * @package     Felamimail
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
@@ -13,10 +13,10 @@
 
 /**
  * cache entry filter Class
- *
+ * 
  * @package     Felamimail
  */
-class Felamimail_Model_MessageFilter extends Tinebase_Model_Filter_FilterGroup
+class Felamimail_Model_MessageFilter extends Tinebase_Model_Filter_FilterGroup 
 {
 	/**
 	 * @var string class name of this filter group
@@ -54,14 +54,14 @@ class Felamimail_Model_MessageFilter extends Tinebase_Model_Filter_FilterGroup
                         'body'          => array('filter' => 'Tinebase_Model_Filter_Text'),
 			'from_email'    => array('filter' => 'Tinebase_Model_Filter_Text'),
 			'from_name'     => array('filter' => 'Tinebase_Model_Filter_Text'),
-			'received'      => array('filter' => 'Tinebase_Model_Filter_DateTime'),
+			'received'      => array('filter' => 'Tinebase_Model_Filter_Date'),
 			'messageuid'    => array('filter' => 'Tinebase_Model_Filter_Int'),
 			// custom filters
 			'path'          => array('custom' => true),
 			'to'            => array('custom' => true, 'requiredCols' => array('to' => 'felamimail_cache_message_to.*')),
 			'cc'            => array('custom' => true, 'requiredCols' => array('cc' => 'felamimail_cache_message_cc.*')),
 			'bcc'           => array('custom' => true, 'requiredCols' => array('bcc' => 'felamimail_cache_message_bcc.*')),
-			'flags'         => array('custom' => true, 'requiredCols' => array('flags' => 'felamimail_cache_message_flag.flag')),
+			'flags'         => array('custom' => true, 'requiredCols' => array('flags' => 'felamimail_cache_msg_flag.flag')),
 			'account_id'    => array('custom' => true),
 			);
 
@@ -173,18 +173,18 @@ class Felamimail_Model_MessageFilter extends Tinebase_Model_Filter_FilterGroup
 			 *
 			 * @return array
 			 */
-			protected function _getFolderIdsOfAllInboxes()
-			{
-				$accounts = Felamimail_Controller_Account::getInstance()->search();
-				$folderFilter = new Felamimail_Model_FolderFilter(array(
-						array('field' => 'account_id',  'operator' => 'in',     'value' => $accounts->getArrayOfIds()),
-						array('field' => 'localname',   'operator' => 'equals', 'value' => 'INBOX')
-				));
-				$folderBackend = Felamimail_Backend_Folder::getInstance();
-				$folderIds = $folderBackend->search($folderFilter, NULL, TRUE);
+            protected function _getFolderIdsOfAllInboxes()
+            {
+                $accounts = Felamimail_Controller_Account::getInstance()->search();
+                $folderFilter = new Felamimail_Model_FolderFilter(array(
+                    array('field' => 'account_id',  'operator' => 'in',     'value' => $accounts->getArrayOfIds()),
+                    array('field' => 'localname',   'operator' => 'equals', 'value' => 'INBOX')
+                ));
+                $folderBackend = Felamimail_Backend_Folder::getInstance();
+                $folderIds = $folderBackend->search($folderFilter, NULL, TRUE);
 
-				return $folderIds;
-			}
+                return $folderIds;
+            }
 
 			/**
 			 * add to/cc/bcc and flags custom filters
@@ -194,68 +194,56 @@ class Felamimail_Model_MessageFilter extends Tinebase_Model_Filter_FilterGroup
 			 * @param  array                                $_filterData
 			 * @return void
 			 */
-			protected function _addRecipientAndFlagsSql($_select, $_backend, $_filterData)
-			{
-				$db = $_backend->getAdapter();
-				$foreignTables = $_backend->getForeignTables();
+            protected function _addRecipientAndFlagsSql($_select, $_backend, $_filterData)
+            {
+                $db = $_backend->getAdapter();
+                $foreignTables = $_backend->getForeignTables();
 
-				// add conditions
-				$tablename  = $foreignTables[$_filterData['field']]['table'];
-				if ($_filterData['field'] !== 'flags') {
-					$fieldName  = $tablename . '.name';
-					$fieldEmail = $tablename . '.email';
-				}
+                // add conditions
+                $tablename  = $foreignTables[$_filterData['field']]['table'];
+                if ($_filterData['field'] !== 'flags') {
+                    $fieldName  = $tablename . '.name';
+                    $fieldEmail = $tablename . '.email';
+                }
 
-				// add filter value
-				if (! is_array($_filterData['value'])) {
-					$value      = '%' . $_filterData['value'] . '%';
-				} else {
-					$value = array();
-					foreach ((array)$_filterData['value'] as $customValue) {
-						$value[]      = '%' . $customValue . '%';
-					}
-				}
+                // add filter value
+                if (! is_array($_filterData['value'])) {
+                    $value      = '%' . $_filterData['value'] . '%';
+                } else {
+                    $value = array();
+                    foreach ((array)$_filterData['value'] as $customValue) {
+                        $value[]      = '%' . $customValue . '%';
+                    }
+                }
 
-				if ($_filterData['field'] == 'flags') {
-					$columns = $_select->getPart(Zend_Db_Select::COLUMNS);
-
-					$flags = '';
-					foreach($columns as $column)
-					{
-						if ($column[2] == 'flags')
-						{
-							$flags = '(' . $column[1] . ')' ;
-							break;
-						}
-					}
-
-					if ($_filterData['operator'] == 'equals' || $_filterData['operator'] == 'contains') {
-						$_select->having($db->quoteInto($flags . ' LIKE ?', $value));
-					} else if ($_filterData['operator'] == 'in' || $_filterData['operator'] == 'notin') {
-						if (empty($value)) {
-							$whereString = $flags . ' IS NULL';
-						} else {
-							$value = (array) $value;
-							$where = array();
-							$op = ($_filterData['operator'] == 'in') ? 'LIKE' : 'NOT LIKE';
-							$opImplode = ($_filterData['operator'] == 'in') ? ' OR ' : ' AND ';
-							foreach ($value as $flag) {
-								$where[] = $db->quoteInto($flags . ' ' . $op . ' ?', $flag);
-							}
-							$whereString = implode($opImplode, $where);
-							if ($_filterData['operator'] == 'notin') {
-								$whereString = '(' . $whereString . ') OR ' . $flags . ' IS NULL';
-							}
-						}
-						$_select->having($whereString);
-					} else {
-						$_select->having($db->quoteInto($flags . ' NOT LIKE ? OR ' . $flags . ' IS NULL', $value));
-					}
-				} else {
-					$_select->where(
-							$db->quoteInto($fieldName  . ' LIKE ?', $value) . ' OR ' .
-							$db->quoteInto($fieldEmail . ' LIKE ?', $value)
-					);
-				}
-			}
+                if ($_filterData['field'] == 'flags') {
+                    if ($_filterData['operator'] == 'equals' || $_filterData['operator'] == 'contains') {
+                        $_select->having($db->quoteInto('flags LIKE ?', $value));
+                    } else if ($_filterData['operator'] == 'in' || $_filterData['operator'] == 'notin') {
+                        if (empty($value)) {
+                            $whereString = 'flags IS NULL';
+                        } else {
+                            $value = (array) $value;
+                            $where = array();
+                            $op = ($_filterData['operator'] == 'in') ? 'LIKE' : 'NOT LIKE';
+                            $opImplode = ($_filterData['operator'] == 'in') ? ' OR ' : ' AND ';
+                            foreach ($value as $flag) {
+                                $where[] = $db->quoteInto('flags ' . $op . ' ?', $flag);
+                            }
+                            $whereString = implode($opImplode, $where);
+                            if ($_filterData['operator'] == 'notin') {
+                                $whereString = '(' . $whereString . ') OR flags IS NULL';
+                            }
+                        }
+                        $_select->having($whereString);
+                    } else {
+                        $_select->having($db->quoteInto('flags NOT LIKE ? OR flags IS NULL', $value));
+                    }
+                } else {
+                    $_select->where(
+                        $db->quoteInto($fieldName  . ' LIKE ?', $value) . ' OR ' .
+                        $db->quoteInto($fieldEmail . ' LIKE ?', $value)
+                    );
+                }
+            }
 }

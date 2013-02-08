@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <application>
     <name>Tinebase</name>
-    <version>5.11</version>
+    <version>7.3</version>
     <tables>
         <table>
             <name>applications</name>
@@ -537,7 +537,7 @@
 
         <table>
             <name>container</name>
-            <version>6</version>
+            <version>7</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -615,6 +615,17 @@
                 <field>
                     <name>deleted_time</name>
                     <type>datetime</type>
+                </field>
+                <field>
+                    <name>seq</name>
+                    <type>integer</type>
+                    <notnull>true</notnull>
+                    <default>0</default>
+                </field>
+                <field>
+                    <name>model</name>
+                    <type>text</type>
+                    <length>64</length>
                 </field>
                 <index>
                     <name>id</name>
@@ -798,7 +809,7 @@
         </table>
         <table>
             <name>access_log</name>
-            <version>3</version>
+            <version>4</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -863,12 +874,18 @@
                         <name>sessionid</name>
                     </field>
                 </index>
+                <index>
+                    <name>li</name>
+                    <field>
+                        <name>li</name>
+                    </field>
+                </index>
             </declaration>
         </table>
 
         <table>
             <name>record_observer</name>
-            <version>2</version>
+            <version>3</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -936,6 +953,12 @@
                     <name>deleted_time</name>
                     <type>datetime</type>
                 </field>
+                <field>
+                    <name>seq</name>
+                    <type>integer</type>
+                    <notnull>true</notnull>
+                    <default>0</default>
+                </field>
                 <index>
                     <name>id</name>
                     <primary>true</primary>
@@ -977,7 +1000,7 @@
 
         <table>
             <name>relations</name>
-            <version>6</version>
+            <version>7</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -1082,6 +1105,12 @@
                     <type>datetime</type>
                     <notnull>false</notnull>
                 </field>
+                <field>
+                    <name>seq</name>
+                    <type>integer</type>
+                    <notnull>true</notnull>
+                    <default>0</default>
+                </field>
                 <index>
                     <name>id</name>
                     <primary>true</primary>
@@ -1132,7 +1161,7 @@
 
         <table>
             <name>timemachine_modlog</name>
-            <version>2</version>
+            <version>3</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -1189,11 +1218,22 @@
                     <name>new_value</name>
                     <type>clob</type>
                 </field>
+                <field>
+                    <name>seq</name>
+                    <type>integer</type>
+                    <length>64</length>
+                </field>
                 <index>
                     <name>id</name>
                     <primary>true</primary>
                     <field>
                         <name>id</name>
+                    </field>
+                </index>
+                <index>
+                    <name>seq</name>
+                    <field>
+                        <name>seq</name>
                     </field>
                 </index>
                 <index>
@@ -1209,9 +1249,6 @@
                         <name>record_type</name>
                     </field>
                     <field>
-                        <name>record_backend</name>
-                    </field>
-                    <field>
                         <name>modification_time</name>
                     </field>
                     <field>
@@ -1220,13 +1257,16 @@
                     <field>
                         <name>modified_attribute</name>
                     </field>
+                    <field>
+                        <name>seq</name>
+                    </field>
                 </index>
             </declaration>
         </table>
 
         <table>
             <name>tags</name>
-            <version>4</version>
+            <version>6</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -1248,7 +1288,7 @@
                 <field>
                     <name>name</name>
                     <type>text</type>
-                    <length>40</length>
+                    <length>256</length>
                     <default>NULL</default>
                 </field>
                 <field>
@@ -1299,6 +1339,12 @@
                 <field>
                     <name>deleted_time</name>
                     <type>datetime</type>
+                </field>
+                <field>
+                    <name>seq</name>
+                    <type>integer</type>
+                    <notnull>true</notnull>
+                    <default>0</default>
                 </field>
                 <index>
                     <name>id</name>
@@ -1791,6 +1837,7 @@
                 <field>
                     <name>value</name>
                     <type>text</type>
+                    <notnull>true</notnull>
                 </field>
                 <index>
                     <name>id</name>
@@ -1934,7 +1981,7 @@
         </table>
         <table>
             <name>customfield</name>
-            <version>1</version>
+            <version>3</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -1959,11 +2006,24 @@
                     <type>text</type>
                 </field>
                 <index>
+                    <name>id</name>
+                    <primary>true</primary>
+                    <field>
+                        <name>id</name>
+                    </field>
+                </index>
+                <index>
                     <name>record_id_customfield_id</name>
                     <unique>true</unique>
                     <field>
                         <name>record_id</name>
                     </field>
+                    <field>
+                        <name>customfield_id</name>
+                    </field>
+                </index>
+                <index>
+                    <name>customfield_id</name>
                     <field>
                         <name>customfield_id</name>
                     </field>
@@ -2165,7 +2225,7 @@
         </table>
         <table>
             <name>notes</name>
-            <version>1</version>
+            <version>2</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -2235,6 +2295,12 @@
                     <name>deleted_time</name>
                     <type>datetime</type>
                 </field>
+                <field>
+                    <name>seq</name>
+                    <type>integer</type>
+                    <notnull>true</notnull>
+                    <default>0</default>
+                </field>
                 <index>
                     <name>id</name>
                     <primary>true</primary>
@@ -2276,7 +2342,7 @@
         </table>
         <table>
             <name>filter</name>
-            <version>3</version>
+            <version>5</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -2299,7 +2365,7 @@
                 <field>
                     <name>model</name>
                     <type>text</type>
-                    <length>40</length>
+                    <length>64</length>
                     <notnull>true</notnull>
                 </field>
                 <field>
@@ -2350,6 +2416,12 @@
                     <name>deleted_time</name>
                     <type>datetime</type>
                 </field>
+                <field>
+                    <name>seq</name>
+                    <type>integer</type>
+                    <notnull>true</notnull>
+                    <default>0</default>
+                </field>
                 <index>
                     <name>id</name>
                     <primary>true</primary>
@@ -2373,7 +2445,7 @@
         </table>
         <table>
             <name>importexport_definition</name>
-            <version>5</version>
+            <version>7</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -2390,7 +2462,7 @@
                 <field>
                     <name>model</name>
                     <type>text</type>
-                    <length>40</length>
+                    <length>64</length>
                     <notnull>true</notnull>
                 </field>
                 <field>
@@ -2413,7 +2485,7 @@
                 <field>
                     <name>plugin</name>
                     <type>text</type>
-                    <length>40</length>
+                    <length>64</length>
                     <notnull>true</notnull>
                 </field>
                 <field>
@@ -2457,6 +2529,12 @@
                     <name>deleted_time</name>
                     <type>datetime</type>
                 </field>
+                <field>
+                    <name>seq</name>
+                    <type>integer</type>
+                    <notnull>true</notnull>
+                    <default>0</default>
+                </field>
                 <index>
                     <name>id</name>
                     <primary>true</primary>
@@ -2493,7 +2571,7 @@
         </table>
         <table>
             <name>alarm</name>
-            <version>2</version>
+            <version>3</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -2545,7 +2623,6 @@
                 </index>
                 <index>
                     <name>record_id-model</name>
-                    <unique>true</unique>
                     <field>
                         <name>record_id</name>
                     </field>
@@ -2775,7 +2852,7 @@
         
         <table>
             <name>departments</name>
-            <version>1</version>
+            <version>2</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -2827,6 +2904,12 @@
                     <name>deleted_time</name>
                     <type>datetime</type>
                 </field>
+                <field>
+                    <name>seq</name>
+                    <type>integer</type>
+                    <notnull>true</notnull>
+                    <default>0</default>
+                </field>
                 <index>
                     <name>id</name>
                     <primary>true</primary>
@@ -2847,7 +2930,7 @@
         
         <table>
             <name>tree_fileobjects</name>
-            <version>1</version>
+            <version>2</version>
             <declaration>
                 <field>
                     <name>id</name>
@@ -2905,10 +2988,16 @@
                     <name>deleted_by</name>
                     <type>text</type>
                     <length>40</length>
-                </field>            
+                </field>
                 <field>
                     <name>deleted_time</name>
                     <type>datetime</type>
+                </field>
+                <field>
+                    <name>seq</name>
+                    <type>integer</type>
+                    <notnull>true</notnull>
+                    <default>0</default>
                 </field>
                 <index>
                     <name>id</name>
@@ -2997,7 +3086,7 @@
                         <onupdate>cascade</onupdate>
                         <ondelete>cascade</ondelete>
                     </reference>
-                </index>            
+                </index>
                 <index>
                     <name>tree_filerevisions::created_by--accounts::id</name>
                     <field>
@@ -3010,7 +3099,7 @@
                         <onupdate>CASCADE</onupdate>
                         <ondelete>SET NULL</ondelete>
                     </reference>
-                </index>            
+                </index>
             </declaration>
         </table>
 
@@ -3044,6 +3133,8 @@
                 <field>
                     <name>islink</name>
                     <type>boolean</type>
+                    <default>false</default>
+                    <notnull>true</notnull>
                 </field>
                 <index>
                     <name>id</name>
@@ -3074,7 +3165,7 @@
                         <onupdate>cascade</onupdate>
                         <!-- add ondelete? -->
                     </reference>
-                </index>            
+                </index>
                 <index>
                     <name>tree_nodes::parent_id--tree_nodes::id</name>
                     <field>
@@ -3087,10 +3178,9 @@
                         <onupdate>cascade</onupdate>
                         <!-- add ondelete? -->
                     </reference>
-                </index>            
+                </index>
             </declaration>
         </table>
-        
     </tables>
 
     <defaultRecords>

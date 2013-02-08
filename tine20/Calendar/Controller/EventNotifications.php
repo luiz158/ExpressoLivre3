@@ -31,7 +31,7 @@
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -67,11 +67,11 @@
     protected function _getUpdates($_event, $_oldEvent)
     {
         // check event details
-        $diff = $_event->diff($_oldEvent);
+        $diff = $_event->diff($_oldEvent)->diff;
         
         $orderedUpdateFieldOfInterest = array(
             'dtstart', 'dtend', 'summary', 'location', 'description',
-            'organizer', 'transp', 'priority', 'status_id', 'class',
+            'transp', 'priority', 'status', 'class',
             'url', 'rrule', 'is_all_day_event', 'originator_tz', /*'tags', 'notes',*/
         );
         
@@ -82,35 +82,31 @@
             }
         }
         
+        // cehck for organizer update
+        if (Tinebase_Record_Abstract::convertId($_event['organizer'], 'Addressbook_Model_Contact') != 
+            Tinebase_Record_Abstract::convertId($_oldEvent['organizer'], 'Addressbook_Model_Contact')) {
+            
+            $updates['organizer'] = $_event->resolveOrganizer();
+        }
+        
         // check attendee updates
-        $attendeeMigration = $_oldEvent->attendee->getMigration($_event->attendee->getArrayOfIds());
-        foreach ($attendeeMigration['toUpdateIds'] as $key => $attenderId) {
-            $currAttender = $_event->attendee[$_event->attendee->getIndexById($attenderId)];
-            $oldAttender  = $_oldEvent->attendee[$_oldEvent->attendee->getIndexById($attenderId)];
-            if ($currAttender->status != $oldAttender->status) {
-                $attendeeMigration['toUpdateIds'][$key] = $currAttender;
-            } else {
-                unset($attendeeMigration['toUpdateIds'][$key]);
-            }
-        }
-        foreach ($attendeeMigration['toCreateIds'] as $key => $attenderId) {
-            $attender = $_event->attendee[$_event->attendee->getIndexById($attenderId)];
-            $attendeeMigration['toCreateIds'][$key] = $attender;
-        }
-        foreach ($attendeeMigration['toDeleteIds'] as $key => $attenderId) {
-            $attender = $_oldEvent->attendee[$_oldEvent->attendee->getIndexById($attenderId)];
-            $attendeeMigration['toDeleteIds'][$key] = $attender;
-        }
-        
-        $attendeeUpdates = array();
-        foreach(array('toCreateIds', 'toDeleteIds', 'toUpdateIds') as $action) {
-            if (! empty($attendeeMigration[$action])) {
-                $attendeeUpdates[substr($action, 0, -3)] = array_values($attendeeMigration[$action]);
+        $attendeeMigration = Calendar_Model_Attender::getMigration($_oldEvent->attendee, $_event->attendee);
+        foreach ($attendeeMigration['toUpdate'] as $attendee) {
+            $oldAttendee = Calendar_Model_Attender::getAttendee($_oldEvent->attendee, $attendee);
+            if ($attendee->status == $oldAttendee->status) {
+                $attendeeMigration['toUpdate']->removeRecord($attendee);
             }
         }
         
-        if (! empty($attendeeUpdates)) {
-            $updates['attendee'] = $attendeeUpdates;
+        foreach($attendeeMigration as $action => $migration) {
+            Calendar_Model_Attender::resolveAttendee($migration, FALSE);
+            if (! count($migration)) {
+                unset($attendeeMigration[$action]);
+            }
+        }
+        
+        if (! empty($attendeeMigration)) {
+            $updates['attendee'] = $attendeeMigration;
         }
         
         return $updates;
@@ -123,13 +119,22 @@
      * @param Tinebase_Model_FullAccount $_updater
      * @param Sting                      $_action
      * @param Calendar_Model_Event       $_oldEvent
+     * @param Tinebase_Model_Alarm       $_alarm
      * @param array                      $attachs
      * @return void
      */
-    public function doSendNotifications($_event, $_updater, $_action, $_oldEvent=NULL, $attachs = FALSE)
+    public function doSendNotifications($_event, $_updater, $_action, $_oldEvent=NULL, $_alarm=NULL, $attachs = FALSE)
     {
+        // we only send notifications to attendee
         if (! $_event->attendee instanceof Tinebase_Record_RecordSet) {
             return;
+        }
+        
+        // skip notifications to past events
+        if (Tinebase_DateTime::now()->subHour(1)->isLater($_event->dtend )) {
+            if ($_action == 'alarm' || ! ($_event->isRecurException() || $_event->rrule)) {
+                return;
+            }
         }
         
         // lets resolve attendee once as batch to fill cache
@@ -139,7 +144,9 @@
         switch ($_action) {
             case 'alarm':
                 foreach($_event->attendee as $attender) {
-                    $this->sendNotificationToAttender($attender, $_event, $_updater, $_action, self::NOTIFICATION_LEVEL_NONE);
+                    if (Calendar_Model_Attender::isAlarmForAttendee($attender, $_alarm)) {
+                        $this->sendNotificationToAttender($attender, $_event, $_updater, $_action, self::NOTIFICATION_LEVEL_NONE);
+                    }
                 }
                 break;
             case 'created':
@@ -153,20 +160,18 @@
                 }
                 break;
             case 'changed':
-                $attendeeMigration = $_oldEvent->attendee->getMigration($_event->attendee->getArrayOfIds());
+                $attendeeMigration = Calendar_Model_Attender::getMigration($_oldEvent->attendee, $_event->attendee);
                 
-                foreach ($attendeeMigration['toCreateIds'] as $attenderId) {
-                    $attender = $_event->attendee[$_event->attendee->getIndexById($attenderId)];
+                foreach ($attendeeMigration['toCreate'] as $attender) {
                     $this->sendNotificationToAttender($attender, $_event, $_updater, 'created', self::NOTIFICATION_LEVEL_INVITE_CANCEL);
                 }
                 
-                foreach ($attendeeMigration['toDeleteIds'] as $attenderId) {
-                    $attender = $_oldEvent->attendee[$_oldEvent->attendee->getIndexById($attenderId)];
+                foreach ($attendeeMigration['toDelete'] as $attender) {
                     $this->sendNotificationToAttender($attender, $_oldEvent, $_updater, 'deleted', self::NOTIFICATION_LEVEL_INVITE_CANCEL);
                 }
                 
-                // NOTE: toUpdateIds are all attendee to be notified
-                if (! empty($attendeeMigration['toUpdateIds'])) {
+                // NOTE: toUpdate are all attendee to be notified
+                if (count($attendeeMigration['toUpdate']) > 0) {
                     $updates = $this->_getUpdates($_event, $_oldEvent);
                     
                     if (empty($updates)) {
@@ -184,8 +189,7 @@
                     }
                     
                     // send notifications
-                    foreach ($attendeeMigration['toUpdateIds'] as $attenderId) {
-                        $attender = $_event->attendee[$_event->attendee->getIndexById($attenderId)];
+                    foreach ($attendeeMigration['toUpdate'] as $attender) {
                         $this->sendNotificationToAttender($attender, $_event, $_updater, 'changed', $notificationLevel, $updates);
                     }
                 }
@@ -200,7 +204,7 @@
         
         // SEND REPLY/COUNTER to external organizer
         if ($_event->organizer && ! $_event->resolveOrganizer()->account_id && count($_event->attendee) == 1) {
-            $updates = array('attendee' => array('toUpdate' => array($_event->attendee->getFirstRecord())));
+            $updates = array('attendee' => array('toUpdate' => $_event->attendee));
             $organizer = new Calendar_Model_Attender(array(
                 'user_type'  => Calendar_Model_Attender::USERTYPE_USER,
                 'user_id'    => $_event->resolveOrganizer()
@@ -245,6 +249,7 @@
             
             // NOTE: organizer gets mails unless she set notificationlevel to NONE
             if (($prefUser == $_updater->getId() && ! $sendOnOwnActions) || ($sendLevel < $_notificationLevel && ($prefUser != $organizer->getId() || $sendLevel == self::NOTIFICATION_LEVEL_NONE))) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " Preferred notification level not reached -> skipping notification for {$_attender->getEmail()}");
                 return;
             }
     
@@ -267,9 +272,13 @@
                 case 'changed':
                     switch ($_notificationLevel) {
                         case self::NOTIFICATION_LEVEL_EVENT_RESCHEDULE:
-                            $messageSubject = sprintf($translate->_('Event "%1$s" at %2$s has been rescheduled' ), $_event->summary, $startDateString);
-                            $method = Calendar_Model_iMIP::METHOD_REQUEST;
-                            break;
+                            if (array_key_exists('dtstart', $_updates)) {
+                                $oldStartDateString = Tinebase_Translation::dateToStringInTzAndLocaleFormat($_updates['dtstart'], $timezone, $locale);
+                                $messageSubject = sprintf($translate->_('Event "%1$s" has been rescheduled from %2$s to %3$s' ), $_event->summary, $oldStartDateString, $startDateString);
+                                $method = Calendar_Model_iMIP::METHOD_REQUEST;
+                                break;
+                            }
+                            // fallthrough if dtstart didn't change
                             
                         case self::NOTIFICATION_LEVEL_EVENT_UPDATE:
                             $messageSubject = sprintf($translate->_('Event "%1$s" at %2$s has been updated' ), $_event->summary, $startDateString);
@@ -279,7 +288,7 @@
                         case self::NOTIFICATION_LEVEL_ATTENDEE_STATUS_UPDATE:
                             if(! empty($_updates['attendee']) && ! empty($_updates['attendee']['toUpdate']) && count($_updates['attendee']['toUpdate']) == 1) {
                                 // single attendee status update
-                                $attender = $_updates['attendee']['toUpdate'][0];
+                                $attender = $_updates['attendee']['toUpdate']->getFirstRecord();
                                 
                                 switch ($attender->status) {
                                     case Calendar_Model_Attender::STATUS_ACCEPTED:
@@ -343,12 +352,14 @@
                     }
                 }
                 
-                /* not yet supported
-                // in Tine 2.0 status updater might not be updater
+                // @TODO in Tine 2.0 status updater might not be updater
                 if ($method == Calendar_Model_iMIP::METHOD_REPLY) {
-                    
+                    foreach($vcalendar->children() as $component) {
+                        if ($component->name == 'VEVENT') {
+                            $component->{'REQUEST-STATUS'} = '2.0;Success';
+                        }
+                    }
                 }
-                */
                 
                 $calendarPart           = new Zend_Mime_Part($vcalendar->serialize());
                 $calendarPart->charset  = 'UTF-8';
@@ -363,18 +374,18 @@
                 
                 $attachments = array($attachment);
                 if($attachs)
+                {
+                    foreach($attachs as $file) 
                     {
-                        foreach($attachs as $file) 
-                            {
-                                $stream = fopen($file['tempFile']['path'], 'r');
-                                $part = new Zend_Mime_Part($stream);
-                                $part->type = $file['tempFile']['type'];                                
-                                $part->encoding = Zend_Mime::ENCODING_BASE64;
-                                $part->disposition = Zend_Mime::DISPOSITION_ATTACHMENT;
-                                $part->filename = $file['tempFile']['name'];
-                                $attachments[] = $part;
-                            }
+                        $stream = fopen($file['tempFile']['path'], 'r');
+                        $part = new Zend_Mime_Part($stream);
+                        $part->type = $file['tempFile']['type'];                                
+                        $part->encoding = Zend_Mime::ENCODING_BASE64;
+                        $part->disposition = Zend_Mime::DISPOSITION_ATTACHMENT;
+                        $part->filename = $file['tempFile']['name'];
+                        $attachments[] = $part;
                     }
+                }
             } else {
                 $calendarPart = null;
                 $attachments = null;
@@ -390,7 +401,6 @@
         
             Tinebase_Notification::getInstance()->send($sender, array($contact), $messageSubject, $messageBody, $calendarPart, $attachments);
         } catch (Exception $e) {
-            Tinebase_Core::getLogger()->WARN(__METHOD__ . '::' . __LINE__ . " could not send notification :" . $e);
             return;
         }
     }

@@ -24,7 +24,7 @@ class Tinebase_Convert_Json implements Tinebase_Convert_Interface
      * @param  Tinebase_Record_Abstract  $_record  update existing record
      * @return Tinebase_Record_Abstract
      */
-    public function toTine20Model($_blob, Tinebase_Record_Abstract $_record = null)
+    public function toTine20Model($_blob, Tinebase_Record_Abstract $_record = NULL)
     {
         throw new Tinebase_Exception_NotImplemented('From json to record is not implemented yet');
     }
@@ -41,28 +41,75 @@ class Tinebase_Convert_Json implements Tinebase_Convert_Interface
             return array();
         }
         
+        // for resolving we'll use recordset
+        $records = new Tinebase_Record_RecordSet(get_class($_record), array($_record));
+        
+        Tinebase_Frontend_Json_Abstract::resolveContainerTagsUsers($records);
+        $this->_resolveMultipleIdFields($records);
+        
+        $_record = $records->getFirstRecord();
+        
         $_record->setTimezone(Tinebase_Core::get(Tinebase_Core::USERTIMEZONE));
         $_record->bypassFilters = true;
         
-        Tinebase_Model_Container::resolveContainerOfRecord($_record);
-        
         return $_record->toArray();
+    }
+
+    /**
+     * resolves multiple records
+     * @param Tinebase_Record_RecordSet $_records the records
+     */
+    protected function _resolveMultipleIdFields(Tinebase_Record_RecordSet $_records)
+    {
+        $ownRecordClass = $_records->getRecordClassName();
+        if(! $resolveFields = $ownRecordClass::getResolveForeignIdFields()) {
+            return;
+        }
+        
+        foreach($resolveFields as $foreignRecordClassName => $fields) {
+            $foreignIds = array();
+            $fields = (array) $fields;
+            
+            foreach($fields as $field) {
+                $foreignIds = array_unique(array_merge($foreignIds, $_records->{$field}));
+            }
+
+            $controller = Tinebase_Core::getApplicationInstance($foreignRecordClassName);
+            
+            $foreignRecords = $controller->getMultiple($foreignIds);
+            if($foreignRecords->count()) {
+                foreach ($_records as $record) {
+                    foreach($fields as $field) {
+                        $idx = $foreignRecords->getIndexById($record->{$field});
+                        if(isset($idx) && $idx !== FALSE) {
+                            $record->{$field} = $foreignRecords[$idx];
+                        } else {
+                            $record->{$field} = NULL;
+                        }
+                    }
+                }
+            }
+        }
     }
     
     /**
      * converts Tinebase_Record_RecordSet to external format
      * 
      * @param  Tinebase_Record_RecordSet  $_records
-     * @param  array $_resolveUserFields
+     * @param Tinebase_Model_Filter_FilterGroup $_filter
+     * @param Tinebase_Model_Pagination $_pagination
+     * 
      * @return mixed
      */
-    public function fromTine20RecordSet(Tinebase_Record_RecordSet $_records, $_resolveUserFields = array())
+    public function fromTine20RecordSet(Tinebase_Record_RecordSet $_records, $_filter = NULL, $_pagination = NULL)
     {
         if (count($_records) == 0) {
             return array();
         }
 
-        Tinebase_Frontend_Json_Abstract::resolveContainerTagsUsers($_records, $_resolveUserFields);
+        Tinebase_Frontend_Json_Abstract::resolveContainerTagsUsers($_records);
+
+        $this->_resolveMultipleIdFields($_records);
 
         $_records->setTimezone(Tinebase_Core::get(Tinebase_Core::USERTIMEZONE));
         $_records->convertDates = true;

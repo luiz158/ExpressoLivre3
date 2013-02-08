@@ -29,6 +29,8 @@ Tine.Timetracker.TimeaccountPickerCombo = Ext.extend(Tine.Tinebase.widgets.form.
      */
     showClosedBtn: null,
     
+    sortBy: 'number',
+    
     initComponent: function() {
         this.recordProxy = Tine.Timetracker.timeaccountBackend;
         this.recordClass = Tine.Timetracker.Model.Timeaccount;
@@ -43,7 +45,8 @@ Tine.Timetracker.TimeaccountPickerCombo = Ext.extend(Tine.Tinebase.widgets.form.
             this.showClosedBtn = new Tine.widgets.grid.FilterButton({
                 text: this.app.i18n._('Show closed'),
                 iconCls: 'action_showArchived',
-                field: 'showClosed',
+                field: 'is_open',
+                invert: true,
                 pressed: this.showClosed,
                 scope: this,
                 handler: function() {
@@ -74,16 +77,18 @@ Tine.Timetracker.TimeaccountPickerCombo = Ext.extend(Tine.Tinebase.widgets.form.
      */
     onBeforeLoad: function (store, options) {
         Tine.Timetracker.TimeaccountPickerCombo.superclass.onBeforeLoad.apply(this, arguments);
-        
+
         if (this.showClosedBtn) {
             Ext.each(store.baseParams.filter, function(filter, idx) {
-                if (filter.field == 'showClosed'){
+                if (filter.field == 'is_open'){
                     store.baseParams.filter.remove(filter);
                 }
             }, this);
-            store.baseParams.filter.push(this.showClosedBtn.getValue());
+            
+            if (this.showClosedBtn.getValue().value === true) {
+                store.baseParams.filter.push(this.showClosedBtn.getValue());
+            }
         }
-        
     }
 });
 

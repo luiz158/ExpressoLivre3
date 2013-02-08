@@ -6,7 +6,7 @@
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
  * @copyright   Copyright (c) 2011 Metaways Infosystems GmbH (http://www.metaways.de)
- * 
+ *
  */
 
 /**
@@ -25,15 +25,7 @@ class Projects_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      */
     protected $_controller = NULL;
     
-    /**
-     * user fields (created_by, ...) to resolve in _multipleRecordsToJson and _recordToJson
-     *
-     * @var array
-     */
-    protected $_resolveUserFields = array(
-        'Projects_Model_Project' => array('created_by', 'last_modified_by')
-    );
-    
+    protected $_relatableModels = array('Projects_Model_Project');
     /**
      * the constructor
      *
@@ -54,7 +46,7 @@ class Projects_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     public function searchProjects($filter, $paging)
     {
         return $this->_search($filter, $paging, $this->_controller, 'Projects_Model_ProjectFilter', TRUE);
-    }     
+    }
     
     /**
      * Return a single record
@@ -75,27 +67,27 @@ class Projects_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      */
     public function saveProject($recordData)
     {
-        return $this->_save($recordData, $this->_controller, 'Project');        
+        return $this->_save($recordData, $this->_controller, 'Project');
     }
     
     /**
      * deletes existing records
      *
-     * @param  array  $ids 
+     * @param  array  $ids
      * @return string
      */
     public function deleteProjects($ids)
     {
         return $this->_delete($ids, $this->_controller);
-    }    
+    }
 
     /**
      * Returns registry data
-     * 
+     *
      * @return array
      */
     public function getRegistryData()
-    {   
+    {
         $defaultContainerArray = Tinebase_Container::getInstance()->getDefaultContainer($this->_applicationName)->toArray();
         $defaultContainerArray['account_grants'] = Tinebase_Container::getInstance()->getGrantsOfAccount(Tinebase_Core::getUser(), $defaultContainerArray['id'])->toArray();
         

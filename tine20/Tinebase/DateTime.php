@@ -73,7 +73,7 @@ class Tinebase_DateTime extends DateTime
      */
     public function __wakeup() {
     	$this->__sDTZ = $this->__sDTZ == '+00:00' ? 'UTC' : $this->__sDTZ;        
-        $this->__sDTZ = ($this->__sDTZ=='Z')?'UTC':$this->__sDTZ;
+        $this->__sDTZ = ($this->__sDTZ=='Z')?'UTC':$this->__sDTZ;        
         $this->__construct($this->__sDT, new DateTimeZone($this->__sDTZ ? $this->__sDTZ : 'UTC'));    	
         $this->__sDT = $this->__sDTZ = NULL;
     }
@@ -111,7 +111,7 @@ class Tinebase_DateTime extends DateTime
         }
 
         // Normalize Timezonename, as sometimes +00:00 is taken
-        if (is_numeric($_time) || $_timezone == '+00:00') {
+        if (is_numeric($_time)) {
             $this->setTimezone('UTC');
         }
     }

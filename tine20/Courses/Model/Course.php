@@ -4,8 +4,8 @@
  * 
  * @package     Courses
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @author      Philipp Schuele <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2007-2008 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @author      Philipp Schüle <p.schuele@metaways.de>
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * 
  */
 
@@ -16,14 +16,14 @@
  * @package     Courses
  */
 class Courses_Model_Course extends Tinebase_Record_Abstract
-{  
+{
     /**
      * key in $_validators/$_properties array for the filed which 
      * represents the identifier
      * 
      * @var string
      */    
-    protected $_identifier = 'id';    
+    protected $_identifier = 'id';
     
     /**
      * application the record belongs to
@@ -45,7 +45,7 @@ class Courses_Model_Course extends Tinebase_Record_Abstract
         'name'                  => array(Zend_Filter_Input::ALLOW_EMPTY => false),
         'type'                  => array(Zend_Filter_Input::ALLOW_EMPTY => false),
         'description'           => array(Zend_Filter_Input::ALLOW_EMPTY => true),
-        'internet'              => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => 0),
+        'internet'              => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => 'OFF'),
         'fileserver'            => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => 0),
     // modlog information
         'created_by'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
@@ -55,6 +55,7 @@ class Courses_Model_Course extends Tinebase_Record_Abstract
         'is_deleted'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'deleted_time'          => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'deleted_by'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'seq'                   => array(Zend_Filter_Input::ALLOW_EMPTY => true),
     // relations (linked Courses_Model_Course records) and other metadata
         'relations'             => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => NULL),
         'tags'                  => array(Zend_Filter_Input::ALLOW_EMPTY => true),    
@@ -71,15 +72,4 @@ class Courses_Model_Course extends Tinebase_Record_Abstract
         'last_modified_time',
         'deleted_time'
     );
-    
-    /**
-     * fills a record from json data
-     *
-     * @param string $_data json encoded data
-     * @return void
-     */
-    public function setFromJson($_data)
-    {
-        parent::setFromJson($_data);
-    }
 }

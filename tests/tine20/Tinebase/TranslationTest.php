@@ -30,7 +30,7 @@ class Tinebase_TranslationTest extends PHPUnit_Framework_TestCase
     
     public function setUp()
     {
-    	//Some tests may have changed the User Locale => restore defaults
+        //Some tests may have changed the User Locale => restore defaults
         Tinebase_Core::setupUserLocale();
     }
     
@@ -209,5 +209,27 @@ msgstr "изпълни"
         
         Tinebase_Core::setupUserLocale();
         
+    }
+    
+    /**
+    * test SingularExistence
+    */
+    public function testSingularExistence()
+    {
+        $jsTranslations = Tinebase_Translation::getJsTranslations('de', 'Tinebase');
+        $this->assertContains(', "Deleting Tag"', $jsTranslations, 'Singular of "Deleting Tag, Deleting Tags" is missing!');
+    }
+
+    /**
+    * test french translations singular
+    * 
+    * @see 0007014: Dates not formatted
+    */
+    public function testFrench()
+    {
+        Tinebase_Core::getCache()->clean();
+        $jsTranslations = Tinebase_Translation::getJsTranslations('fr', 'Tinebase');
+        $this->assertTrue(preg_match("/: \"liste \\\\\"\n/", $jsTranslations, $matches) === 0, 'Translation string missing / preg_match fail: ' . print_r($matches, TRUE));
+        $this->assertContains(': "liste \"à faire\""', $jsTranslations, 'Could not find french singular of "todo lists"');
     }
 }

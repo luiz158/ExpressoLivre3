@@ -63,10 +63,17 @@ Tine.widgets.container.selectionComboBox = Ext.extend(Ext.form.ComboBox, {
      */
     recordClass: null,
     /**
-     * @cfg {String} requiredGrant
-     * grant which is required to select leaf node(s)
+     * @cfg {Array} requiredGrants
+     * grants which are required to select leaf node(s)
      */
-    requiredGrant: 'readGrant',
+    requiredGrants: null,
+    
+    /**
+     * @cfg {String} requiredGrant (legacy - should not be used any more)
+     * grants which is required to select leaf node(s)
+     */
+    requiredGrant: null,
+    
     /**
      *  @cfg {Number} trigger2width
      */
@@ -88,6 +95,12 @@ Tine.widgets.container.selectionComboBox = Ext.extend(Ext.form.ComboBox, {
     displayField: 'name',
     
     /**
+     * is set to true if subpanels (selectionDialog) are active
+     * useful in QuickAddGrid
+     * @type Boolean
+     */
+    hasFocusedSubPanels: null,
+    /**
      * @private
      */
     initComponent: function() {
@@ -99,6 +112,15 @@ Tine.widgets.container.selectionComboBox = Ext.extend(Ext.form.ComboBox, {
                 this.stateId = this.recordClass.getMeta('appName') + '-tinebase-widgets-container-selectcombo-' + this.recordClass.getMeta('modelName');
             }
         }
+
+        // legacy handling for requiredGrant
+        if(this.requiredGrant && ! this.requiredGrants) {
+            this.requiredGrants = [this.requiredGrant];
+        } else if (! this.requiredGrant && ! this.requiredGrants) {
+            // set default required Grants
+            this.requiredGrants = ['readGrant', 'addGrant', 'editGrant'];
+        }
+
         // no state saving for startPath != /
         this.on('beforestatesave', function() {return this.startPath === '/';}, this);
         
@@ -135,7 +157,11 @@ Tine.widgets.container.selectionComboBox = Ext.extend(Ext.form.ComboBox, {
             this.selectedContainer = this.defaultContainer;
             this.value = this.defaultContainer.name;
         }
-        
+        this.on('blur', function() {
+            if(this.hasFocusedSubPanels) {
+                return false;
+            }
+        }, this);
         this.on('beforequery', this.onBeforeQuery, this);
     },
     
@@ -279,6 +305,7 @@ Tine.widgets.container.selectionComboBox = Ext.extend(Ext.form.ComboBox, {
     },
     
     onSelect: function(record, index) {
+        this.hasFocusedSubPanels = true;
         if (record == this.otherRecord) {
             this.onChoseOther();
         } else {
@@ -296,7 +323,7 @@ Tine.widgets.container.selectionComboBox = Ext.extend(Ext.form.ComboBox, {
             allowNodeSelect: this.allowNodeSelect,
             containerName: this.containerName,
             containersName: this.containersName,
-            requiredGrant: this.requiredGrant,
+            requiredGrants: this.requiredGrants,
             TriggerField: this
         });
     },
@@ -313,7 +340,10 @@ Tine.widgets.container.selectionComboBox = Ext.extend(Ext.form.ComboBox, {
      * @todo // records might be in from state, but value is conainerData only
      */
     setValue: function(container) {
-        if (typeof container.get === 'function') {
+        
+        if(!container) return;
+        
+        if (container.hasOwnProperty('get') && Ext.isFunction(container.get)) {
             // container is a record -> already in store -> nothing to do
         } else if (this.store.getById(container)) {
             // store already has a record of this container
@@ -323,7 +353,7 @@ Tine.widgets.container.selectionComboBox = Ext.extend(Ext.form.ComboBox, {
             // store already has a record of this container
             container = this.store.getAt(this.store.findExact('path', container.path));
             
-        }else if (container.path || container.id) {
+        } else if (container.path || container.id) {
             // ignore server name for node 'My containers'
             if (container.path && container.path === Tine.Tinebase.container.getMyNodePath()) {
                 container.name = null;
@@ -342,7 +372,7 @@ Tine.widgets.container.selectionComboBox = Ext.extend(Ext.form.ComboBox, {
         container.set('is_container_node', !!!Tine.Tinebase.container.pathIsContainer(container.get('path')));
         this.selectedContainer = container.data;
         
-        // make shure other is _last_ entry in list
+        // make sure other is _last_ entry in list
         this.store.remove(this.otherRecord);
         this.store.add(this.otherRecord);
         
@@ -393,6 +423,7 @@ Tine.widgets.container.selectionComboBox = Ext.extend(Ext.form.ComboBox, {
 });
 Ext.reg('tinewidgetscontainerselectcombo', Tine.widgets.container.selectionComboBox);
 
+Tine.widgets.form.RecordPickerManager.register('Tinebase', 'Container', Tine.widgets.container.selectionComboBox);
 /**
  * @namespace Tine.widgets.container
  * @class Tine.widgets.container.selectionDialog
@@ -401,7 +432,7 @@ Ext.reg('tinewidgetscontainerselectcombo', Tine.widgets.container.selectionCombo
  * This widget shows a modal container selection dialog
  */
 Tine.widgets.container.selectionDialog = Ext.extend(Ext.Component, {
-	/**
+    /**
      * @cfg {Boolean} allowNodeSelect
      */
     allowNodeSelect: false,
@@ -416,9 +447,9 @@ Tine.widgets.container.selectionDialog = Ext.extend(Ext.Component, {
      */
     containersName: 'containers',
     /**
-	 * @cfg {string}
-	 * title of dialog
-	 */
+     * @cfg {string}
+     * title of dialog
+     */
     title: null,
     /**
      * @cfg {Number}
@@ -433,10 +464,10 @@ Tine.widgets.container.selectionDialog = Ext.extend(Ext.Component, {
      */
     tree: null,
     /**
-     * @cfg {String} requiredGrant
-     * grant which is required to select leaf node(s)
+     * @cfg {Array} requiredGrants
+     * grants which are required to select leaf node(s)
      */
-    requiredGrant: 'readGrant',
+    requiredGrants: ['readGrant'],
     
     /**
      * @private
@@ -464,22 +495,22 @@ Tine.widgets.container.selectionDialog = Ext.extend(Ext.Component, {
         });
         
         // adjust window height
-		if (Ext.getBody().getHeight(true) * 0.7 < this.windowHeight) {
-			this.windowHeight = Ext.getBody().getHeight(true) * 0.7;
-		}
+        if (Ext.getBody().getHeight(true) * 0.7 < this.windowHeight) {
+            this.windowHeight = Ext.getBody().getHeight(true) * 0.7;
+        }
 
         this.tree = new Tine.widgets.container.TreePanel({
-        	allowMultiSelection: false,
+            allowMultiSelection: false,
             containerName: this.TriggerField.containerName,
             containersName: this.TriggerField.containersName,
             appName: this.TriggerField.appName,
             defaultContainer: this.TriggerField.defaultContainer,
-            requiredGrant: this.requiredGrant
+            requiredGrants: this.requiredGrants
         });
         
         this.tree.on('click', this.onTreeNodeClick, this);
         this.tree.on('dblclick', this.onTreeNoceDblClick, this);
-		
+        
         this.win = Tine.WindowFactory.getWindow({
             title: this.title,
             closeAction: 'close',
@@ -542,6 +573,7 @@ Tine.widgets.container.selectionDialog = Ext.extend(Ext.Component, {
     onOk: function() {
         var  node = this.tree.getSelectionModel().getSelectedNode();
         if (node) {
+            this.TriggerField.hasFocusedSubPanels = false;
             var container = this.TriggerField.setValue(node.attributes.container);
             this.TriggerField.manageRecents(container);
             this.TriggerField.fireEvent('select', this.TriggerField, node.attributes.container);

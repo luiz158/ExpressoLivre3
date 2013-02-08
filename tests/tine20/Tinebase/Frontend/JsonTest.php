@@ -63,17 +63,17 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
             'id'        => 1,
             'model'     => 'Addressbook_Model_Contact',
             'backend'    => 'Sql',
-        );        
+        );
 
-		$this->_objects['group'] = new Tinebase_Model_Group(array(
-			'name'			=> 'phpunit test group',
-			'description'	=> 'phpunit test group'
-		));
+        $this->_objects['group'] = new Tinebase_Model_Group(array(
+            'name'            => 'phpunit test group',
+            'description'    => 'phpunit test group'
+        ));
 
-		$this->_objects['role'] = new Tinebase_Model_Role(array(
-			'name'			=> 'phpunit test role',
-			'description'	=> 'phpunit test role'
-		));
+        $this->_objects['role'] = new Tinebase_Model_Role(array(
+            'name'            => 'phpunit test role',
+            'description'    => 'phpunit test role'
+        ));
 
         $this->_objects['note'] = new Tinebase_Model_Note(array(
             'note_type_id'      => 1,
@@ -81,7 +81,7 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
             'record_model'      => $this->_objects['record']['model'],
             'record_backend'    => $this->_objects['record']['backend'],       
             'record_id'         => $this->_objects['record']['id']
-        ));        
+        ));
     }
     
     /**
@@ -91,7 +91,7 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
     {
         if ($this->_clearPrefs) {
             $query = Tinebase_Core::getDb()->quoteInto(
-                'DELETE FROM ' . SQL_TABLE_PREFIX . 'preferences WHERE application_id = ?', 
+                'DELETE FROM ' . Tinebase_Core::getDb()->quoteIdentifier(SQL_TABLE_PREFIX . 'preferences') .' WHERE ' .Tinebase_Core::getDb()->quoteIdentifier('application_id') .' = ?', 
                 Tinebase_Application::getInstance()->getApplicationByName('Tinebase')->getId()
             );
             Tinebase_Core::getDb()->query($query);
@@ -118,7 +118,7 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
         
         $notes = $this->_instance->searchNotes($filter, $paging);
         
-        $this->assertGreaterThan(0, $notes['totalcount']);        
+        $this->assertGreaterThan(0, $notes['totalcount']);
         $this->assertEquals($this->_objects['note']->note, $notes['results'][0]['note']);
         
         // delete note
@@ -126,7 +126,7 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
             $this->_objects['record']['model'], 
             $this->_objects['record']['backend'], 
             $this->_objects['record']['id']
-        );        
+        );
     }
     
     /**
@@ -134,25 +134,25 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
      */
     public function testSearchRoles()
     {
-    	$role = Tinebase_Acl_Roles::getInstance()->createRole($this->_objects['role']);
-    	
-    	$filter = array(array(
-            'field' 	=> 'query',
-            'operator' 	=> 'contains',
-            'value' 	=> 'phpunit test role'
+        $role = Tinebase_Acl_Roles::getInstance()->createRole($this->_objects['role']);
+        
+        $filter = array(array(
+            'field'     => 'query',
+            'operator'     => 'contains',
+            'value'     => 'phpunit test role'
         ));
         $paging = array(
-        	'start'	=> 0,
-        	'limit'	=> 1
+            'start'    => 0,
+            'limit'    => 1
         );
         
         $roles = $this->_instance->searchRoles($filter, $paging);
         
-        $this->assertGreaterThan(0, $roles['totalcount']);        
+        $this->assertGreaterThan(0, $roles['totalcount']);
         $this->assertEquals($this->_objects['role']->name, $roles['results'][0]['name']);
         
         // delete role
-        Tinebase_Acl_Roles::getInstance()->deleteRoles($role->id);  
+        Tinebase_Acl_Roles::getInstance()->deleteRoles($role->id);
     }
     
     /**
@@ -217,7 +217,7 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
         $oldPreference = Tinebase_Core::getPreference()->{Tinebase_Preference::TIMEZONE};
         
         $timezone = 'America/Vancouver';
-        $result = $this->_instance->setTimezone($timezone, true);        
+        $result = $this->_instance->setTimezone($timezone, true);
         
         // check json result
         $this->assertEquals($timezone, $result);
@@ -293,7 +293,7 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
         
         // add new default pref
         $pref = $this->_getPreferenceWithOptions();
-        $pref = Tinebase_Core::getPreference()->create($pref);        
+        $pref = Tinebase_Core::getPreference()->create($pref);
         
         // search prefs
         $results = $this->_instance->searchPreferencesForApplication('Tinebase', $this->_getPreferenceFilter());
@@ -327,12 +327,12 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
         
         // add new default pref
         $pref = $this->_getPreferenceWithOptions();
-        $pref->account_id = 2;
+        $pref->account_id   = '2';
         $pref->account_type = Tinebase_Acl_Rights::ACCOUNT_TYPE_USER;
-        $pref = Tinebase_Core::getPreference()->create($pref);        
+        $pref = Tinebase_Core::getPreference()->create($pref);
         
         // search prefs
-        $results = $this->_instance->searchPreferencesForApplication('Tinebase', $this->_getPreferenceFilter(TRUE, FALSE, 2));
+        $results = $this->_instance->searchPreferencesForApplication('Tinebase', $this->_getPreferenceFilter(TRUE, FALSE, '2'));
         
         // check results
         $this->assertTrue(isset($results['results']));
@@ -465,7 +465,7 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
         
         // add new default pref
         $pref = $this->_getPreferenceWithOptions();
-        $pref = Tinebase_Core::getPreference()->create($pref);        
+        $pref = Tinebase_Core::getPreference()->create($pref);
         
         $prefData = array();
         $prefData['Tinebase'][$pref->getId()] = array('value' => 'test', 'type' => 'forced');
@@ -667,7 +667,7 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
             'Tinebase' => array(
                 'timezone' => array('value' => 'Europe/Amsterdam'),
             )
-        );        
+        );
     }
     
     /**
@@ -681,7 +681,7 @@ class Tinebase_Frontend_JsonTest extends PHPUnit_Framework_TestCase
             'application_id'    => Tinebase_Application::getInstance()->getApplicationByName('Tinebase')->getId(),
             'name'              => 'defaultapp',
             'value'             => 'value1',
-            'account_id'        => 0,
+            'account_id'        => '0',
             'account_type'      => Tinebase_Acl_Rights::ACCOUNT_TYPE_ANYONE,
             'type'              => Tinebase_Model_Preference::TYPE_ADMIN,
             'options'           => '<?xml version="1.0" encoding="UTF-8"?>

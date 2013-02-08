@@ -105,7 +105,6 @@ class Felamimail_Backend_Cache_Imap_Folder extends Felamimail_Backend_Cache_Imap
             } 
             else
             {
-                $folders = array();
                 foreach ($_folderName as $folder)
                 {
                     $decodedFolder = self::decodeFolderUid($folder);
@@ -140,7 +139,7 @@ class Felamimail_Backend_Cache_Imap_Folder extends Felamimail_Backend_Cache_Imap
      * @param Felamimail_Model_Account $_account
      * @return array of folders
      */
-    protected function _getFolder(Felamimail_Model_Account $_account, $_folderName)
+    protected function _getFolder($_folderName)
     {
         $imap = Felamimail_Backend_ImapFactory::factory($_account);
         
@@ -265,9 +264,13 @@ Tinebase_Core::getLogger()->alert(__METHOD__ . '#####::#####' . __LINE__ . ' Fol
                     'cache_job_actions_est' => 0,
                     'cache_job_actions_done' => 0
                 ));
-
-                if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
-                    . $ex->getMessage());
+                
+            }else{
+                $imap = Felamimail_Backend_ImapFactory::factory($folderDecoded['accountId']);
+                $folder = $imap->getFolders('',$folderDecoded['globalName']);
+                $counter = $imap->examineFolder($folderDecoded['globalName']);
+                $status = $imap->getFolderStatus($folderDecoded['globalName']);
+                $quota = $imap->getQuota($folderDecoded['globalName']);
             }
             
             $globalName = $folderDecoded['globalName'];
@@ -485,7 +488,7 @@ Tinebase_Core::getLogger()->alert(__METHOD__ . '#####::#####' . __LINE__ . ' Fol
      * @param string $_folder
      * @return array 
      */
-    static public function decodeFolderUid($_folder)
+    public function decodeFolderUid($_folder)
     {
         $decoded = base64_decode(str_pad(substr($_folder, 0, -1), substr($_folder, -1), '='));
         list($accountId, $globalName) = explode(';', $decoded);

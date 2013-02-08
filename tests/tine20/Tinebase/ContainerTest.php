@@ -60,6 +60,7 @@ class Tinebase_ContainerTest extends PHPUnit_Framework_TestCase
             'owner_id'          => Tinebase_Core::getUser(),
             'backend'           => 'Sql',
             'application_id'    => Tinebase_Application::getInstance()->getApplicationByName('Addressbook')->getId(),
+            'model'             => 'Addressbook_Model_Contact'
         )));
 
         $this->objects['grants'] = new Tinebase_Record_RecordSet('Tinebase_Model_Grants', array(
@@ -71,7 +72,7 @@ class Tinebase_ContainerTest extends PHPUnit_Framework_TestCase
                 Tinebase_Model_Grants::GRANT_EDIT      => true,
                 Tinebase_Model_Grants::GRANT_DELETE    => true,
                 Tinebase_Model_Grants::GRANT_ADMIN     => true
-            )            
+            )
         ));
     }
 
@@ -172,6 +173,28 @@ class Tinebase_ContainerTest extends PHPUnit_Framework_TestCase
         
         $this->assertEquals($initialContentSeq, $updatedContainer->content_seq);
     }
+
+    /**
+    * try to set content seq that was NULL / test with deleted container
+    */
+    public function testSetNullContentSeq()
+    {
+        $container = $this->objects['initialContainer'];
+        $db = Tinebase_Core::getDb();
+        $db->update(SQL_TABLE_PREFIX . 'container', array(
+            'content_seq' => NULL,
+        ), $db->quoteInto($db->quoteIdentifier('id') . ' = ?', $container->getId()));
+        $seq = $this->_instance->getContentSequence($container->getId());
+        $this->assertEquals(NULL, $seq);
+        
+        $this->_instance->increaseContentSequence($container->getId());
+        $seq = $this->_instance->getContentSequence($container->getId());
+        $this->assertEquals(1, $seq);
+        
+        $this->_instance->deleteContainer($container);
+        $seq = $this->_instance->getContentSequence($container->getId());
+        $this->assertEquals(1, $seq);
+    }
     
     /**
      * try to add an existing container. should throw an exception
@@ -269,7 +292,9 @@ class Tinebase_ContainerTest extends PHPUnit_Framework_TestCase
         );
         
         // get group and add grants for it
-        $lists = Addressbook_Controller_List::getInstance()->search(new Addressbook_Model_ListFilter());
+        $lists = Addressbook_Controller_List::getInstance()->search(new Addressbook_Model_ListFilter(array(
+            array('field' => 'showHidden', 'operator' => 'equals', 'value' => TRUE)
+        )));
         $groupToAdd = $lists->getFirstRecord();
         $newGrants->addRecord(
             new Tinebase_Model_Grants(array(
@@ -322,7 +347,7 @@ class Tinebase_ContainerTest extends PHPUnit_Framework_TestCase
         $this->assertEquals(1, count($grants));
         
         // check num of db rows
-        $stmt = Tinebase_Core::getDb()->query("select * from tine20_container_acl where container_id = ?;", $this->objects['initialContainer']->getId());
+        $stmt = Tinebase_Core::getDb()->query('select * from '.Tinebase_Core::getDb()->quoteIdentifier(SQL_TABLE_PREFIX .'container_acl') . ' where ' . Tinebase_Core::getDb()->quoteInto(Tinebase_Core::getDb()->quoteIdentifier('container_id') . ' = ?', $this->objects['initialContainer']->getId()));
         $rows = $stmt->fetchAll();
         
         $this->assertEquals(1, count($rows));
@@ -339,7 +364,7 @@ class Tinebase_ContainerTest extends PHPUnit_Framework_TestCase
         $this->assertTrue($result);
         
         // check num of db rows
-        $stmt = Tinebase_Core::getDb()->query("select * from tine20_container_acl where container_id = ?;", $this->objects['initialContainer']->getId());
+        $stmt = Tinebase_Core::getDb()->query('select * from '.Tinebase_Core::getDb()->quoteIdentifier(SQL_TABLE_PREFIX .'container_acl') . ' where ' . Tinebase_Core::getDb()->quoteInto(Tinebase_Core::getDb()->quoteIdentifier('container_id') . ' = ?', $this->objects['initialContainer']->getId()));
         $rows = $stmt->fetchAll();
         
         $this->assertEquals(7, count($rows));
@@ -466,6 +491,7 @@ class Tinebase_ContainerTest extends PHPUnit_Framework_TestCase
         $filter = array(array('field' => 'id', 'operator' => 'in', 'value' => array($contact->getId())));
         $containerJson = new Tinebase_Frontend_Json_Container();
         $result = $containerJson->moveRecordsToContainer($initialContainer->getId(), $filter, 'Addressbook', 'Contact');
+        $this->assertGreaterThan(0, count($result['results']), 'no contacts moved');
         $this->assertEquals($contact->getId(), $result['results'][0]);
         
         $movedContact = Addressbook_Controller_Contact::getInstance()->get($contact->getId());
@@ -526,7 +552,7 @@ class Tinebase_ContainerTest extends PHPUnit_Framework_TestCase
             )
         );
         
-        Tinebase_Container::getInstance()->setGrants($container->getFirstRecord()->id, $newGrants, TRUE);        
+        Tinebase_Container::getInstance()->setGrants($container->getFirstRecord()->id, $newGrants, TRUE);
         
         $otherUsers = Tinebase_Container::getInstance()->getOtherUsers($user1, 'Calendar', array(
             Tinebase_Model_Grants::GRANT_READ
@@ -541,7 +567,7 @@ class Tinebase_ContainerTest extends PHPUnit_Framework_TestCase
         ));
         
         Tinebase_User::getInstance()->setStatus($user2, 'enabled');
-        Tinebase_Container::getInstance()->setGrants($container->getFirstRecord()->id, $oldGrants, TRUE); 
+        Tinebase_Container::getInstance()->setGrants($container->getFirstRecord()->id, $oldGrants, TRUE);
         
         $this->assertEquals(0, $otherUsers->filter('accountId', $user2->accountId)->count());
     }
@@ -584,4 +610,28 @@ class Tinebase_ContainerTest extends PHPUnit_Framework_TestCase
         }
     }
 
+    /**
+     * testSetContainerColor
+     * 
+     * @see 0006274: Can no longer change calendar's color
+     */
+    public function testSetContainerColor()
+    {
+        $result = $this->_instance->setContainerColor($this->objects['initialContainer'], '#99CC00');
+        $this->assertEquals('#99CC00', $result->color);
+    }
+    
+    /**
+     * testGetPersonalContainer
+     * @see https://gerrit.tine20.org/tine20/#/c/862
+     */
+    
+    public function testGetPersonalContainer()
+    {
+        $uid=Tinebase_Core::getUser()->getId();
+        $containers = Tinebase_Container::getInstance()->getPersonalContainer($uid, 'Addressbook_Model_Contact', $uid, Tinebase_Model_Grants::GRANT_READ);
+        $container = $containers->filter('name', 'tine20phpunit')->getFirstRecord();
+        $this->assertEquals($container->name, 'tine20phpunit');
+        $this->assertEquals($container->model, 'Addressbook_Model_Contact');
+    }
 }

@@ -107,7 +107,14 @@ Tine.widgets.tree.FilterPlugin = Ext.extend(Tine.widgets.grid.FilterPlugin, {
                 return;
             }
             
+            // save active Element, so we can restore focus after selecting nodes
             this.lastFocusEl = document.activeElement;
+            
+            // save west panel scrolling position so we can restore it after selecting nodes
+            if (this.treePanel.app.getMainScreen().getWestPanel().body) {
+                this.leftPanelScrollTop = this.treePanel.app.getMainScreen().getWestPanel().body.getScroll().top;
+            }
+            
             this.treePanel.getSelectionModel().suspendEvents();
             this.selectValue(filter.value);
         }, this);
@@ -136,11 +143,25 @@ Tine.widgets.tree.FilterPlugin = Ext.extend(Tine.widgets.grid.FilterPlugin, {
                 
                 if (allValuesExpanded) {
                     this.treePanel.getSelectionModel().resumeEvents();
-                    try {
-                        if (this.lastFocusEl) {
-                            Ext.fly(this.lastFocusEl).focus(10);
-                        }
-                    } catch (e) {}
+                    (function() {
+                        try {
+                            if (this.lastFocusEl) {
+                                var scroller = Ext.fly(this.lastFocusEl).up('div[class$=-scroller]'),
+                                    scrollTop = scroller ? scroller.dom.scrollTop : null;
+                                // TODO: is this needed (the element is already focused, atm. IE breaks (https://forge.tine20.org/mantisbt/view.php?id=6916))?
+                                if(!Ext.isIE) {
+                                    Ext.fly(this.lastFocusEl).focus();
+                                }
+                                
+                                if (scrollTop) scroller.dom.scrollTop = scrollTop;
+                            }
+                            
+                            if (this.leftPanelScrollTop) {
+                                this.treePanel.app.getMainScreen().getWestPanel().body.dom.scrollTop = this.leftPanelScrollTop;
+                            }
+                        } catch (e) {}
+                    }).defer(10, this);
+                    
                 }
             }.createDelegate(this), true);
         }, this);
@@ -152,6 +173,7 @@ Tine.widgets.tree.FilterPlugin = Ext.extend(Tine.widgets.grid.FilterPlugin, {
      * @param {String} attr (optional) The attribute used in the path (see {@link Ext.data.Node#getPath} for more info)
      * @param {Function} callback (optional) The callback to call when the selection is complete. The callback will be called with
      * (bSuccess, oSelNode) where bSuccess is if the selection was successful and oSelNode is the selected node.
+     * @param {keep} bool keep current selection
      */
     selectPath : function(path, attr, callback, keep){
         attr = attr || 'id';
@@ -159,8 +181,8 @@ Tine.widgets.tree.FilterPlugin = Ext.extend(Tine.widgets.grid.FilterPlugin, {
             v = keys.pop();
         if(keys.length > 1){
             var f = function(success, node){
-                if(success && node){
-                    var n = node.findChild(attr, v);
+                if(success && node) {
+                    var n = node.findChild(attr, v) || node.findChild('path', node.attributes.path + '/' + v);
                     if(n){
                         n.getOwnerTree().getSelectionModel().select(n, false, keep);
                         if(callback){

@@ -4,7 +4,7 @@
  * 
  * @package     Addressbook
  * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2008-2010 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2008-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  * 
  */
@@ -14,15 +14,18 @@
  */
 require_once dirname(dirname(__FILE__)) . DIRECTORY_SEPARATOR . 'TestHelper.php';
 
-if (!defined('PHPUnit_MAIN_METHOD')) {
-    define('PHPUnit_MAIN_METHOD', 'Addressbook_ControllerTest::main');
-}
-
 /**
- * Test class for Tinebase_Group
+ * Test class for Addressbook_Controller
  */
 class Addressbook_ControllerTest extends PHPUnit_Framework_TestCase
 {
+    /**
+     * set geodata for contacts
+     * 
+     * @var boolean
+     */
+    protected $_geodata = FALSE;
+    
     /**
      * @var array test objects
      */
@@ -41,9 +44,9 @@ class Addressbook_ControllerTest extends PHPUnit_Framework_TestCase
      */
     public static function main()
     {
-		$suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Addressbook Controller Tests');
+        $suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Addressbook Controller Tests');
         PHPUnit_TextUI_TestRunner::run($suite);
-	}
+    }
 
     /**
      * Sets up the fixture.
@@ -53,6 +56,8 @@ class Addressbook_ControllerTest extends PHPUnit_Framework_TestCase
      */
     protected function setUp()
     {
+        $this->_geodata = Addressbook_Controller_Contact::getInstance()->setGeoDataForContacts(false);
+        
         $personalContainer = Tinebase_Container::getInstance()->getPersonalContainer(
             Zend_Registry::get('currentAccount'), 
             'Addressbook', 
@@ -103,7 +108,7 @@ class Addressbook_ControllerTest extends PHPUnit_Framework_TestCase
             'tel_home'              => '+49TELHOME',
             'tel_pager'             => '+49TELPAGER',
             'tel_work'              => '+49TELWORK',
-        )); 
+        ));
         
         $this->objects['updatedContact'] = new Addressbook_Model_Contact(array(
             'adr_one_countryname'   => 'DE',
@@ -146,17 +151,14 @@ class Addressbook_ControllerTest extends PHPUnit_Framework_TestCase
             'tel_home'              => '+49TELHOME',
             'tel_pager'             => '+49TELPAGER',
             'tel_work'              => '+49TELWORK',
-        )); 
-            	
+        ));
+                
         $this->objects['note'] = new Tinebase_Model_Note(array(
             'note_type_id'      => 1,
             'note'              => 'phpunit test note',    
         ));
         
         $this->_instance = Addressbook_Controller_Contact::getInstance();
-        
-        return;
-        
     }
 
     /**
@@ -167,9 +169,11 @@ class Addressbook_ControllerTest extends PHPUnit_Framework_TestCase
      */
     protected function tearDown()
     {
-	    if (array_key_exists('contact', $this->objects)) {
-	        $this->_instance->delete($this->objects['contact']);
-	    }
+        Addressbook_Controller_Contact::getInstance()->setGeoDataForContacts($this->_geodata);
+        
+        if (array_key_exists('contact', $this->objects)) {
+            $this->_instance->delete($this->objects['contact']);
+        }
     }
     
     /**
@@ -243,7 +247,7 @@ class Addressbook_ControllerTest extends PHPUnit_Framework_TestCase
             'Addressbook', 
             Zend_Registry::get('currentAccount'), 
             Tinebase_Model_Grants::GRANT_EDIT
-        );        
+        );
         $container = $personalContainer[0];
         
         $filter = new Addressbook_Model_ContactFilter(array(
@@ -310,7 +314,7 @@ class Addressbook_ControllerTest extends PHPUnit_Framework_TestCase
         $contact->jpegphoto = '';
         $contact = $this->_instance->update($contact);
         
-        $this->setExpectedException('Exception');
+        $this->setExpectedException('Addressbook_Exception_NotFound');
         $image = Addressbook_Controller::getInstance()->getImage($contact->id);
     }
     

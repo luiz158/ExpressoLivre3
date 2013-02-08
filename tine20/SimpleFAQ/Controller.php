@@ -28,7 +28,13 @@ Class SimpleFAQ_Controller extends Tinebase_Controller_Event implements Tinebase
         'faqstatus_id'  => 1,
         'faqtype_id'    => 2,
     );
-
+    
+    /**
+     * holds the default Model of this application
+     * @var string
+     */
+    protected static $_defaultModel = 'SimpleFAQ_Model_FAQ';
+    
     /**
      * the constructor
      *
@@ -36,7 +42,6 @@ Class SimpleFAQ_Controller extends Tinebase_Controller_Event implements Tinebase
      */
     private function  __construct()
     {
-        $this->_currentAccount = Tinebase_Core::getUser();
         $this->_applicationName = 'SimpleFAQ';
     }
 
@@ -110,7 +115,8 @@ Class SimpleFAQ_Controller extends Tinebase_Controller_Event implements Tinebase
             'type'              => Tinebase_Model_Container::TYPE_PERSONAL,
             'owner_id'          => $_accountId,
             'backend'           => 'Sql',
-            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName('SimpleFAQ')->getId()
+            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName('SimpleFAQ')->getId(),
+            'model'             => static::$_defaultModel
         ));
 
         Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Creating new personal folder for account id ' . $_accountId);
@@ -121,6 +127,16 @@ Class SimpleFAQ_Controller extends Tinebase_Controller_Event implements Tinebase
         return $container;
     }
 
+    /**
+     * delete all personal user folders and the contacts associated with these folders
+     *
+     * @param Tinebase_Model_User $_account the accountd object
+     * @todo implement and write test
+     */
+    public function deletePersonalFolder($_account)
+    {
+    }
+    
     /**
      * Returns settings for SimpleFAQ app
      * - result is cached
@@ -155,7 +171,7 @@ Class SimpleFAQ_Controller extends Tinebase_Controller_Event implements Tinebase
                 )
             );
             foreach ($others as $setting => $defaults) {
-                $result->$setting = Tinebase_Config::getInstance()->getConfigAsArray($setting, $this->_applicationName, $defaults);
+                $result->$setting = SimpleFAQ_Config::getInstance()->get($setting, new Tinebase_Config_Struct($defaults))->toArray();
             }
 
             // save result and tag it with 'settings'
@@ -166,7 +182,7 @@ Class SimpleFAQ_Controller extends Tinebase_Controller_Event implements Tinebase
     }
 
     /**
-     * save SimpleFAAQ settings
+     * save SimpleFAQ settings
      *
      * @param SimpleFAQ_Model_Config $_settings
      * @return SimpleFAQ_Model_Config
@@ -183,7 +199,7 @@ Class SimpleFAQ_Controller extends Tinebase_Controller_Event implements Tinebase
             } else if ($field == 'defaults') {
                 parent::saveConfigSettings($value);
             } else {
-                Tinebase_Config::getInstance()->setConfigForApplication($field, Zend_Json::encode($value), $this->_applicationName);
+                SimpleFAQ_Config::getInstance()->set($field, $value);
             }
         }
 

@@ -5,8 +5,8 @@
  * @package     Tinebase
  * @subpackage  Filter
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
- * @author      Philipp Schuele <p.schuele@metaways.de>
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @author      Philipp Schüle <p.schuele@metaways.de>
  */
 
 /**
@@ -57,13 +57,19 @@ class Tinebase_Model_Filter_Id extends Tinebase_Model_Filter_Abstract
          // quote field identifier
          $field = $this->_getQuotedFieldName($_backend);
          
-         //if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . print_r($this->_value, TRUE));
-         
          if (empty($this->_value)) {
              // prevent sql error
              if ($this->_operator == 'in') {
-                $_select->where('1=0');
+                 if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                     . ' Empty value with "in" operator (model: ' 
+                     . (isset($this->_options['modelName']) ? $this->_options['modelName'] : 'unknown / no modelName defined in filter options'). ')');
+                 $_select->where('1=0');
              }
+         } else if ($this->_operator == 'equals' && is_array($this->_value)) {
+             if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ 
+                 . ' Unexpected array value with "equals" operator (model: ' 
+                 . (isset($this->_options['modelName']) ? $this->_options['modelName'] : 'unknown / no modelName defined in filter options') . ')');
+             $_select->where('1=0');
          } else {
              // finally append query to select object
              $_select->where($field . $action['sqlop'], $this->_value);
@@ -125,7 +131,12 @@ class Tinebase_Model_Filter_Id extends Tinebase_Model_Filter_Abstract
         }
         
         try {
-            $recordArray = $controller->get($value)->toArray();
+            if (method_exists($controller, 'get')) {
+                $recordArray = $controller->get($value)->toArray();
+            } else {
+                Tinebase_Core::getLogger()->NOTICE(__METHOD__ . '::' . __LINE__ . ' Controller ' . get_class($controller) . ' has no get method');
+                return $value;
+            }
         } catch (Exception $e) {
             $recordArray = $value;
         }

@@ -74,8 +74,8 @@ Tine.Tinebase.AppManager = function() {
             this.apps.add(app.appName, app);
         }
         
-        this.apps.sort("ASC", function(app1, app2) {
-            return parseInt(app1.order, 10) < parseInt(app2.order, 10) ? 1 : -1;
+        this.apps.sort("ASC", function (app1, app2) {
+            return parseInt(app1.order, 10) - parseInt(app2.order, 10);
         });
     }
 };
@@ -123,7 +123,7 @@ Ext.extend(Tine.Tinebase.AppManager, Ext.util.Observable, {
                 return false;
             }
             
-            var mainscreen = app.getMainScreen(); 
+            var mainscreen = app.getMainScreen();
             if (mainscreen) {
                 mainscreen.show();
             } else {
@@ -271,7 +271,7 @@ Ext.extend(Tine.Tinebase.AppManager, Ext.util.Observable, {
                 // make a legacy Tine.Application
                 return this.getLegacyApp(app);
             }
-            
+
             return typeof(Tine[app.appName].Application) == 'function' ? new Tine[app.appName].Application(app) : new Tine.Tinebase.Application(app);
             
         } catch(e) {

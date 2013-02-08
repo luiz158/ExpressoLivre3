@@ -18,88 +18,103 @@
 class Tinebase_Backend_Sql_Command_Oracle implements Tinebase_Backend_Sql_Command_Interface
 {
     /**
-     * setAutocommit
      * 
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param boolean $on
+     * @var Zend_Db_Adapter_Abstract
      */
-    public static function setAutocommit($adapter, $on)
+    protected $_adapter;
+    
+    /**
+     * @param Zend_Db_Adapter_Abstract $adapter
+     */
+    public function __construct(Zend_Db_Adapter_Abstract $adapter)
     {
+        $this->_adapter = $adapter;
     }
     
     /**
-     * 
-     * @param Zend_Db_Adapter_Abstract $adapter
      * @param string $field
      * @return string
      * @todo replace by equivalent function of MySQL GROUP_CONCAT in Oracle
-     */    
-    public static function getAggregateFunction($adapter, $field)
+     */
+    public function getAggregate($field)
     {
-        return "GROUP_CONCAT( DISTINCT $field)";
-    } 
-    
+        $quotedField = $this->_adapter->quoteIdentifier($field);
+        
+        return new Zend_Db_Expr("GROUP_CONCAT( DISTINCT $quotedField)");
+    }
+
     /**
-     * 
-     * @param Zend_Db_Adapter_Abstract $adapter
      * @param string $field
      * @param mixed $returnIfTrue
      * @param mixed $returnIfFalse
      */
-    public static function getIfIsNull($adapter, $field, $returnIfTrue, $returnIfFalse)
+    public function getIfIsNull($field, $returnIfTrue, $returnIfFalse)
     {
-        return "(CASE WHEN $field IS NULL THEN " . (string) $returnIfTrue . " ELSE " . (string) $returnIfFalse . " END)";
-    }    
-    
-    /**
-      * 
-      * @param Zend_Db_Adapter_Abstract $adapter
-      * @return string
-      */
-    public static function getLike($adapter)
-    {
-        return 'LIKE';
+        $quotedField = $this->_adapter->quoteIdentifier($field);
+        
+        return new Zend_Db_Expr("(CASE WHEN $quotedField IS NULL THEN " . (string) $returnIfTrue . " ELSE " . (string) $returnIfFalse . " END)");
     }
     
     /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param string $date
-     * @return string 
+     * @param string $condition
+     * @param string $returnIfTrue
+     * @param string $returnIfFalse
+     * @return string
      */
-    public static function setDate($adapter, $date)
+    public function getIfElse($condition, $returnIfTrue, $returnIfFalse)
     {
-    	return "TO_DATE({$date}, 'YYYY-MM-DD hh24:mi:ss') ";
-    }    
+        return new Zend_Db_Expr("(CASE WHEN $condition THEN $returnIfTrue ELSE $returnIfFalse END)");
+    }
     
     /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param string $value
-     * @return string 
+     * @param string $date
+     * @return string
      */
-    public static function setDateValue($adapter, $value)
+    public function setDate($date)
     {
-    	return "TO_DATE('{$value}', 'YYYY-MM-DD hh24:mi:ss') ";
+        return "TO_DATE({$date}, 'YYYY-MM-DD hh24:mi:ss') ";
     }
 
     /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
+     * @param string $value
+     * @return string
+     */
+    public function setDateValue($value)
+    {
+        return "TO_DATE('{$value}', 'YYYY-MM-DD hh24:mi:ss') ";
+    }
+
+    /**
      * @return mixed
      */
-    public static function getFalseValue($adapter = null)
+    public function getFalseValue()
     {
-    	return '0';
+        return '0';
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getTrueValue()
+    {
+        return '1';
+    }
+
+    /**
+     * @return string
+     */
+    public function setDatabaseJokerCharacters()
+    {
+        return array('%', '_');
     }
     
     /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @return mixed
+     * get like keyword
+     * 
+     * @return string
      */
-    public static function getTrueValue($adapter = null)
+    public function getLike()
     {
-    	return '1';
-    }    
+        return 'LIKE';
+    }
 }

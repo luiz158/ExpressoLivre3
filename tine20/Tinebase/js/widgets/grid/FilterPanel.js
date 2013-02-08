@@ -16,7 +16,7 @@ Tine.widgets.grid.FilterPanel = function(config) {
         {field: 'query',        operator: 'contains',    value: ''}
     ];
     
-    // the plugins woun't work there
+    // the plugins won't work there
     delete this.filterToolbarConfig.plugins;
     
     // apply some filterPanel configs
@@ -215,6 +215,10 @@ Ext.extend(Tine.widgets.grid.FilterPanel, Ext.Panel, {
         this.layout.center.panel.layout.setActiveItem(filterPanel.id);
         
         filterPanel.doLayout();
+        if (filterPanel.activeSheet) {
+         // solve layout problems (#6332)
+            filterPanel.setActiveSheet(filterPanel.activeSheet);
+        }
         this.manageHeight.defer(100, this);
         
         this.fireEvent('filterpanelactivate', this, filterPanel);

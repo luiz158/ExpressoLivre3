@@ -29,6 +29,13 @@ class Sales_ControllerTest extends PHPUnit_Framework_TestCase
     protected $_backend = array();
     
     /**
+     * the costcenter number used for the tests
+     * 
+     * @var string
+     */
+    protected $_costCenterNumber;
+    
+    /**
      * Runs the test methods of this class.
      *
      * @access public
@@ -36,9 +43,9 @@ class Sales_ControllerTest extends PHPUnit_Framework_TestCase
      */
     public static function main()
     {
-		$suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Sales Controller Tests');
+        $suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Sales Controller Tests');
         PHPUnit_TextUI_TestRunner::run($suite);
-	}
+    }
 
     /**
      * Sets up the fixture.
@@ -77,7 +84,7 @@ class Sales_ControllerTest extends PHPUnit_Framework_TestCase
             'turnover'      => '200000',
             'probability'   => 70,
             'end_scheduled' => Tinebase_DateTime::now(),
-        )); 
+        ));
         
         $this->_objects['updatedLead'] = new Crm_Model_Lead(array(
             'id'            => 20,
@@ -92,7 +99,7 @@ class Sales_ControllerTest extends PHPUnit_Framework_TestCase
             'turnover'      => '200000',
             'probability'   => 70,
             'end_scheduled' => NULL,
-        )); 
+        ));
 
         $addressbookPersonalContainer = Tinebase_Container::getInstance()->getPersonalContainer(
             Zend_Registry::get('currentAccount'), 
@@ -144,7 +151,7 @@ class Sales_ControllerTest extends PHPUnit_Framework_TestCase
             'tel_home'              => '+49TELHOME',
             'tel_pager'             => '+49TELPAGER',
             'tel_work'              => '+49TELWORK',
-        )); 
+        ));
 
         $tasksPersonalContainer = Tinebase_Container::getInstance()->getPersonalContainer(
             Zend_Registry::get('currentAccount'), 
@@ -327,7 +334,50 @@ class Sales_ControllerTest extends PHPUnit_Framework_TestCase
      * @access protected
      */
     protected function tearDown()
-    {        
+    {
+    }
+    
+    /**
+     * tests for the costcenter controller
+     */
+    public function testCostCenterController()
+    {
+        $cc = $this->_getCostCenter();
+        $ccRet = Sales_Controller_CostCenter::getInstance()->create($cc);
+        
+        $this->assertEquals($cc->id, $ccRet->id);
+        $this->assertEquals($cc->number, $ccRet->number);
+        $this->assertEquals($cc->remark, $ccRet->remark);
+
+        // check uniquity
+        $cc1 = $this->_getCostCenter();
+        
+        try {
+            Sales_Controller_CostCenter::getInstance()->create($cc1);
+            $this->fail('A duplicate exception should have been thrown!');
+        } catch (Zend_Db_Statement_Exception $e) {
+            $this->assertEquals(0, $e->getCode());
+            // MySQL: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '217fcc5beddf1744c20d572d7e740a8bf88bf8a1' for key 'number'
+            // PGSQL: SQLSTATE[23505]: Unique violation: 7 ERROR:  duplicate key value violates unique constraint "tine20_sales_cost_centers_number_key"
+            $this->assertContains("SQLSTATE[23", $e->getMessage());
+        }
+    }
+    
+    /**
+     * get cost center
+     *
+     * @return Sales_Model_CostCenter
+     */
+    protected function _getCostCenter()
+    {
+        $this->_costCenterNumber = $this->_costCenterNumber ? $this->_costCenterNumber : Tinebase_Record_Abstract::generateUID();
+        
+        $cc = new Sales_Model_CostCenter(array(
+            'id'      => Tinebase_Record_Abstract::generateUID(),
+            'number'  => $this->_costCenterNumber,
+            'remark'  => 'blabla'
+        ), TRUE);
+        return $cc;
     }
     
     /**
@@ -346,7 +396,7 @@ class Sales_ControllerTest extends PHPUnit_Framework_TestCase
         
         // cleanup
         $this->_backend->delete($contract->getId());
-        $this->_decreaseNumber();        
+        $this->_decreaseNumber();
     }
     
     /**
@@ -366,7 +416,7 @@ class Sales_ControllerTest extends PHPUnit_Framework_TestCase
         
         // cleanup
         $this->_backend->delete($contract->getId());
-        $this->_decreaseNumber();        
+        $this->_decreaseNumber();
     }
     
     /**

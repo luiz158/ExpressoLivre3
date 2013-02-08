@@ -32,7 +32,7 @@ class Addressbook_Preference extends Tinebase_Preference_Abstract
     /**
      * @var string application
      */
-    protected $_application = 'Addressbook';    
+    protected $_application = 'Addressbook';
         
     /**************************** public functions *********************************/
     
@@ -47,7 +47,7 @@ class Addressbook_Preference extends Tinebase_Preference_Abstract
             self::DEFAULTADDRESSBOOK,
             self::DEFAULTPERSISTENTFILTER,
         );
-            
+        
         return $allPrefs;
     }
     
@@ -98,25 +98,5 @@ class Addressbook_Preference extends Tinebase_Preference_Abstract
         }
         
         return $preference;
-    }
-    
-    /**
-     * get special options
-     *
-     * @param string $_value
-     * @return array
-     */
-    protected function _getSpecialOptions($_value)
-    {
-        $result = array();
-        switch($_value) {
-            case self::DEFAULTPERSISTENTFILTER:
-                $result = Tinebase_PersistentFilter::getPreferenceValues('Addressbook');
-                break;
-            default:
-                $result = parent::_getSpecialOptions($_value);
-        }
-        
-        return $result;
     }
 }

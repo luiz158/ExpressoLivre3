@@ -30,12 +30,17 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
     const TOTALCOUNT_COUNTRESULT = 'countresult';
 
     /**
-     * user fields (created_by, ...) to resolve in _multipleRecordsToJson and _recordToJson
-     *
+     * All models of this application (needed for application starter)
      * @var array
      */
-    protected $_resolveUserFields = array();
-
+    protected $_models = NULL;
+    
+    /**
+     * default model (needed for application starter -> defaultContentType)
+     * @var string
+     */
+    protected $_defaultModel = NULL;
+    
     /**
      * Returns registry data of the application.
      *
@@ -53,23 +58,111 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
     }
 
     /**
-    * resolve containers, tags and users
-    *
-    * @param Tinebase_Record_RecordSet $_records
-    * @param array $_resolveUserFields
-    */
-    public static function resolveContainerTagsUsers(Tinebase_Record_RecordSet $_records, $_resolveUserFields = array())
+     * Returns all relatable models for this app
+     * 
+     * @return array
+     */
+    public function getRelatableModels()
     {
-        if ($_records->getFirstRecord()->has('container_id')) {
-            Tinebase_Container::getInstance()->getGrantsOfRecords($_records, Tinebase_Core::getUser());
+        $ret = array();
+        
+        if (property_exists($this, '_relatableModels') && is_array($this->_relatableModels)) {
+            $i = 0;
+            foreach ($this->_relatableModels as $model) {
+                if (! class_exists($model)) {
+                    continue;
+                }
+                $cItems = $model::getRelatableConfig();
+                $ownModel = explode('_Model_', $model);
+                $ownModel = $ownModel[1];
+                foreach($cItems as $cItem) {
+                    $cItem['ownModel'] = $ownModel;
+                    $ret[$this->_applicationName][$i] = $cItem;
+                    $ret[$cItem['relatedApp']][$i] = array('reverted' => true, 'ownModel' => $cItem['relatedModel'], 'relatedModel' => $cItem['ownModel'], 'relatedApp' => $this->_applicationName);
+                    // KeyfieldConfigs
+                    if(array_key_exists('keyfieldConfig', $cItem)) {
+                        $ret[$cItem['relatedApp']][$i]['keyfieldConfig'] = $cItem['keyfieldConfig'];
+                        if($cItem['keyfieldConfig']['from']) $ret[$cItem['relatedApp']][$i]['keyfieldConfig']['from'] = $cItem['keyfieldConfig']['from'] == 'foreign' ? 'own' : 'foreign';
+                    }
+                    $j=0;
+                    if (array_key_exists('config', $cItem)) {
+                        foreach ($cItem['config'] as $conf) {
+                            $max = explode(':',$conf['max']);
+                            $ret[$this->_applicationName][$i]['config'][$j]['max'] = $max[0];
+                            $ret[$cItem['relatedApp']][$i]['config'][$j] = $conf;
+                            $ret[$cItem['relatedApp']][$i]['config'][$j]['max'] = $max[1];
+                            if($conf['degree'] == 'sibling') {
+                                $ret[$cItem['relatedApp']][$i]['config'][$j]['degree'] = $conf['degree'];
+                            } else {
+                                $ret[$cItem['relatedApp']][$i]['config'][$j]['degree'] = $conf['degree'] == 'parent' ? 'child' : 'parent';
+                            }
+                            $j++;
+                        }
+                    }
+                    $i++;
+                }
+            }
         }
+        return $ret;
+    }
     
-        if ($_records->getFirstRecord()->has('tags')) {
-            Tinebase_Tags::getInstance()->getMultipleTagsOfRecords($_records);
+    /**
+     * returns models for this application
+     */
+    public function getModels()
+    {
+        return $this->_models;
+    }
+    
+    /**
+     * returns model configurations for application starter
+     * @return array
+     */
+    public function getModelsConfiguration()
+    {
+        if($this->_models) {
+            foreach($this->_models as $model) {
+                $mn = $this->_applicationName . '_Model_' . $model;
+                $ret[$model] = $mn::getConfiguration();
+            }
+            return $ret;
         }
+        return NULL;
+    }
     
-        if (array_key_exists($_records->getRecordClassName(), $_resolveUserFields)) {
-            Tinebase_User::getInstance()->resolveMultipleUsers($_records, $_resolveUserFields[$_records->getRecordClassName()], TRUE);
+    /**
+     * returns the default model
+     * @return NULL
+     */
+    public function getDefaultModel()
+    {
+        if($this->_defaultModel) {
+            return $this->_defaultModel;
+        }
+        if($this->_models) {
+            return $this->_models[0];
+        }
+        return NULL;
+    }
+    
+    /**
+     * resolve containers and tags
+     *
+     * @param Tinebase_Record_RecordSet $_records
+     * @param array $_resolveProperties
+     */
+    public static function resolveContainerTagsUsers(Tinebase_Record_RecordSet $_records, $_resolveProperties = array('container_id', 'tags'))
+    {
+        $firstRecord = $_records->getFirstRecord();
+        
+        if ($firstRecord) {
+            if ($firstRecord->has('container_id') && in_array('container_id', $_resolveProperties)) {
+                Tinebase_Container::getInstance()->getGrantsOfRecords($_records, Tinebase_Core::getUser());
+            }
+        
+            if ($firstRecord->has('tags') && in_array('tags', $_resolveProperties)) {
+                Tinebase_Tags::getInstance()->getMultipleTagsOfRecords($_records);
+            }
         }
     }
     
@@ -110,8 +203,8 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
     /**
      * Search for records matching given arguments
      *
-     * @param string                              $_filter json encoded
-     * @param string                              $_paging json encoded
+     * @param string|array                        $_filter json encoded / array
+     * @param string|array                        $_paging json encoded / array
      * @param Tinebase_Controller_SearchInterface $_controller the record controller
      * @param string                              $_filterModel the class name of the filter model to use
      * @param bool                                $_getRelations
@@ -197,8 +290,7 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
      */
     protected function _updateMultiple($_filter, $_data, Tinebase_Controller_Record_Interface $_controller, $_filterModel)
     {
-        $oldMaxExcecutionTime = Tinebase_Core::setExecutionLifeTime(0);
-        
+        $this->_longRunningRequest();
         $decodedData   = is_array($_data) ? $_data : Zend_Json::decode($_data);
         $filter = $this->_decodeFilter($_filter, $_filterModel, TRUE);
         
@@ -209,7 +301,24 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
         
         return $result;
     }
-
+    
+    /**
+     * prepare long running request
+     * - execution time
+     * - session write close
+     * 
+     * @param integer $executionTime
+     * @return integer old max execution time
+     */
+    protected function _longRunningRequest($executionTime = 0)
+    {
+        $oldMaxExcecutionTime = Tinebase_Core::setExecutionLifeTime(0);
+        // close session to allow other requests
+        Zend_Session::writeClose(true);
+        
+        return $oldMaxExcecutionTime;
+    }
+    
     /**
      * update properties of record by id
      *
@@ -231,26 +340,28 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
 
         return $this->_recordToJson($savedRecord);
     }
-
+    
     /**
      * deletes existing records
      *
      * @param array|string $_ids
      * @param Tinebase_Controller_Record_Interface $_controller the record controller
+     * @param array $_additionalArguments
      * @return array
      */
-    protected function _delete($_ids, Tinebase_Controller_Record_Interface $_controller)
+    protected function _delete($_ids, Tinebase_Controller_Record_Interface $_controller, $additionalArguments = array())
     {
         if (! is_array($_ids) && strpos($_ids, '[') !== false) {
             $_ids = Zend_Json::decode($_ids);
         }
-        $_controller->delete($_ids);
+        $args = array_merge(array($_ids), $additionalArguments);
+        $savedRecord = call_user_func_array(array($_controller, 'delete'), $args);
 
         return array(
             'status'    => 'success'
         );
     }
-
+    
     /**
      * import records
      *
@@ -271,7 +382,7 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
         }
 
         // extend execution time to 30 minutes
-        $oldMaxExcecutionTime = Tinebase_Core::setExecutionLifeTime(1800);
+        $this->_longRunningRequest(1800);
 
         $file = Tinebase_TempFile::getInstance()->getTempFile($_tempFileId);
         $importResult = $importer->importFile($file->path, $_clientRecordData);
@@ -279,9 +390,6 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
         $importResult['results']    = $importResult['results']->toArray();
         $importResult['exceptions'] = $importResult['exceptions']->toArray();
         $importResult['status']     = 'success';
-
-        // reset max execution time to old value
-        Tinebase_Core::setExecutionLifeTime($oldMaxExcecutionTime);
 
         return $importResult;
     }
@@ -297,6 +405,9 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
     protected function _deleteByFilter($_filter, Tinebase_Controller_Record_Interface $_controller, $_filterModel)
     {
         $filter = $this->_decodeFilter($_filter, $_filterModel, TRUE);
+        
+        // extend execution time to 30 minutes
+        $this->_longRunningRequest(1800);
 
         $_controller->deleteByFilter($filter);
         return array(
@@ -314,7 +425,7 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
     {
         $converter = Tinebase_Convert_Factory::factory($_record);
         $result = $converter->fromTine20Model($_record);
-        
+
         return $result;
     }
 
@@ -323,17 +434,18 @@ abstract class Tinebase_Frontend_Json_Abstract extends Tinebase_Frontend_Abstrac
      *
      * @param Tinebase_Record_RecordSet $_records Tinebase_Record_Abstract
      * @param Tinebase_Model_Filter_FilterGroup $_filter
+     * @param Tinebase_Model_Pagination $_pagination
      * @return array data
      */
-    protected function _multipleRecordsToJson(Tinebase_Record_RecordSet $_records, $_filter = NULL)
+    protected function _multipleRecordsToJson(Tinebase_Record_RecordSet $_records, $_filter = NULL, $_pagination = NULL)
     {
         $result = array();
-        
+
         if ($_records->getFirstRecord()) {
             $converter = Tinebase_Convert_Factory::factory($_records->getFirstRecord());
-            $result = $converter->fromTine20RecordSet($_records, $this->_resolveUserFields);
+            $result = $converter->fromTine20RecordSet($_records, $_filter, $_pagination);
         }
-        
+
         return $result;
     }
 }

@@ -153,7 +153,19 @@ Ext.ns('Tine.Felamimail');
      */
     waitForContent: function(record, body) {
         if (! this.grid || this.grid.getSelectionModel().getCount() == 1) {
-            this.refetchBody(record, this.updateDetails.createDelegate(this, [record, body]), 'updateDetails');
+            this.refetchBody(record, {
+                success: this.updateDetails.createDelegate(this, [record, body]),
+                failure: function (exception) {
+                    Tine.log.debug(exception);
+                    this.getLoadMask().hide();
+                    if (exception.code == 404) {
+                        this.defaultTpl.overwrite(body, {msg: this.app.i18n._('Message not available.')});
+                    } else {
+                        Tine.Felamimail.messageBackend.handleRequestException(exception);
+                    }
+                },
+                scope: this
+            });
             this.defaultTpl.overwrite(body, {msg: ''});
             this.getLoadMask().show();
         } else {
@@ -166,14 +178,14 @@ Ext.ns('Tine.Felamimail');
      * 
      * @param {Tine.Felamimail.Model.Message} record
      * @param {Function} callback
-     * @param {String} fnName
      */
-    refetchBody: function(record, callback, fnName) {
+    refetchBody: function(record, callback) {
         // cancel old request first
         if (this.fetchBodyTransactionId && ! Tine.Felamimail.messageBackend.isLoading(this.fetchBodyTransactionId)) {
-            Tine.log.debug('Tine.Felamimail.GridDetailsPanel::' + fnName + '() cancelling current fetchBody request.');
+            Tine.log.debug('Tine.Felamimail.GridDetailsPanel::refetchBody -> cancelling current fetchBody request.');
             Tine.Felamimail.messageBackend.abort(this.fetchBodyTransactionId);
         }
+        Tine.log.debug('Tine.Felamimail.GridDetailsPanel::refetchBody -> calling fetchBody');
         this.fetchBodyTransactionId = Tine.Felamimail.messageBackend.fetchBody(record, callback);
     },
     
@@ -238,7 +250,7 @@ Ext.ns('Tine.Felamimail');
                     '<b>' + this.i18n._('From') + ':</b>',
                     ' {[this.showFrom(values.from_email, values.from_name, "' + this.i18n._('Add') + '", "' 
                         + this.i18n._('Add contact to addressbook') + '")]}<br/>',
-                    '<b>' + this.i18n._('Date') + ':</b> {[Tine.Tinebase.common.dateTimeRenderer(values.received)]}',
+                    '<b>' + this.i18n._('Date') + ':</b> {[this.showDate(values.sent, values)]}',
                     '{[this.showRecipients(values.headers)]}',
                     '{[this.showHeaders("' + this.i18n._('Show or hide header information') + '")]}',
                 '</div>',
@@ -260,6 +272,11 @@ Ext.ns('Tine.Felamimail');
                     return '';
                 }
                 return value;
+            },
+            
+            showDate: function(sent, messageData) {
+                var date = (sent) ? sent : messageData.received;
+                return Tine.Tinebase.common.dateTimeRenderer(date);
             },
             
             showFrom: function(email, name, addText, qtip) {
@@ -298,7 +315,7 @@ Ext.ns('Tine.Felamimail');
                             id = Ext.id();
                             
                         if (height < 0) {
-                        	// sometimes the height is negative, fix this here
+                            // sometimes the height is negative, fix this here
                             height = 500;
                         }
                             
@@ -307,12 +324,12 @@ Ext.ns('Tine.Felamimail');
                             'autocomplete="off" id="' + id + '" name="body" class="x-form-textarea x-form-field x-ux-display-background-border" readonly="" >' +
                             body + '</textarea>';
                     }
-                }                    
+                }
                 return body;
             },
             
             showHeaders: function(qtip) {
-                var result = ' <span ext:qtip="' + qtip + '" id="' + Ext.id() + ':show" class="tinebase-showheaders-link">[...]</span>';
+                var result = ' <span ext:qtip="' + Tine.Tinebase.common.doubleEncode(qtip) + '" id="' + Ext.id() + ':show" class="tinebase-showheaders-link">[...]</span>';
                 return result;
             },
             
@@ -461,7 +478,7 @@ Ext.ns('Tine.Felamimail');
                     
                 if (! this.record.bodyIsFetched()) {
                     // sometimes there is bad timing and we do not have the attachments available -> refetch body
-                    this.refetchBody(this.record, this.onClick.createDelegate(this, [e]), 'onClick');
+                    this.refetchBody(this.record, this.onClick.createDelegate(this, [e]));
                     return;
                 }
                     
@@ -629,7 +646,7 @@ Ext.ns('Tine.Felamimail');
                     target.id = targetId + ':' + 'hide';
                     
                 } else {
-                    html = ' <span ext:qtip="' + this.i18n._('Show or hide header information') + '" id="' 
+                    html = ' <span ext:qtip="' + Ext.util.Format.htmlEncode(this.i18n._('Show or hide header information')) + '" id="' 
                         + Ext.id() + ':show" class="tinebase-showheaders-link">[...]</span>'
                 }
                 

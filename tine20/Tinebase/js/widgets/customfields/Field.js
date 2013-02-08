@@ -9,8 +9,17 @@
 Ext.ns('Tine.widgets.customfields');
 
 Tine.widgets.customfields.Field = {
-//    this.cfConfig = Tine.widgets.customfields.ConfigManager.getConfig(this.app, this.model, this.name);
-    get: function (app, cfConfig, config) {
+    /**
+     * get the form field 
+     * 
+     * @param {Tine.Tinebase.Application} app the application the customfield belongs to
+     * @param {Tine.Tinebase.data.Record} cfConfig customfields config record
+     * @param {Object} config additional field config
+     * @param {Tine.widgets.dialog.EditDialog} editDialog the calling editdialog - just needed if record must not link itself
+     * 
+     * @return {Ext.form.Field}
+     */
+    get: function (app, cfConfig, config, editDialog) {
         Tine.log.debug(cfConfig);
         
         var def = cfConfig.get('definition'),
@@ -35,18 +44,21 @@ Tine.widgets.customfields.Field = {
                         Ext.apply(fieldDef, {
                             xtype: 'widget-keyfieldcombo',
                             app: options.app ? options.app : app,
-                            keyFieldName: options.keyFieldName ? options.keyFieldName : cfConfig.get('name')
+                            keyFieldName: options.keyFieldName ? options.keyFieldName : cfConfig.get('name'),
+                            sortBy: 'id'
                         });
                         break;
-                   	case 'record':
-                   		var options = def.options ? def.options : {},
+                       case 'record':
+                           var options = def.options ? def.options : {},
                             recordConfig = def.recordConfig ? def.recordConfig : null;
                             
                         Ext.apply(fieldDef, {
                             xtype: 'tinerecordpickercombobox',
                             app: options.app ? options.app : app,
                             resizable: true,
-                            recordClass: eval(recordConfig.value.records)
+                            recordClass: eval(recordConfig.value.records),
+                            allowLinkingItself: false,
+                            editDialog: editDialog
                         });
                         break;
                     case 'integer':
@@ -78,6 +90,10 @@ Tine.widgets.customfields.Field = {
             
         if (def.length) {
             fieldDef.maxLength = def.length;
+        }
+        
+        if (def.required) {
+            fieldDef.allowBlank = false;
         }
         
         try {

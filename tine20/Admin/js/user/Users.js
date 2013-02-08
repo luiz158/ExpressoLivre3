@@ -23,7 +23,7 @@ Tine.Admin.user.show = function () {
         });
     }
     else {
-    	Tine.Admin.user.gridPanel.loadGridData.defer(100, Tine.Admin.user.gridPanel, []);
+        Tine.Admin.user.gridPanel.loadGridData.defer(100, Tine.Admin.user.gridPanel, []);
     }
     
     Tine.Tinebase.MainScreen.setActiveContentPanel(Tine.Admin.user.gridPanel, true);
@@ -46,8 +46,8 @@ Tine.Admin.Model.UserArray = [
     { name: 'accountDisplayName' },
     { name: 'accountFullName' },
     { name: 'accountStatus' },
-	{ name: 'groups' },
-	{ name: 'accountRoles' },
+    { name: 'groups' },
+    { name: 'accountRoles' },
     { name: 'accountPrimaryGroup' },
     { name: 'accountExpires', type: 'date', dateFormat: Date.patterns.ISO8601Long },
     { name: 'accountLastLogin', type: 'date', dateFormat: Date.patterns.ISO8601Long },
@@ -82,11 +82,13 @@ Tine.Admin.Model.User = Tine.Tinebase.data.Record.create(Tine.Admin.Model.UserAr
  * @return {Object} default data
  */
 Tine.Admin.Model.User.getDefaultData = function () {
-    var internalAddressbook = Tine.Admin.registry.get('defaultInternalAddressbook');
-    
+    var internalAddressbook = Tine.Admin.registry.get('defaultInternalAddressbook'),
+        emailUserDefaults = (Tine.Admin.registry.get('config').defaultImapUserSettings && Tine.Admin.registry.get('config').defaultImapUserSettings.value)
+            ? Tine.Admin.registry.get('config').defaultImapUserSettings.value : '';
+        
     return {
         sambaSAM: '',
-        emailUser: '',
+        emailUser: emailUserDefaults,
         accountStatus: 'enabled',
         visibility: (internalAddressbook !== null) ? 'displayed' : 'hidden',
         container_id: internalAddressbook,

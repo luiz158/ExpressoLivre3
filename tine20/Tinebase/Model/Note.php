@@ -5,8 +5,8 @@
  * @package     Tinebase
  * @subpackage  Notes
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2008 Metaways Infosystems GmbH (http://www.metaways.de)
- * @author      Philipp Schuele <p.schuele@metaways.de>
+ * @copyright   Copyright (c) 2008-2012 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @author      Philipp Schüle <p.schuele@metaways.de>
  */
 
 /**
@@ -81,6 +81,7 @@ class Tinebase_Model_Note extends Tinebase_Record_Abstract
         'is_deleted'             => array('allowEmpty' => true),
         'deleted_time'           => array('allowEmpty' => true),
         'deleted_by'             => array('allowEmpty' => true),
+        'seq'                    => array('allowEmpty' => true),
     );
     
     /**
@@ -110,14 +111,14 @@ class Tinebase_Model_Note extends Tinebase_Record_Abstract
         if ($this->created_by && $_resolveCreator) {
             //resolve creator; return default NonExistentUser-Object if creator cannot be resolved =>
             //@todo perhaps we should add a "getNonExistentUserIfNotExists" parameter to Tinebase_User::getUserById 
-        	try {
+            try {
                 $creator = Tinebase_User::getInstance()->getUserById($this->created_by);
             }
             catch (Tinebase_Exception_NotFound $e) {
                 $creator = Tinebase_User::getInstance()->getNonExistentUser();
             }
              
-            $result['created_by'] = $creator->accountDisplayName; 
+            $result['created_by'] = $creator->accountDisplayName;
         }
         
         return $result;

@@ -146,6 +146,12 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
      */
     protected $_label = NULL;
     
+    /**
+     * default filter
+     * @var string
+     */
+    protected $_defaultFilter = 'query';
+    
     /******************************* properties ********************************/
     
     /**
@@ -179,11 +185,23 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
      */
     public function __construct(array $_data = array(), $_condition = '', $_options = array())
     {
+        $this->_autoModeling();
+        
         $this->_setOptions($_options);
         
         $this->_concatenationCondition = $_condition == self::CONDITION_OR ? self::CONDITION_OR : self::CONDITION_AND;
         
         $this->setFromArray($_data);
+    }
+    
+    /**
+     * clone filters after creating clone of filter group
+     */
+    public function __clone()
+    {
+        foreach($this->_filterObjects as $idx => $filter) {
+            $this->_filterObjects[$idx] = clone $filter;
+        }
     }
     
     /**
@@ -237,7 +255,7 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
     protected function _createForeignRecordFilterFromArray($_filterData)
     {
         $filterData = $_filterData;
-        
+                
         $filterData['value'] = $_filterData['value']['filters'];
         $filterData['options'] = array(
             'isGeneric'         => TRUE
@@ -246,7 +264,9 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
         switch ($_filterData['value']['linkType']) {
             case 'relation':
                 $modelName = $this->_getModelNameFromLinkInfo($_filterData['value'], 'modelName');
+                $model = new $this->_modelName();
                 $filterData['options']['related_model'] = $modelName;
+                $filterData['options']['idProperty'] = $model->getIdProperty();
                 $filter = new Tinebase_Model_Filter_Relation($filterData);
                 break;
 
@@ -274,6 +294,43 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
         }
         
         $this->addFilter($filter);
+    }
+    /**
+     * creates generic filters from the model definition
+     */
+    protected function _autoModeling()
+    {
+        // add modlog and other generic filters by model config
+        $mn = $this->_modelName;
+        if($mn) {
+            $metaInfo = $mn::getMeta();
+            if($metaInfo) {
+                if(array_key_exists('useModlog', $metaInfo) && $metaInfo['useModlog']) {
+                    $this->_filterModel = array_merge($this->_filterModel, array(
+                            'deleted_by'           => array('filter' => 'Tinebase_Model_Filter_User'),
+                            'last_modified_time'   => array('filter' => 'Tinebase_Model_Filter_Date'),
+                            'deleted_time'         => array('filter' => 'Tinebase_Model_Filter_Date'),
+                            'creation_time'        => array('filter' => 'Tinebase_Model_Filter_Date'),
+                            'last_modified_by'     => array('filter' => 'Tinebase_Model_Filter_User'),
+                            'created_by'           => array('filter' => 'Tinebase_Model_Filter_User'),
+                            'is_deleted'           => array('filter' => 'Tinebase_Model_Filter_Bool')
+                    ));
+                }
+
+                if(array_key_exists('containerProperty', $metaInfo) && $metaInfo['containerProperty']) {
+                    $this->_filterModel = array_merge($this->_filterModel, array(
+                            $metaInfo['containerProperty'] => array('filter' => 'Tinebase_Model_Filter_Container', 'options' => array('applicationName' => $this->_applicationName)),
+                    ));
+                }
+
+                if(array_key_exists('hasTags', $metaInfo) && $metaInfo['hasTags']) {
+                    $this->_filterModel = array_merge($this->_filterModel, array(
+                            'tag'            => array('filter' => 'Tinebase_Model_Filter_Tag', 'options' => array(
+                                    'applicationName' => $this->_applicationName,
+                            ))));
+                }
+            }
+        }
     }
     
     /**
@@ -411,8 +468,8 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
         if (is_array($_fieldOrData)) {
             $data = $_fieldOrData;
         } else {
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' 
-                . 'Using deprecated function syntax. Please pass all filter data in one array.');
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' 
+                . ' Using deprecated function syntax. Please pass all filter data in one array (field: ' . $_fieldOrData . ')');
             
             $data = array(
                 'field'     => $_fieldOrData,
@@ -441,12 +498,12 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
             );
             $filter = NULL;
         } else {
-            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' '
-                . print_r($definition, TRUE));
             $data['options'] = array_merge($this->_options, isset($definition['options']) ? (array)$definition['options'] : array());
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__
+                . ' Creating filter: ' . $definition['filter'] . ' with data: ' . print_r($data, TRUE));
             $filter = new $definition['filter']($data);
         }
-            
+        
         return $filter;
     }
     
@@ -461,7 +518,7 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
         
         foreach ($this->_filterObjects as $object) {
             if ($object instanceof Tinebase_Model_Filter_AclFilter) {
-                $aclFilters[] = $object;        
+                $aclFilters[] = $object;
             }
         }
         
@@ -531,6 +588,15 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
     }
     
     /**
+     * returns default filter
+     * @return string default filter
+     */
+    public function getDefaultFilter()
+    {
+        return $this->_defaultFilter;
+    }
+    
+    /**
      * returns application name of this filtergroup
      *
      * @return string
@@ -565,11 +631,13 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
      *
      * @param string $_field
      * @param boolean $_getAll
+     * @param boolean $_recursive
+     * 
      * @return Tinebase_Model_Filter_Abstract|array
      */
-    public function getFilter($_field, $_getAll = FALSE)
+    public function getFilter($_field, $_getAll = FALSE, $_recursive = FALSE)
     {
-        return $this->_findFilter($_field, $_getAll);
+        return $this->_findFilter($_field, $_getAll, $_recursive);
     }
     
     /**
@@ -680,12 +748,12 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
         $result = FALSE;
         
         foreach ($this->_filterObjects as $object) {
-        	if ($object instanceof Tinebase_Model_Filter_Abstract) {
-	            if ($object->getField() == $_field) {
-	                $result = TRUE;
-	                break;
-	            }
-        	}
+            if ($object instanceof Tinebase_Model_Filter_Abstract) {
+                if ($object->getField() == $_field) {
+                    $result = TRUE;
+                    break;
+                }
+            }
         }
         
         return $result;
@@ -745,22 +813,34 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
      *
      * @param string $_field
      * @param boolean $_getAll
+     * @param boolean $_recursive
+     * 
      * @return Tinebase_Model_Filter_Abstract|array
      */
-    protected function _findFilter($_field, $_getAll = FALSE)
+    protected function _findFilter($_field, $_getAll = FALSE, $_recursive= FALSE)
     {
         $result = ($_getAll) ? array() : NULL;
         
         foreach ($this->_filterObjects as $object) {
-        	if ($object instanceof Tinebase_Model_Filter_Abstract) {
-	            if ($object->getField() == $_field) {
-    	            if ($_getAll) {
+            if ($_recursive && $object instanceof Tinebase_Model_Filter_FilterGroup) {
+                $filter = $object->getFilter($_field, $_getAll, $_recursive);
+                
+                if ($filter) {
+                    if ($_getAll) {
+                        $result = array_merge($result, $filter);
+                    } else {
+                        return $filter;
+                    }
+                }
+            } else if ($object instanceof Tinebase_Model_Filter_Abstract) {
+                if ($object->getField() == $_field) {
+                    if ($_getAll) {
                         $result[] = $object;
                     } else {
                         return $object;
-                    }	                
-	            }
-        	}
+                    }                    
+                }
+            }
         }
         
         foreach ($this->_customData as $customFilter) {
@@ -784,11 +864,11 @@ class Tinebase_Model_Filter_FilterGroup implements Iterator
     protected function _removeFilter($_field)
     {
         foreach ($this->_filterObjects as $key => $object) {
-        	if ($object instanceof Tinebase_Model_Filter_Abstract) {
-	            if ($object->getField() == $_field) {
-	                unset($this->_filterObjects[$key]);
-	            }
-        	}
+            if ($object instanceof Tinebase_Model_Filter_Abstract) {
+                if ($object->getField() == $_field) {
+                    unset($this->_filterObjects[$key]);
+                }
+            }
         }
 
         foreach ($this->_customData as $key => $customFilter) {

@@ -14,10 +14,6 @@
  */
 require_once dirname(dirname(dirname(dirname(dirname(__FILE__))))) . DIRECTORY_SEPARATOR . 'TestHelper.php';
 
-if (!defined('PHPUnit_MAIN_METHOD')) {
-    define('PHPUnit_MAIN_METHOD', 'Tinebase_User_EmailUser_Smtp_LdapDbmailSchemaTest::main');
-}
-
 /**
  * Test class for Tinebase_Group
  */
@@ -67,7 +63,7 @@ class Tinebase_User_EmailUser_Smtp_LdapDbmailSchemaTest extends PHPUnit_Framewor
             $this->markTestSkipped('Dbmail LDAP plugin not enabled');
         }
         
-        $this->_config = Tinebase_Config::getInstance()->getConfigAsArray(Tinebase_Config::IMAP);
+        $this->_config = Tinebase_Config::getInstance()->get(Tinebase_Config::IMAP, new Tinebase_Config_Struct())->toArray();
         
         $this->objects['users'] = array();
     }
@@ -93,13 +89,13 @@ class Tinebase_User_EmailUser_Smtp_LdapDbmailSchemaTest extends PHPUnit_Framewor
     public function testAddUser()
     {
         $user = Tinebase_User_LdapTest::getTestRecord();
-		$user->smtpUser = new Tinebase_Model_EmailUser(array(
-		    'emailAddress'     => $user->accountEmailAddress,
-		    'emailForwardOnly' => true,
+        $user->smtpUser = new Tinebase_Model_EmailUser(array(
+            'emailAddress'     => $user->accountEmailAddress,
+            'emailForwardOnly' => true,
             'emailForwards'    => array('unittest@tine20.org', 'test@tine20.org'),
             'emailAliases'     => array('bla@tine20.org', 'blubb@tine20.org')
-		));
-		
+        ));
+        
         $testUser = $this->_backend->addUser($user);
         $this->objects['users']['testUser'] = $testUser;
 
@@ -171,9 +167,5 @@ class Tinebase_User_EmailUser_Smtp_LdapDbmailSchemaTest extends PHPUnit_Framewor
         
         //$this->assertEquals(md5('password'), $updatedUser->emailPassword);
     }
-}		
-	
-
-if (PHPUnit_MAIN_METHOD == 'Tinebase_User_EmailUser_Smtp_LdapDbmailSchemaTest::main') {
-    Tinebase_Group_SqlTest::main();
 }
+

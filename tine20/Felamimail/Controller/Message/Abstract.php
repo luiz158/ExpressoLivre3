@@ -197,9 +197,9 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
         : Zend_Mime::TYPE_TEXT;
         
         $headers     = $this->getMessageHeaders($_message, $_partId, true);
+        $body        = $this->getMessageBody($_message, $_partId, $mimeType, $_account, true);
         $attachments = $this->getAttachments($_message, $_partId);
         $this->_attachments = $attachments;
-        $body        = $this->getMessageBody($_message, $_partId, $mimeType, $_account, true);
         $signature   = $this->getDigitalSignature($_message, $_partId);
         
         if ($_partId === null) {
@@ -208,6 +208,8 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
             $message->body        = $body;
             $message->headers     = $headers;
             $message->attachments = $attachments;
+            // make sure the structure is present
+            $message->structure   = $message->structure;
             $message->signature_info   = $signature;
         } else {
             // create new object for rfc822 message
@@ -232,6 +234,7 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
         }
         
         $message->sendReadingConfirmation();
+
         return $message;
     }
     
@@ -405,7 +408,7 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
     }
     
     
-       /**
+    /**
      * get Raw message
      *
      * @param string|Felamimail_Model_Message $_id
@@ -535,18 +538,23 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
             . ' Get Message body of message id ' . $message->getId() . ' (content type ' . $_contentType . ')');
         
-        $cache = Tinebase_Core::getCache();
-        $cacheId = $this->_getMessageBodyCacheId($message, $_partId, $_contentType, $_account);
-        
-        if ($cache->test($cacheId)) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Getting Message from cache.');
-            return $cache->load($cacheId);
+        $cacheBody = Felamimail_Config::getInstance()->get(Felamimail_Config::CACHE_EMAIL_BODY, TRUE);
+        if ($cacheBody) {
+            $cache = Tinebase_Core::getCache();
+            $cacheId = $this->_getMessageBodyCacheId($message, $_partId, $_contentType, $_account);
+            
+            if ($cache->test($cacheId)) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Getting Message from cache.');
+                return $cache->load($cacheId);
+            }
         }
         
         $messageBody = $this->_getAndDecodeMessageBody($message, $_partId, $_contentType, $_account);
         
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Put message body into Tinebase cache (for 24 hours).');
-        $cache->save($messageBody, $cacheId, array('getMessageBody'), 86400);
+        if ($cacheBody) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Put message body into Tinebase cache (for 24 hours).');
+            $cache->save($messageBody, $cacheId, array('getMessageBody'), 86400);
+        }
         
         return $messageBody;
     }
@@ -601,8 +609,18 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
             $body = $this->_getDecodedBodyContent($bodyPart, $partStructure);
             
             if ($partStructure['contentType'] != Zend_Mime::TYPE_TEXT) {
+                $bodyCharCountBefore = strlen($body);
                 $body = $this->_getDecodedBodyImages($_message->getId(), $body);
                 $body = $this->_purifyBodyContent($body);
+                $bodyCharCountAfter = strlen($body);
+                
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                    . ' Purifying removed ' . ($bodyCharCountBefore - $bodyCharCountAfter) . ' / ' . $bodyCharCountBefore . ' characters.');
+                if ($_message->text_partid && $bodyCharCountAfter < $bodyCharCountBefore / 10) {
+                    if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
+                        . ' Purify may have removed (more than 9/10) too many chars, using alternative text message part.');
+                    return $this->_getAndDecodeMessageBody($_message, $_message->text_partid , Zend_Mime::TYPE_TEXT, $_account);
+                }
             }
             
             if (! ($_account !== NULL && $_account->display_format === Felamimail_Model_Account::DISPLAY_CONTENT_TYPE && $bodyPart->type == Zend_Mime::TYPE_TEXT)) {
@@ -730,13 +748,45 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
      */
     protected function _getDecodeFilter($_charset = self::DEFAULT_FALLBACK_CHARSET)
     {
-        $filter = "convert.iconv.$_charset/utf-8//IGNORE";
+        if (in_array(strtolower($_charset), array('iso-8859-1', 'windows-1252', 'iso-8859-15')) && extension_loaded('mbstring')) {
+            require_once 'StreamFilter/ConvertMbstring.php';
+            $filter = 'convert.mbstring';
+        } else {
+            $filter = "convert.iconv.$_charset/utf-8//IGNORE";
+        }
         
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Appending decode filter: ' . $filter);
         
         return $filter;
     }
     
+    /**
+     * convert image cids to download image links
+     *
+     * @param string $_content
+     * @return string
+     */
+    protected function _getDecodedBodyImages($_messageId, $_content)
+    {
+        $found = preg_match_all('/<img.[^>]*src=[\"|\']cid:(.[^>\"\']*).[^>]*>/',$_content,$matches,PREG_SET_ORDER);
+        if ($found) {
+            Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Replacing cids from multipart messages with images');
+            foreach ($matches as $match) {
+                $pid = '';
+                foreach ($this->_attachments as $attachment) {
+                    if ($attachment['cid']==='<'.$match[1].'>') {
+                        $pid = $attachment['partId'];
+                        break;
+                    }
+                }
+                $src = "index.php?method=Felamimail.downloadAttachment&amp;messageId=".$_messageId."&amp;partId=".$pid;
+                $_content = preg_replace("/cid:$match[1]/",$src,$_content);
+            }
+        }
+
+        return $_content;
+    }
+
     /**
      * use html purifier to remove 'bad' tags/attributes from html body
      *
@@ -746,7 +796,7 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
     protected function _purifyBodyContent($_content)
     {
         if (!defined('HTMLPURIFIER_PREFIX')) {
-            define('HTMLPURIFIER_PREFIX', realpath(dirname(__FILE__) . '/../../../library/HTMLPurifier'));
+            define('HTMLPURIFIER_PREFIX', realpath(dirname(__FILE__) . '/../../library/HTMLPurifier'));
         }
         
         $config = Tinebase_Core::getConfig();
@@ -758,7 +808,13 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
         $config = HTMLPurifier_Config::createDefault();
         $config->set('Core.LexerImpl', 'PH5P');
         $config->set('HTML.DefinitionID', 'purify message body contents'); 
-        $config->set('HTML.DefinitionRev', 1);
+        $config->set('HTML.DefinitionRev', 1);    
+        // some config values to consider
+        /*
+        $config->set('Attr.EnableID', true);
+        $config->set('Attr.ClassUseCDATA', true);
+        $config->set('CSS.AllowTricky', true);
+        */
         $config->set('CSS.AllowTricky', 1);
         $config->set('CSS.ForbiddenProperties', array());
         $config->set('Cache.SerializerPath', $path);
@@ -768,6 +824,7 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
             $config->set('CSS.ForbiddenProperties', array('background-image'));
         }
         
+
         // add target="_blank" to anchors
         if ($def = $config->maybeGetRawHTMLDefinition()) {
             $a = $def->addBlankElement('a');
@@ -872,12 +929,13 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
      * @param boolean                   $_select
      * @param Felamimail_Backend_ImapProxy   $_imapBackend
      * @throws Felamimail_Exception_IMAPServiceUnavailable
+     * @throws Felamimail_Exception_IMAPFolderNotFound
      * @return Felamimail_Backend_ImapProxy
      */
     protected function _getBackendAndSelectFolder($_folderId = NULL, &$_folder = NULL, $_select = TRUE, Felamimail_Backend_ImapProxy $_imapBackend = NULL)
     {
         if ($_folder === NULL || empty($_folder)) {
-            $folderBackend  = Felamimail_Backend_Folder::getInstance();
+            $folderBackend  = new Felamimail_Backend_Folder();
             $_folder = $folderBackend->get($_folderId);
         }
         
@@ -888,9 +946,11 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
                     . ' Select folder ' . $_folder->globalname);
                 $backendFolderValues = $imapBackend->selectFolder(Felamimail_Model_Folder::encodeFolderName($_folder->globalname));
             }
+        } catch (Zend_Mail_Storage_Exception $zmse) {
+            // @todo remove the folder from cache if it could not be found on the IMAP server?
+            throw new Felamimail_Exception_IMAPFolderNotFound($zmse->getMessage());
         } catch (Zend_Mail_Protocol_Exception $zmpe) {
-            // no imap connection
-            throw new Felamimail_Exception_IMAPServiceUnavailable();
+            throw new Felamimail_Exception_IMAPServiceUnavailable($zmpe->getMessage());
         }
         
         return $imapBackend;
@@ -919,6 +979,9 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
         }
         
         foreach ($structure['parts'] as $part) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__
+                . ' ' . print_r($part, TRUE));
+            
             if ($part['type'] == 'multipart') {
                 $attachments = $attachments + $this->getAttachments($message, $part['partId']);
             } else {
@@ -928,27 +991,26 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
                     continue;
                 }
                 
-                if (is_array($part['disposition']) && array_key_exists('parameters', $part['disposition']) && array_key_exists('filename', $part['disposition']['parameters'])) {
-                    $filename = $part['disposition']['parameters']['filename'];
-                } elseif (is_array($part['parameters']) && array_key_exists('name', $part['parameters'])) {
-                    $filename = $part['parameters']['name'];
-                } else {
-                    $filename = 'Part ' . $part['partId'];
-                }
-                $attachments[] = array( 
+                $filename = $this->_getAttachmentFilename($part);
+                $attachmentData = array(
                     'content-type' => $part['contentType'], 
                     'filename'     => $filename,
                     'partId'       => $part['partId'],
                     'size'         => $part['size'],
                     'description'  => $part['description'],
-		    		'cid'          => $part['id']
+                    'cid'          => $part['id']
                 );
+                
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                    . ' Got attachment with name ' . $filename);
+                
+                $attachments[] = $attachmentData;
             }
         }
         
         return $attachments;
     }
-    
+
     // Ignore $_partId
     public function getDigitalSignature($messageId, $_partId = null)
     {
@@ -974,7 +1036,28 @@ abstract class Felamimail_Controller_Message_Abstract extends Tinebase_Controlle
     	}
     
     	return  $signature;
-    }    
+    }
+
+    /**
+     * fetch attachment filename from part
+     * 
+     * @param array $part
+     * @return string
+     */
+    protected function _getAttachmentFilename($part)
+    {
+        if (is_array($part['disposition']) && array_key_exists('parameters', $part['disposition']) 
+            && array_key_exists('filename', $part['disposition']['parameters'])) 
+        {
+            $filename = $part['disposition']['parameters']['filename'];
+        } elseif (is_array($part['parameters']) && array_key_exists('name', $part['parameters'])) {
+            $filename = $part['parameters']['name'];
+        } else {
+            $filename = 'Part ' . $part['partId'];
+        }
+        
+        return $filename;
+    }
     
     /**
      * delete messages from cache by folder

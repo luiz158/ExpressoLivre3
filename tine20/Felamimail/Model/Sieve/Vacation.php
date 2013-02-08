@@ -5,7 +5,7 @@
  * @package     Felamimail
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2010-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2010-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * 
  */
 
@@ -22,14 +22,14 @@
  * @package     Felamimail
  */
 class Felamimail_Model_Sieve_Vacation extends Tinebase_Record_Abstract
-{  
+{
     /**
      * key in $_validators/$_properties array for the field which 
      * represents the identifier
      * 
      * @var string
-     */    
-    protected $_identifier = 'id';    
+     */
+    protected $_identifier = 'id';
     
     /**
      * application the record belongs to
@@ -53,8 +53,26 @@ class Felamimail_Model_Sieve_Vacation extends Tinebase_Record_Abstract
         'from'                  => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'days'                  => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => 7),
         'enabled'               => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => 0),
+        'date_enabled'          => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => 0),
         'mime'                  => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'reason'                => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+    // not persistent, only used for message template
+        'start_date'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'end_date'              => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'contact_ids'           => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'template_id'           => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'signature'             => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+    );
+    
+    /**
+    * name of fields containing datetime or an array of datetime
+    * information
+    *
+    * @var array list of datetime fields
+    */
+    protected $_datetimeFields = array(
+        'start_date',
+        'end_date',
     );
     
     /**
@@ -77,12 +95,22 @@ class Felamimail_Model_Sieve_Vacation extends Tinebase_Record_Abstract
         $fsv = new Felamimail_Sieve_Vacation();
         
         $fsv->setEnabled($this->enabled)
-            ->setDays($this->days)
+            ->setDays((is_int($this->days) && $this->days > 0) ? $this->days : 7)
             ->setSubject($this->subject)
             ->setFrom($this->from)
             ->setMime($this->mime)
-            ->setReason($this->reason);
-            
+            ->setReason($this->reason)
+            ->setDateEnabled($this->date_enabled);
+        
+        $this->setTimezone(Tinebase_Core::get(Tinebase_Core::USERTIMEZONE));
+        if ($this->start_date instanceof Tinebase_DateTime) {
+            $fsv->setStartdate($this->start_date->format('Y-m-d'));
+        }
+        if ($this->end_date instanceof Tinebase_DateTime) {
+            $fsv->setEnddate($this->end_date->format('Y-m-d'));
+        }
+        $this->setTimezone('UTC');
+        
         if (is_array($this->addresses)) {
             foreach ($this->addresses as $address) {
                 $fsv->addAddress($address);

@@ -30,24 +30,33 @@ class Tinebase_Translation
      * @var array
      */
     private static $SUPPORTED_LANGS = array(
-        'bg',      // Bulgarian            Dimitrina Mileva <d.mileva@metaways.de>
-        'ca',      // Catalan              Damià Verger - JUG Països Catalans <dverger@joomla.cat>
-        'cs',      // Czech                Michael Sladek <msladek@brotel.cz>
+//        'bg',      // Bulgarian            Dimitrina Mileva <d.mileva@metaways.de>
+//        'ca',      // Catalan              Damià Verger - JUG Països Catalans <dverger@joomla.cat>
+//        'cs',      // Czech                Michael Sladek <msladek@brotel.cz>
+//        'da',      // Danish               Sylvester Nielsen
         'de',      // German               Cornelius Weiss <c.weiss@metaways.de>
         'en',      // English              Cornelius Weiss <c.weiss@metaways.de>
-        'es',      // Spanish              Enrique Palacios <enriquepalaciosc@gmail.com>
-        'fr',      // French               Rémi Peltier <rpeltier@agglo-clermont.fr>
-        'hu',      // Hungarian            Gump <admin@kemenyfem.hu>
-        'it',      // Italian              Roberto Rossi <impiastro@gmail.com>
-        'ja',      // Japanese             Yuuki Kitamura <ykitamura@clasi-co.jp>
-        'nb',      // Norwegian Bokmål     Ronny Gonzales <gonzito@online.no>
-        //'nl',      // Dutch                Joost Venema <post@joostvenema.nl>
-        'pl',      // Polish               Wojciech Kaczmarek <wojciech_kaczmarek@wp.pl>
-        //'pt',      // Portuguese           Holger Rothemund <holger@rothemund.org>
-        'ru',      // Russian              Nikolay Parukhin <parukhin@gmail.com> 
-        'sv',      // Swedish              Andreas Storbjörk <andreas.storbjork@rambolo.net>
-        'zh_CN',   // Chinese Simplified   Jason Qi <qry@yahoo.com>
-        'zh_TW',   // Chinese Traditional  Frank Huang <frank.cchuang@gmail.com>
+        'es',      // Spanish (Castilian)  Enrique Palacios <enriquepalaciosc@gmail.com>
+//        'es_MX',   // Spanish (Mexico)     Miguel Gutierrez 
+//        'et',      // Estonian             Rivo Zängov
+//        'fa_IR',   // Persian (Iran)       hamid112233
+//        'fr',      // French               Rémi Peltier <rpeltier@agglo-clermont.fr>
+//        'hr_HR',   // Croatian (Croatia)   AirMike
+//        'hu',      // Hungarian            Tamás Faragó <admin@kemenyfem.hu>
+//        'it',      // Italian              Roberto Rossi <impiastro@gmail.com>
+//        'ja',      // Japanese             Yuuki Kitamura <ykitamura@clasi-co.jp>
+//        'lt',      // Lithuanian           Aurimas Driskius
+//        'nb',      // Norwegian Bokmål     Ronny Gonzales <gonzito@online.no>
+//        //'nl',      // Dutch                Joost Venema <post@joostvenema.nl>
+//        'pl',      // Polish               Wojciech Kaczmarek <wojciech_kaczmarek@wp.pl>
+//        //'pt',      // Portuguese           Holger Rothemund <holger@rothemund.org>
+        'pt_BR',   // Portuguese (Brazil)  Eduardo Fukunari
+//        'ru',      // Russian              Nikolay Parukhin <parukhin@gmail.com>
+//        'sk',      // Slovak               attila623
+//        'sv_SE',   // Swedish              Andreas Storbjörk <andreas.storbjork@rambolo.net>
+//        'tr_TR',   // Turkish (Turkey)     Furkan Karatopraklı
+//        'zh_CN',   // Chinese Simplified   Jason Qi <qry@yahoo.com>
+//        'zh_TW',   // Chinese Traditional  Frank Huang <frank.cchuang@gmail.com>
     );
     
     /**
@@ -78,7 +87,7 @@ class Tinebase_Translation
         if (Tinebase_Config::isReady() === TRUE) {
             $customTranslationsDir = Tinebase_Config::getInstance()->translations;
             if ($customTranslationsDir) {
-                foreach((array) scandir($customTranslationsDir) as $dir) {
+                foreach((array) @scandir($customTranslationsDir) as $dir) {
                     $poFile = "$customTranslationsDir/$dir/Tinebase/translations/$dir.po";
                     if (is_readable($poFile)) {
                         $availableTranslations[$dir] = array(
@@ -223,6 +232,11 @@ class Tinebase_Translation
                 }
             }
         } catch (Exception $e) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . 
+                ' ' . $e->getMessage() . ', falling back to locale en.');
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . 
+                ' ' . $e->getTraceAsString());
+            $locale = new Zend_Locale('en');
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " $e, falling back to locale en");
             $locale = new Zend_Locale(Zend_Locale::BROWSER);
         }
@@ -261,12 +275,22 @@ class Tinebase_Translation
         
         // create new translation
         $path = $basePath . DIRECTORY_SEPARATOR . ucfirst($_applicationName) . DIRECTORY_SEPARATOR . 'translations';
+        $options = array(
+                'scan' => Zend_Translate::LOCALE_FILENAME,
+                'disableNotices' => TRUE,
+                );
+        // Switch between Po and Mo adapter depending on the mode
+        switch (TINE20_BUILDTYPE) {
+            case 'DEVELOPMENT':
+                $translate = new Zend_Translate('gettextPo', $path, null, $options);
+                break;
+            case 'DEBUG':
+            case 'RELEASE':
+                $translate = new Zend_Translate('gettext', $path, null, $options);
+                break;
+        }
         
-        $translate = new Zend_Translate('gettext', $path, null, array(
-            'scan' => Zend_Translate::LOCALE_FILENAME,
-            'disableNotices' => TRUE,
-        ));
-
+        
         try {
             $translate->setLocale($locale);
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .' locale used: ' . $_applicationName . '/' . (string)$locale);
@@ -428,9 +452,6 @@ class Tinebase_Translation
     
     /**
      * convertes po file to js object
-     * 
-     * @todo rewrite this in a way that we can automatically add singulars
-     *       seperatly into the js output
      *
      * @param  string $filePath
      * @return string
@@ -440,13 +461,18 @@ class Tinebase_Translation
         $po = file_get_contents($filePath);
         
         global $first, $plural;
-        $first = true; 
+        $first = true;
         $plural = false;
         
         $po = preg_replace('/\r?\n/', "\n", $po);
         $po = preg_replace('/^#.*\n/m', '', $po);
         // 2008-08-25 \s -> \n as there are situations when whitespace like space breaks the thing!
         $po = preg_replace('/"(\n+)"/', '', $po);
+        // Create a singular version of plural defined words
+        preg_match_all('/msgid "(.*?)"\nmsgid_plural ".*"\nmsgstr\[0\] "(.*?)"\n/', $po, $plurals);
+        for ($i = 0; $i < count($plurals[0]); $i++) {
+            $po = $po . "\n".'msgid "' . $plurals[1][$i] . '"' . "\n" . 'msgstr "' . $plurals[2][$i] . '"' . "\n";
+        }
         $po = preg_replace('/msgid "(.*?)"\nmsgid_plural "(.*?)"/', 'msgid "$1, $2"', $po);
         $po = preg_replace_callback('/msg(\S+) /', create_function('$matches','
             global $first, $plural;

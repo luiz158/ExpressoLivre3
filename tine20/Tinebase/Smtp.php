@@ -49,10 +49,10 @@ class Tinebase_Smtp
      */
     public static function createDefaultTransport()
     {
-        $config = Tinebase_Config::getInstance()->getConfigAsArray(Tinebase_Config::SMTP, 'Tinebase', array(
+        $config = Tinebase_Config::getInstance()->get(Tinebase_Config::SMTP, new Tinebase_Config_Struct(array(
             'hostname' => 'localhost', 
             'port' => 25
-        ));
+        )))->toArray();
         
         // set default transport none is set yet
         if (! self::getDefaultTransport() && array_key_exists('hostname', $config)) {
@@ -79,7 +79,7 @@ class Tinebase_Smtp
      *
      */
     private function __clone() 
-    {   
+    {
     }
     
     /**
@@ -89,7 +89,7 @@ class Tinebase_Smtp
      */
     public static function getInstance() 
     {
-		if (self::$_instance === NULL) {
+        if (self::$_instance === NULL) {
             self::$_instance = new Tinebase_Smtp();
         }
         
@@ -133,8 +133,11 @@ class Tinebase_Smtp
     {
         $transport = $_transport instanceof Zend_Mail_Transport_Abstract ? $_transport : self::getDefaultTransport();
         
+        if (! $_mail->getMessageId()) {
+            $_mail->setMessageId();
+        }
         $_mail->addHeader('X-MailGenerator', 'Tine 2.0');
         
-        $_mail->send($transport); 
+        $_mail->send($transport);
     }
 }

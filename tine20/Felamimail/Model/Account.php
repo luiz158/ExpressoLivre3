@@ -3,7 +3,7 @@
  * class to hold Account data
  * 
  * @package     Felamimail
- * @subpackage	Model
+ * @subpackage    Model
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
  * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
@@ -24,11 +24,12 @@
  * @property  string    delimiter
  * @property  string    type
  * @property  string    signature_position
+ * @property  string    email
  * @package   Felamimail
- * @subpackage	Model
+ * @subpackage    Model
  */
 class Felamimail_Model_Account extends Tinebase_Record_Abstract
-{  
+{
     /**
      * secure connection setting for no secure connection
      *
@@ -191,6 +192,7 @@ class Felamimail_Model_Account extends Tinebase_Record_Abstract
         'is_deleted'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'deleted_time'          => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'deleted_by'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'seq'                   => array(Zend_Filter_Input::ALLOW_EMPTY => true),
     );
     
     /**
@@ -233,6 +235,7 @@ class Felamimail_Model_Account extends Tinebase_Record_Abstract
         $this->_filters['smtp_ssl']         = array(new Zend_Filter_Empty(self::SECURE_TLS), 'StringTrim', 'StringToLower');
         $this->_filters['sieve_ssl']        = array(new Zend_Filter_Empty(self::SECURE_TLS), 'StringTrim', 'StringToLower');
         $this->_filters['display_format']   = array(new Zend_Filter_Empty(self::DISPLAY_HTML), 'StringTrim', 'StringToLower');
+        $this->_filters['port']             = new Zend_Filter_Empty(NULL);
         $this->_filters['smtp_port']        = new Zend_Filter_Empty(NULL);
         $this->_filters['sieve_port']       = new Zend_Filter_Empty(NULL);
         
@@ -279,7 +282,7 @@ class Felamimail_Model_Account extends Tinebase_Record_Abstract
         $result = ($_username !== NULL) ? $_username : $this->user;
         
         if ($this->type == self::TYPE_SYSTEM) {
-            $imapConfig = Tinebase_Config::getInstance()->getConfigAsArray(Tinebase_Config::IMAP);
+            $imapConfig = Tinebase_Config::getInstance()->get(Tinebase_Config::IMAP, new Tinebase_Config_Struct())->toArray();
             if (isset($imapConfig['domain']) && ! empty($imapConfig['domain'])) {
                 $result .= '@' . $imapConfig['domain'];
             }
@@ -299,13 +302,13 @@ class Felamimail_Model_Account extends Tinebase_Record_Abstract
         
         // get values from account
         if ($this->smtp_hostname) {
-            $result['hostname'] = $this->smtp_hostname; 
+            $result['hostname'] = $this->smtp_hostname;
         }
         if ($this->smtp_user) {
-            $result['username'] = $this->smtp_user; 
+            $result['username'] = $this->smtp_user;
         }
         if ($this->smtp_password) {
-            $result['password'] = $this->smtp_password; 
+            $result['password'] = $this->smtp_password;
         }
         if ($this->smtp_auth) {
             $result['auth'] = $this->smtp_auth;
@@ -314,12 +317,12 @@ class Felamimail_Model_Account extends Tinebase_Record_Abstract
             $result['ssl'] = $this->smtp_ssl;
         }
         if ($this->smtp_port) {
-            $result['port'] = $this->smtp_port; 
+            $result['port'] = $this->smtp_port;
         }
         
         // system account: overwriting with values from config if set
         if ($this->type == self::TYPE_SYSTEM) {
-            $systemAccountConfig = Tinebase_Config::getInstance()->getConfigAsArray(Tinebase_Config::SMTP);
+            $systemAccountConfig = Tinebase_Config::getInstance()->get(Tinebase_Config::SMTP, new Tinebase_Config_Struct())->toArray();
             //if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . print_r($systemAccountConfig, true));
             // we don't need username/pass from system config (those are the notification service credentials)
             // @todo think about renaming config keys (to something like notification_email/pass)
@@ -329,8 +332,8 @@ class Felamimail_Model_Account extends Tinebase_Record_Abstract
         }
         
         // sanitizing some values
-        if (isset($result['primarydomain']) && ! empty($result['primarydomain'])) {            
-            $result['username'] .= '@' . $result['primarydomain'];        
+        if (isset($result['primarydomain']) && ! empty($result['primarydomain'])) {
+            $result['username'] .= '@' . $result['primarydomain'];
         }        
         if (array_key_exists('auth', $result) && $result['auth'] == 'none') {
             unset($result['username']);
@@ -448,7 +451,7 @@ class Felamimail_Model_Account extends Tinebase_Record_Abstract
                 }
             } else {
                 // just use tine user credentials to connect to mailserver / or use credentials from config if set
-                $imapConfig = Tinebase_Config::getInstance()->getConfigAsArray(Tinebase_Config::IMAP);
+                $imapConfig = Tinebase_Config::getInstance()->get(Tinebase_Config::IMAP, new Tinebase_Config_Struct())->toArray();
                 
                 $credentials = $userCredentialCache;
                 if (array_key_exists('user', $imapConfig) && array_key_exists('password', $imapConfig) && ! empty($imapConfig['user'])) {

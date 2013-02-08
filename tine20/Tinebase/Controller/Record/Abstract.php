@@ -6,7 +6,7 @@
  * @subpackage  Controller
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  * @todo        this should be splitted into smaller parts!
  */
@@ -97,18 +97,23 @@ abstract class Tinebase_Controller_Record_Abstract
     protected $_recordAlarmField = 'dtstart';
 
     /**
-     * the current user
-     *
-     * @var Tinebase_Model_User
-     */
-    protected $_currentAccount = NULL;
-
-    /**
      * duplicate check fields / if this is NULL -> no duplicate check
      *
      * @var array
      */
     protected $_duplicateCheckFields = NULL;
+
+    /**
+     * holds new relation on update multiple
+     * @var array
+     */
+    protected $_newRelations = NULL;
+    
+    /**
+     * holds relations to remove on update multiple
+     * @var array
+     */
+    protected $_removeRelations = NULL;
     
     /**
      * result of updateMultiple function
@@ -116,6 +121,14 @@ abstract class Tinebase_Controller_Record_Abstract
      * @var array
      */
     protected $_updateMultipleResult = array();
+
+    /**
+     * should each record be validated in updateMultiple 
+     * - FALSE: only the first record is validated with the incoming data
+     *
+     * @var boolean
+     */
+    protected $_updateMultipleValidateEachRecord = FALSE;
 
     /**
      * returns controller for records of given model
@@ -146,12 +159,18 @@ abstract class Tinebase_Controller_Record_Abstract
         $this->_checkRight($_action);
         $this->checkFilterACL($_filter, $_action);
         $this->_addDefaultFilter($_filter);
-		
-        $result = $this->_backend->search($_filter, $_pagination, $_onlyIds);
+
+        try{
+            $result = $this->_backend->search($_filter, $_pagination, $_onlyIds);
+    }catch (Exception $e)
+    {
+        Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Resetting ' . $e);
+    }
+        
 
         if (! $_onlyIds) {
             if ($_getRelations) {
-                $result->setByIndices('relations', Tinebase_Relations::getInstance()->getMultipleRelations($this->_modelName, $this->_backend->getType(), $result->getId()));
+                $result->setByIndices('relations', Tinebase_Relations::getInstance()->getMultipleRelations($this->_modelName, $this->_getBackendType(), $result->getId()));
             }
             if ($this->resolveCustomfields()) {
                 Tinebase_CustomField::getInstance()->resolveMultipleCustomfields($result);
@@ -272,6 +291,7 @@ abstract class Tinebase_Controller_Record_Abstract
             $paramValue = (bool) func_get_arg(0);
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Resetting modlog active to ' . (int) $paramValue);
             $this->_backend->setModlogActive($paramValue);
+            $this->_omitModLog = ! $paramValue;
         }
 
         return $currValue;
@@ -283,49 +303,76 @@ abstract class Tinebase_Controller_Record_Abstract
      * @param string $_id
      * @param int $_containerId
      * @return Tinebase_Record_Interface
-     * @throws  Tinebase_Exception_AccessDenied
+     * @throws Tinebase_Exception_AccessDenied
      */
     public function get($_id, $_containerId = NULL)
     {
         $this->_checkRight('get');
-
-        if (!$_id) { // yes, we mean 0, null, false, ''
+        
+        if (! $_id) { // yes, we mean 0, null, false, ''
             $record = new $this->_modelName(array(), true);
-
+            
             if ($this->_doContainerACLChecks) {
                 if ($_containerId === NULL) {
-                    $containers = Tinebase_Container::getInstance()->getPersonalContainer($this->_currentAccount, $this->_applicationName, $this->_currentAccount, Tinebase_Model_Grants::GRANT_ADD);
+                    $containers = Tinebase_Container::getInstance()->getPersonalContainer(Tinebase_Core::getUser(), $this->_applicationName, Tinebase_Core::getUser(), Tinebase_Model_Grants::GRANT_ADD);
                     $record->container_id = $containers[0]->getId();
                 } else {
                     $record->container_id = $_containerId;
                 }
             }
-
+            
         } else {
             $record = $this->_backend->get($_id);
-
             $this->_checkGrant($record, 'get');
-
-            // get tags / notes / relations / alarms
-            if ($record->has('tags')) {
-                Tinebase_Tags::getInstance()->getTagsOfRecord($record);
-            }
+            $this->_getRelatedData($record);
+            
             if ($record->has('notes')) {
                 $record->notes = Tinebase_Notes::getInstance()->getNotesOfRecord($this->_modelName, $record->getId());
             }
-            if ($record->has('relations')) {
-                $record->relations = Tinebase_Relations::getInstance()->getRelations($this->_modelName, $this->_backend->getType(), $record->getId());
-            }
-            if ($record->has('alarms')) {
-                $this->getAlarms($record);
-            }
-
-            if ($this->resolveCustomfields()) {
-                Tinebase_CustomField::getInstance()->resolveRecordCustomFields($record);
-            }
         }
-
+        
         return $record;
+    }
+    
+    /**
+     * check if record with given $id exists
+     * 
+     * @param string $id
+     * @return boolean
+     */
+    public function exists($id)
+    {
+        $this->_checkRight('get');
+        
+        try {
+            $record = $this->_backend->get($id);
+            $result = $this->_checkGrant($record, 'get', FALSE);
+        } catch (Tinebase_Exception_NotFound $tenf) {
+            $result = FALSE;
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * add related data to record
+     * 
+     * @param Tinebase_Record_Interface $record
+     */
+    protected function _getRelatedData($record)
+    {
+        if ($record->has('tags')) {
+            Tinebase_Tags::getInstance()->getTagsOfRecord($record);
+        }
+        if ($record->has('relations')) {
+            $record->relations = Tinebase_Relations::getInstance()->getRelations($this->_modelName, $this->_getBackendType(), $record->getId());
+        }
+        if ($record->has('alarms')) {
+            $this->getAlarms($record);
+        }
+        if ($this->resolveCustomfields()) {
+            Tinebase_CustomField::getInstance()->resolveRecordCustomFields($record);
+        }
     }
 
     /**
@@ -342,7 +389,7 @@ abstract class Tinebase_Controller_Record_Abstract
         // get all allowed containers and add them to getMultiple query
         $containerIds = ($this->_doContainerACLChecks && $_ignoreACL !== TRUE)
            ? Tinebase_Container::getInstance()->getContainerByACL(
-               $this->_currentAccount,
+               Tinebase_Core::getUser(),
                $this->_applicationName,
                Tinebase_Model_Grants::GRANT_READ,
                TRUE)
@@ -396,13 +443,14 @@ abstract class Tinebase_Controller_Record_Abstract
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
             . ' Create new ' . $this->_modelName);
 
+        $db = (method_exists($this->_backend, 'getAdapter')) ? $this->_backend->getAdapter() : Tinebase_Core::getDb();
+        
         try {
-            $db = $this->_backend->getAdapter();
             $transactionId = Tinebase_TransactionManager::getInstance()->startTransaction($db);
 
             // add personal container id if container id is missing in record
             if ($_record->has('container_id') && empty($_record->container_id)) {
-                $containers = Tinebase_Container::getInstance()->getPersonalContainer($this->_currentAccount, $this->_applicationName, $this->_currentAccount, Tinebase_Model_Grants::GRANT_ADD);
+                $containers = Tinebase_Container::getInstance()->getPersonalContainer(Tinebase_Core::getUser(), $this->_applicationName, Tinebase_Core::getUser(), Tinebase_Model_Grants::GRANT_ADD);
                 $_record->container_id = $containers[0]->getId();
             }
 
@@ -424,7 +472,7 @@ abstract class Tinebase_Controller_Record_Abstract
             $this->_setNotes($createdRecord, $_record);
 
             if ($this->sendNotifications()) {
-                $this->doSendNotifications($createdRecord, $this->_currentAccount, 'created');
+                $this->doSendNotifications($createdRecord, Tinebase_Core::getUser(), 'created');
             }
             
             $this->_increaseContainerContentSequence($createdRecord, Tinebase_Model_ContainerContent::ACTION_CREATE);
@@ -449,7 +497,9 @@ abstract class Tinebase_Controller_Record_Abstract
     protected function _handleRecordCreateOrUpdateException(Exception $e)
     {
         Tinebase_TransactionManager::getInstance()->rollBack();
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $e);
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' ' . $e->getMessage());
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . $e->getTraceAsString());
         
         if ($e instanceof Zend_Db_Statement_Exception && preg_match('/Lock wait timeout exceeded/', $e->getMessage())) {
             throw new Tinebase_Exception_Backend_Database_LockTimeout($e->getMessage());
@@ -487,7 +537,7 @@ abstract class Tinebase_Controller_Record_Abstract
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
             ' Doing duplicate check.');
 
-        $duplicates = $this->search($duplicateFilter, new Tasks_Model_Pagination(array('limit' => 5)));
+        $duplicates = $this->search($duplicateFilter, new Tinebase_Model_Pagination(array('limit' => 5)));
 
         if (count($duplicates) > 0) {
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
@@ -591,12 +641,13 @@ abstract class Tinebase_Controller_Record_Abstract
         if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
             . ' Update ' . $this->_modelName);
 
+        $db = (method_exists($this->_backend, 'getAdapter')) ? $this->_backend->getAdapter() : Tinebase_Core::getDb();
+        
         try {
-            $db = $this->_backend->getAdapter();
             $transactionId = Tinebase_TransactionManager::getInstance()->startTransaction($db);
 
             $_record->isValid(TRUE);
-
+            
             $currentRecord = $this->get($_record->getId());
             if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__
                 . ' Current record: ' . print_r($currentRecord->toArray(), TRUE));
@@ -615,17 +666,15 @@ abstract class Tinebase_Controller_Record_Abstract
                 . ' Updated record: ' . print_r($updatedRecord->toArray(), TRUE));
             
             $this->_inspectAfterUpdate($updatedRecord, $_record);
-            $this->_setRelatedData($updatedRecord, $_record);
-
-            $updatedRecordWithRelatedData = $this->get($_record->getId());
+            $updatedRecordWithRelatedData = $this->_setRelatedData($updatedRecord, $_record, TRUE);
             if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__
                 . ' Updated record with related data: ' . print_r($updatedRecordWithRelatedData->toArray(), TRUE));
             
             $currentMods = $this->_writeModLog($updatedRecordWithRelatedData, $currentRecord);
             $this->_setNotes($updatedRecordWithRelatedData, $_record, Tinebase_Model_Note::SYSTEM_NOTE_NAME_CHANGED, $currentMods);
-                        
+            
             if ($this->_sendNotifications && count($currentMods) > 0) {
-                $this->doSendNotifications($updatedRecordWithRelatedData, $this->_currentAccount, 'changed', $currentRecord);
+                $this->doSendNotifications($updatedRecordWithRelatedData, Tinebase_Core::getUser(), 'changed', $currentRecord);
             }
             
             if ($_record->has('container_id') && $currentRecord->container_id !== $updatedRecord->container_id) {
@@ -682,8 +731,19 @@ abstract class Tinebase_Controller_Record_Abstract
             . ' Doing concurrency check ...');
 
         $modLog = Tinebase_Timemachine_ModificationLog::getInstance();
-        $modLog->manageConcurrentUpdates($_record, $_currentRecord, $this->_modelName, $this->_backend->getType(), $_record->getId());
+        $modLog->manageConcurrentUpdates($_record, $_currentRecord);
         $modLog->setRecordMetaData($_record, 'update', $_currentRecord);
+    }
+    
+    /**
+     * get backend type
+     * 
+     * @return string
+     */
+    protected function _getBackendType()
+    {
+        $type = (method_exists( $this->_backend, 'getType')) ? $this->_backend->getType() : 'Sql';
+        return $type;
     }
 
     /**
@@ -702,7 +762,7 @@ abstract class Tinebase_Controller_Record_Abstract
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
             . ' Writing modlog');
     
-        $currentMods = Tinebase_Timemachine_ModificationLog::getInstance()->writeModLog($_newRecord, $_oldRecord, $this->_modelName, $this->_backend->getType(), $_newRecord->getId());
+        $currentMods = Tinebase_Timemachine_ModificationLog::getInstance()->writeModLog($_newRecord, $_oldRecord, $this->_modelName, $this->_getBackendType(), $_newRecord->getId());
         
         return $currentMods;
     }
@@ -710,22 +770,30 @@ abstract class Tinebase_Controller_Record_Abstract
     /**
      * set relations / tags / alarms
      * 
-     * @param   Tinebase_Record_Interface $_updatedRecord   the just updated record
-     * @param   Tinebase_Record_Interface $_record          the update record
+     * @param   Tinebase_Record_Interface $updatedRecord   the just updated record
+     * @param   Tinebase_Record_Interface $record          the update record
+     * @param   boolean $returnUpdatedRelatedData
+     * @return  Tinebase_Record_Interface
      */
-    protected function _setRelatedData($_updatedRecord, $_record)
+    protected function _setRelatedData($updatedRecord, $record, $returnUpdatedRelatedData = FALSE)
     {
-        if ($_record->has('relations') && isset($_record->relations) && is_array($_record->relations)) {
-            Tinebase_Relations::getInstance()->setRelations($this->_modelName, $this->_backend->getType(), $_updatedRecord->getId(), $_record->relations);
+        if ($record->has('relations') && isset($record->relations) && is_array($record->relations)) {
+            $type = $this->_getBackendType();
+            Tinebase_Relations::getInstance()->setRelations($this->_modelName, $type, $updatedRecord->getId(), $record->relations);
         }
-        if ($_record->has('tags') && isset($_record->tags) && (is_array($_record->tags) || $_record->tags instanceof Tinebase_Record_RecordSet)) {
-            $_updatedRecord->tags = $_record->tags;
-            Tinebase_Tags::getInstance()->setTagsOfRecord($_updatedRecord);
+        if ($record->has('tags') && isset($record->tags) && (is_array($record->tags) || $record->tags instanceof Tinebase_Record_RecordSet)) {
+            $updatedRecord->tags = $record->tags;
+            Tinebase_Tags::getInstance()->setTagsOfRecord($updatedRecord);
         }
-        if ($_record->has('alarms') && isset($_record->alarms)) {
-            $_updatedRecord->alarms = $_record->alarms;
-            $this->_saveAlarms($_record);
+        if ($record->has('alarms') && isset($record->alarms)) {
+            $this->_saveAlarms($record);
         }
+
+        if ($returnUpdatedRelatedData) {
+            $this->_getRelatedData($updatedRecord);
+        }
+        
+        return $updatedRecord;
     }
 
     /**
@@ -746,7 +814,7 @@ abstract class Tinebase_Controller_Record_Abstract
             $_updatedRecord->notes = $_record->notes;
             Tinebase_Notes::getInstance()->setNotesOfRecord($_updatedRecord);
         }
-        Tinebase_Notes::getInstance()->addSystemNote($_updatedRecord, $this->_currentAccount->getId(), $_systemNoteType, $_currentMods);
+        Tinebase_Notes::getInstance()->addSystemNote($_updatedRecord, Tinebase_Core::getUser(), $_systemNoteType, $_currentMods);
     }
     
     /**
@@ -774,6 +842,9 @@ abstract class Tinebase_Controller_Record_Abstract
     /**
      * update modlog / metadata / add systemnote for multiple records defined by filter
      * 
+     * NOTE: this should be done in a transaction because of the concurrency handling as
+     *  we want the same seq in the record and in the modlog
+     * 
      * @param Tinebase_Model_Filter_FilterGroup|array $_filterOrIds
      * @param array $_oldData
      * @param array $_newData
@@ -785,22 +856,85 @@ abstract class Tinebase_Controller_Record_Abstract
             return;
         }
         
-        list($currentAccountId, $currentTime) = Tinebase_Timemachine_ModificationLog::getCurrentAccountIdAndTime();
-        $updateMetaData = array(
-            'last_modified_by'   => $currentAccountId,
-            'last_modified_time' => $currentTime,
-        );
+        if ($this->_omitModLog !== TRUE) {
+            $recordSeqs = $this->_backend->getPropertyByIds($ids, 'seq');
+            
+            list($currentAccountId, $currentTime) = Tinebase_Timemachine_ModificationLog::getCurrentAccountIdAndTime();
+            $updateMetaData = array(
+                'last_modified_by'   => $currentAccountId,
+                'last_modified_time' => $currentTime,
+                'seq'                => new Zend_Db_Expr('seq + 1'),
+                'recordSeqs'         => $recordSeqs, // is not written to DB yet
+            );
+        } else {
+            $updateMetaData = array();
+        }
+        
         $this->_backend->updateMultiple($ids, $updateMetaData);
         
-        if ($this->_omitModLog !== TRUE) {
+        if ($this->_omitModLog !== TRUE && is_object(Tinebase_Core::getUser())) {
             if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
                 . ' Writing modlog for ' . count($ids) . ' records ...');
             
-            $currentMods = Tinebase_Timemachine_ModificationLog::getInstance()->writeModLogMultiple($ids, $_oldData, $_newData, $this->_modelName, $this->_backend->getType(), $updateMetaData);
+            $currentMods = Tinebase_Timemachine_ModificationLog::getInstance()->writeModLogMultiple($ids, $_oldData, $_newData, $this->_modelName, $this->_getBackendType(), $updateMetaData);
             Tinebase_Notes::getInstance()->addMultipleModificationSystemNotes($currentMods, $currentAccountId);
         }
     }
     
+    /**
+     * handles relations on update multiple
+     * @param string $key
+     * @param string $value
+     * @throws Tinebase_Exception_Record_DefinitionFailure
+     */
+    protected function _handleRelations($key, $value)
+    {
+        $model = new $this->_modelName;
+        $relConfig = $model::getRelatableConfig();
+        unset($model);
+        $getRelations = true;
+        preg_match('/%(.+)-((.+)_Model_(.+))/', $key, $a);
+        if(count($a) < 4) {
+            throw new Tinebase_Exception_Record_DefinitionFailure('The relation to delete/set is not configured properly!');
+        } 
+        // TODO: check config from foreign side
+        // $relConfig = $a[2]::getRelatableConfig();
+
+        $constrainsConfig = false;
+        foreach($relConfig as $config) {
+            if($config['relatedApp'] == $a[3] && $config['relatedModel'] == $a[4] && array_key_exists('config', $config) && is_array($config['config'])) {
+                foreach($config['config'] as $constrain) {
+                    if($constrain['type'] == $a[1]) {
+                        $constrainsConfig = $constrain;
+                        break 2; 
+                    }
+                }
+            }
+        }
+
+        if(!$constrainsConfig) {
+            throw new Tinebase_Exception_Record_DefinitionFailure('No relation definition could be found for this model!');
+        }
+
+        $rel = array(
+            'own_model' => $this->_modelName,
+            'own_backend' => 'Sql',
+            'own_degree' =>array_key_exists('sibling', $constrainsConfig) ? $constrainsConfig['sibling'] : 'sibling',
+            'related_model' => $a[2],
+            'related_backend' => 'Sql',
+            'type' => array_key_exists('type', $constrainsConfig) ? $constrainsConfig['type'] : '-',
+            'remark' => array_key_exists('defaultRemark', $constrainsConfig) ? $constrainsConfig['defaultRemark'] : ' '
+        );
+        
+        if(empty($value)) { // delete relations in iterator
+            if(!$this->_removeRelations) $this->removeRelations = array();
+            $this->_removeRelations[] = $rel;
+        } else { // create relations in iterator
+            if(! $this->_newRelations) $this->_newRelations = array();
+            $rel['related_id'] = $value;
+            $this->_newRelations[] = $rel;
+        }
+    }
     /**
      * update multiple records
      *
@@ -814,25 +948,39 @@ abstract class Tinebase_Controller_Record_Abstract
     {
         $this->_checkRight('update');
         $this->checkFilterACL($_filter, 'update');
-
+        $getRelations = false;
+        
+        $this->_newRelations = NULL;
+        $this->_removeRelations = NULL;
+        
         foreach($_data as $key => $value) {
             if(stristr($key,'#')) {
                 $_data['customfields'][substr($key,1)] = $value;
                 unset($_data[$key]);
             }
+            if(stristr($key, '%')) {
+                $getRelations = true;
+                $this->_handleRelations($key, $value);
+                unset($_data[$key]);
+            }
         }
-        
+
         $this->_updateMultipleResult = array(
             'results'           => new Tinebase_Record_RecordSet($this->_modelName),
             'exceptions'        => new Tinebase_Record_RecordSet('Tinebase_Model_UpdateMultipleException'),
             'totalcount'        => 0,
             'failcount'         => 0,
         );
+        // TODO: idProperty should be callable statically
+        $model = new $this->_modelName();
+        $idProperty = $model->getIdProperty();
+        unset($model);
         
         $iterator = new Tinebase_Record_Iterator(array(
             'iteratable' => $this,
             'controller' => $this,
             'filter'     => $_filter,
+            'options'    => array('idProperty' => $idProperty, 'getRelations' => $getRelations),
             'function'   => 'processUpdateMultipleIteration',
         ));
         $result = $iterator->iterate($_data);
@@ -840,6 +988,52 @@ abstract class Tinebase_Controller_Record_Abstract
         if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Updated ' . $this->_updateMultipleResult['totalcount'] . ' records.');
         
         return $this->_updateMultipleResult;
+    }
+    
+    /**
+     * iterate relations
+     * 
+     * @param Tinebase_Record_Abstract $currentRecord
+     * @return array
+     */
+    protected function _iterateRelations($currentRecord)
+    {
+        if(! $currentRecord->relations || get_class($currentRecord->relations) != 'Tinebase_Record_RecordSet') {
+            $currentRecord->relations = new Tinebase_Record_RecordSet('Tinebase_Model_Relation');
+        }
+        
+        // handle relations to remove
+        if($this->_removeRelations) {
+            if($currentRecord->relations->count()) {
+                foreach($this->_removeRelations as $remRelation) {
+                    $removeRelations = $currentRecord->relations->filter('type', $remRelation['type']);
+                    $removeRelations = $removeRelations->filter('related_model', $remRelation['related_model']);
+                    $removeRelations = $removeRelations->filter('own_degree', $remRelation['own_degree']);
+                    $currentRecord->relations->removeRecords($removeRelations);
+                }
+            }
+        }
+        
+        // handle new relations
+        if($this->_newRelations) {
+            $removeRelations = NULL;
+            foreach($this->_newRelations as $newRelation) {
+                $removeRelations = $currentRecord->relations->filter('type', $newRelation['type']);
+                $removeRelations = $removeRelations->filter('related_model', $newRelation['related_model']);
+                $removeRelations = $removeRelations->filter('own_degree', $newRelation['own_degree']);
+                $already = $removeRelations->filter('related_id', $newRelation['related_id']);
+                if($already->count() > 0) {
+                    $removeRelations = NULL;
+                } else {
+                    $newRelation['own_id'] = $currentRecord->getId();
+                    $rel = new Tinebase_Model_Relation();
+                    $rel->setFromArray($newRelation);
+                    if($removeRelations) $currentRecord->relations->removeRecords($removeRelations);
+                    $currentRecord->relations->addRecord($rel);
+                }
+            }
+        }
+        return $currentRecord->relations->toArray();
     }
     
     /**
@@ -854,20 +1048,27 @@ abstract class Tinebase_Controller_Record_Abstract
         if (count($_records) === 0) {
             return;
         }
-        
+        $bypassFilters = FALSE;
         foreach ($_records as $currentRecord) {
             $oldRecordArray = $currentRecord->toArray();
+            unset($oldRecordArray['relations']);
+            
             $data = array_merge($oldRecordArray, $_data);
-
+            
+            if($this->_newRelations || $this->_removeRelations) {
+                $data['relations'] = $this->_iterateRelations($currentRecord);
+            }
             try {
-                $record = new $this->_modelName($data);
+                $record = new $this->_modelName($data, $bypassFilters);
                 $updatedRecord = $this->update($record, FALSE);
                 
                 $this->_updateMultipleResult['results']->addRecord($updatedRecord);
                 $this->_updateMultipleResult['totalcount'] ++;
                 
             } catch (Tinebase_Exception_Record_Validation $e) {
-                
+                if ($this->_updateMultipleValidateEachRecord === FALSE) {
+                    throw $e;
+                }
                 $this->_updateMultipleResult['exceptions']->addRecord(new Tinebase_Model_UpdateMultipleException(array(
                     'id'         => $currentRecord->getId(),
                     'exception'  => $e,
@@ -877,6 +1078,10 @@ abstract class Tinebase_Controller_Record_Abstract
                 )));
                 $this->_updateMultipleResult['failcount'] ++;
             }
+            if ($this->_updateMultipleValidateEachRecord === FALSE) {
+                // only validate the first record
+                $bypassFilters = TRUE;
+            }
         }
     }
     
@@ -885,7 +1090,7 @@ abstract class Tinebase_Controller_Record_Abstract
      *
      * If one of the records could not be deleted, no record is deleted
      *
-     * @param   array array of record identifiers
+     * @param   array $_ids array of record identifiers
      * @return  Tinebase_Record_RecordSet
      * @throws Tinebase_Exception_NotFound|Tinebase_Exception
      */
@@ -901,6 +1106,13 @@ abstract class Tinebase_Controller_Record_Abstract
         if (count((array)$ids) != count($records)) {
             Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' Only ' . count($records) . ' of ' . count((array)$ids) . ' records exist.');
         }
+        
+        if (empty($records)) {
+            return $records;
+        }
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
+            . ' Deleting ' . count($records) . ' records ...');
 
         try {
             $db = $this->_backend->getAdapter();
@@ -908,7 +1120,6 @@ abstract class Tinebase_Controller_Record_Abstract
             $this->_checkRight('delete');
 
             foreach ($records as $record) {
-                $this->_checkGrant($record, 'delete');
                 $this->_deleteRecord($record);
             }
 
@@ -917,15 +1128,13 @@ abstract class Tinebase_Controller_Record_Abstract
             // send notifications
             if ($this->sendNotifications()) {
                 foreach ($records as $record) {
-                    $this->doSendNotifications($record, $this->_currentAccount, 'deleted');
+                    $this->doSendNotifications($record, Tinebase_Core::getUser(), 'deleted');
                 }
             }
-
 
         } catch (Exception $e) {
             Tinebase_TransactionManager::getInstance()->rollBack();
             Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__ . ' ' . print_r($e->getMessage(), true));
-            Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__ . ' ' . print_r($e->getTraceAsString(), true));
             throw $e;
         }
 
@@ -946,14 +1155,12 @@ abstract class Tinebase_Controller_Record_Abstract
         Tinebase_Core::setExecutionLifeTime(300); // 5 minutes
 
         $ids = $this->search($_filter, NULL, FALSE, TRUE);
-
-        Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Deleting ' . count($ids) . ' records ...');
-        //if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . print_r($ids, true));
-
+        $deletedRecords = $this->delete($ids);
+        
         // reset max execution time to old value
         Tinebase_Core::setExecutionLifeTime($oldMaxExcecutionTime);
 
-        return $this->delete($ids);
+        return $deletedRecords;
     }
 
     /**
@@ -962,7 +1169,8 @@ abstract class Tinebase_Controller_Record_Abstract
      * @param array $_ids
      * @return array of ids to actually delete
      */
-    protected function _inspectDelete(array $_ids) {
+    protected function _inspectDelete(array $_ids)
+    {
         return $_ids;
     }
 
@@ -980,13 +1188,13 @@ abstract class Tinebase_Controller_Record_Abstract
 
         if ($this->_doContainerACLChecks) {
             // check add grant in target container
-            if (! $this->_currentAccount->hasGrant($targetContainerId, Tinebase_Model_Grants::GRANT_ADD)) {
+            if (! Tinebase_Core::getUser()->hasGrant($targetContainerId, Tinebase_Model_Grants::GRANT_ADD)) {
                 Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' Permission denied to add records to container.');
                 throw new Tinebase_Exception_AccessDenied('You are not allowed to move records to this container');
             }
 
             // check delete grant in source container
-            $containerIdsWithDeleteGrant = Tinebase_Container::getInstance()->getContainerByACL($this->_currentAccount, $this->_applicationName, Tinebase_Model_Grants::GRANT_DELETE, TRUE);
+            $containerIdsWithDeleteGrant = Tinebase_Container::getInstance()->getContainerByACL(Tinebase_Core::getUser(), $this->_applicationName, Tinebase_Model_Grants::GRANT_DELETE, TRUE);
             foreach ($records as $index => $record) {
                 if (! in_array($record->{$_containerProperty}, $containerIdsWithDeleteGrant)) {
                     Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__
@@ -1029,7 +1237,7 @@ abstract class Tinebase_Controller_Record_Abstract
 
         $this->_deleteLinkedObjects($_record);
 
-        if (!$this->_purgeRecords && $_record->has('created_by')) {
+        if (! $this->_purgeRecords && $_record->has('created_by')) {
             Tinebase_Timemachine_ModificationLog::setRecordMetaData($_record, 'delete', $_record);
             $this->_backend->update($_record);
         } else {
@@ -1048,13 +1256,13 @@ abstract class Tinebase_Controller_Record_Abstract
     {
         // delete notes & relations
         if ($_record->has('notes')) {
-            Tinebase_Notes::getInstance()->deleteNotesOfRecord($this->_modelName, $this->_backend->getType(), $_record->getId());
+            Tinebase_Notes::getInstance()->deleteNotesOfRecord($this->_modelName, $this->_getBackendType(), $_record->getId());
         }
         if ($_record->has('relations')) {
-            $relations = Tinebase_Relations::getInstance()->getRelations($this->_modelName, $this->_backend->getType(), $_record->getId());
+            $relations = Tinebase_Relations::getInstance()->getRelations($this->_modelName, $this->_getBackendType(), $_record->getId());
             if (!empty($relations)) {
                 // remove relations
-                Tinebase_Relations::getInstance()->setRelations($this->_modelName, $this->_backend->getType(), $_record->getId(), array());
+                Tinebase_Relations::getInstance()->setRelations($this->_modelName, $this->_getBackendType(), $_record->getId(), array());
 
                 // remove related objects
                 if (!empty($this->_relatedObjectsToDelete)) {
@@ -1086,28 +1294,35 @@ abstract class Tinebase_Controller_Record_Abstract
      */
     protected function _checkGrant($_record, $_action, $_throw = TRUE, $_errorMessage = 'No Permission.', $_oldRecord = NULL)
     {
-        if (   !$this->_doContainerACLChecks
-            || !$_record->has('container_id')
-            // admin grant includes all others
-            || $this->_currentAccount->hasGrant($_record->container_id, Tinebase_Model_Grants::GRANT_ADMIN)) {
+        if (   ! $this->_doContainerACLChecks
+            || ! $_record->has('container_id')) {
             return TRUE;
         }
-
+        
+        if (! is_object(Tinebase_Core::getUser())) {
+            throw new Tinebase_Exception_AccessDenied('User object required to check grants');
+        }
+        
+        // admin grant includes all others
+        if (Tinebase_Core::getUser()->hasGrant($_record->container_id, Tinebase_Model_Grants::GRANT_ADMIN)) {
+            return TRUE;
+        }
+        
         $hasGrant = FALSE;
-
+        
         switch ($_action) {
             case 'get':
-                $hasGrant = $this->_currentAccount->hasGrant($_record->container_id, Tinebase_Model_Grants::GRANT_READ);
+                $hasGrant = Tinebase_Core::getUser()->hasGrant($_record->container_id, Tinebase_Model_Grants::GRANT_READ);
                 break;
             case 'create':
-                $hasGrant = $this->_currentAccount->hasGrant($_record->container_id, Tinebase_Model_Grants::GRANT_ADD);
+                $hasGrant = Tinebase_Core::getUser()->hasGrant($_record->container_id, Tinebase_Model_Grants::GRANT_ADD);
                 break;
             case 'update':
-                $hasGrant = $this->_currentAccount->hasGrant($_record->container_id, Tinebase_Model_Grants::GRANT_EDIT);
+                $hasGrant = Tinebase_Core::getUser()->hasGrant($_record->container_id, Tinebase_Model_Grants::GRANT_EDIT);
                 break;
             case 'delete':
                 $container = Tinebase_Container::getInstance()->getContainerById($_record->container_id);
-                $hasGrant = $this->_currentAccount->hasGrant($_record->container_id, Tinebase_Model_Grants::GRANT_DELETE);
+                $hasGrant = Tinebase_Core::getUser()->hasGrant($_record->container_id, Tinebase_Model_Grants::GRANT_DELETE);
                 break;
         }
 
@@ -1151,7 +1366,9 @@ abstract class Tinebase_Controller_Record_Abstract
         $aclFilters = $_filter->getAclFilters();
 
         if (! $aclFilters) {
-            // force a standard containerFilter as ACL filter
+            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
+                . ' Force a standard containerFilter (specialNode = all) as ACL filter.');
+            
             $containerFilter = $_filter->createFilter('container_id', 'specialNode', 'all', array('applicationName' => $_filter->getApplicationName()));
             $_filter->addFilter($containerFilter);
         }
@@ -1212,9 +1429,7 @@ abstract class Tinebase_Controller_Record_Abstract
         }
 
         Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
-            . " About to save " . count($alarms) . " alarms for {$_record->id} "
-            //.  print_r($alarms->toArray(), true)
-        );
+            . " About to save " . count($alarms) . " alarms for {$_record->id} ");
         $_record->alarms = $alarms;
 
         Tinebase_Alarm::getInstance()->setAlarmsOfRecord($_record);
@@ -1247,12 +1462,16 @@ abstract class Tinebase_Controller_Record_Abstract
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " Resolving alarms and add them to record set.");
         
         $alarms = Tinebase_Alarm::getInstance()->getAlarmsOfRecord($this->_modelName, $_record);
+        
         $records = $_record instanceof Tinebase_Record_RecordSet ? $_record : new Tinebase_Record_RecordSet($this->_modelName, array($_record));
 
         foreach ($records as $record) {
+            if (count($alarms) === 0) {
+                $record->alarms = $alarms;
+                continue;
+            }
 
             $record->alarms = $alarms->filter('record_id', $record->getId());
-
             // calc minutes_before
             if ($record->has($this->_recordAlarmField) && $record->{$this->_recordAlarmField} instanceof DateTime) {
                 $this->_inspectAlarmGet($record);

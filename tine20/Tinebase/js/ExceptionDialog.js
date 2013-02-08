@@ -3,7 +3,7 @@
  * 
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2007-2008 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  */
 
@@ -26,6 +26,13 @@ Tine.Tinebase.ExceptionDialog = Ext.extend(Ext.Window, {
     closeAction: 'close',
     autoScroll: true,
     releaseMode: true,
+    
+    /**
+     * non-interactive mode: do not show anything and just submit the report
+     * 
+     * @type Boolean
+     */
+    nonInteractive: false,
     
     /**
      * @private
@@ -58,8 +65,32 @@ Tine.Tinebase.ExceptionDialog = Ext.extend(Ext.Window, {
         Tine.Tinebase.ExceptionDialog.superclass.initComponent.call(this);
         
         this.on('show', function () {
-            // fix layout issue
-            this.setHeight(this.getHeight() + 10);
+            if (this.nonInteractive) {
+                Tine.log.debug('Tine.Tinebase.ExceptionDialog::onShow -> Sending bugreport non-interactive ...');
+                this.onSendReport();
+            } else {
+                // fix layout issue
+                this.setHeight(this.getHeight() + 10);
+            }
+        }, this);
+        
+        this.on('close', function() {
+            if (Tine.Tinebase.registry && Tine.Tinebase.registry.get('config') && 
+                Tine.Tinebase.registry.get('config').automaticBugreports && 
+                Tine.Tinebase.registry.get('config').automaticBugreports.value && ! this.nonInteractive
+            ) {
+                Tine.log.debug('Tine.Tinebase.ExceptionDialog::onCancel -> Activate non-interacive exception dialog.');
+                Tine.Tinebase.exceptionDlg = new Tine.Tinebase.ExceptionDialog({
+                    exception: this.exception,
+                    nonInteractive: true,
+                    listeners: {
+                        close: function() {
+                            Tine.Tinebase.exceptionDlg = null;
+                        }
+                    }
+                });
+                Tine.Tinebase.exceptionDlg.show();
+            }
         }, this);
     },
     
@@ -68,11 +99,10 @@ Tine.Tinebase.ExceptionDialog = Ext.extend(Ext.Window, {
      * @return {Array}
      */
     initButtons: function () {
-    	this.reportButtons = [{
+        this.reportButtons = [{
             text: _('Cancel'),
             iconCls: 'action_cancel',
             scope: this,
-            enabled: Tine.Tinebase.common.hasRight('report_bugs', 'Tinebase'),
             handler: function() {
                 this.close();
             }
@@ -80,6 +110,7 @@ Tine.Tinebase.ExceptionDialog = Ext.extend(Ext.Window, {
             text: _('Send Report'),
             iconCls: 'action_saveAndClose',
             scope: this,
+            enabled: Tine.Tinebase.common.hasRight('report_bugs', 'Tinebase'),
             handler: this.onSendReport
         }];
         
@@ -90,9 +121,9 @@ Tine.Tinebase.ExceptionDialog = Ext.extend(Ext.Window, {
      * @private
      */
     getReportForm: function () {
-    	this.initButtons();
-    	
-    	this.reportForm = new Ext.FormPanel({
+        this.initButtons();
+        
+        this.reportForm = new Ext.FormPanel({
             id: 'tb-exceptiondialog-frompanel',
             bodyStyle: 'padding:5px;',
             buttonAlign: 'right',
@@ -103,10 +134,10 @@ Tine.Tinebase.ExceptionDialog = Ext.extend(Ext.Window, {
                 xtype: 'panel',
                 border: false,
                 html: '<div class="tb-exceptiondialog-text">' + 
-						'<p>' + _('An error occurred, the program ended abnormal.') + '</p>' +
+                        '<p>' + _('An error occurred, the program ended abnormal.') + '</p>' +
                         '<p>' + _('The last action you made was potentially not performed correctly.') + '</p>' +
                         '<p>' + _('Please help improving this software and notify the vendor. Include a brief description of what you where doing when the error occurred.') + '</p>' + 
-					'</div>'
+                    '</div>'
             }, {
                 id: 'tb-exceptiondialog-description',
                 height: 60,
@@ -143,9 +174,9 @@ Tine.Tinebase.ExceptionDialog = Ext.extend(Ext.Window, {
                     anchor: '95%'
                 },
                 html: '<div class="tb-exceptiondialog-details">' +
-						'<p class="tb-exceptiondialog-msg">' + this.exception.message + '</p>' +
-						'<p class="tb-exceptiondialog-trace">' + this.exception.traceHTML + '</p>' +
-					'</div>'
+                        '<p class="tb-exceptiondialog-msg">' + this.exception.message + '</p>' +
+                        '<p class="tb-exceptiondialog-trace">' + this.exception.traceHTML + '</p>' +
+                    '</div>'
             }]
         });
         
@@ -159,7 +190,9 @@ Tine.Tinebase.ExceptionDialog = Ext.extend(Ext.Window, {
      * @private
      */
     onSendReport: function () {
-        Ext.MessageBox.wait(_('Sending report...'), _('Please wait a moment'));
+        if (! this.nonInteractive) {
+            Ext.MessageBox.wait(_('Sending report...'), _('Please wait a moment'));
+        }
         var baseUrl = 'http://www.tine20.org/bugreport.php';
         var hash = this.generateHash();
         
@@ -195,7 +228,9 @@ Tine.Tinebase.ExceptionDialog = Ext.extend(Ext.Window, {
             img.push(Ext.DomHelper.insertFirst(this.el, {tag: 'img', src: url, hidden: true}, true));
         }
         
-        window.setTimeout(this.showTransmissionCompleted, 4000);
+        if (! this.nonInteractive) {
+            window.setTimeout(this.showTransmissionCompleted, 4000);
+        }
         
         this.close();
     },

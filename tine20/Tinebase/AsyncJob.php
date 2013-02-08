@@ -75,8 +75,12 @@ class Tinebase_AsyncJob
         if ($lastJob) {
             if ($lastJob->status === Tinebase_Model_AsyncJob::STATUS_RUNNING) {
                 if (Tinebase_DateTime::now()->isLater($lastJob->end_time)) {
-                    Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Old ' . $_name . ' job is running too long. Finishing it now.');
+                    if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
+                        . ' Old ' . $_name . ' job is running too long. Finishing it now.');
                     $this->finishJob($lastJob, Tinebase_Model_AsyncJob::STATUS_FAILURE);
+                } else {
+                    if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                        . ' Current job runs till ' . $lastJob->end_time->toString());
                 }
                 $result = FALSE;
             } else {
@@ -104,9 +108,9 @@ class Tinebase_AsyncJob
             'value'     => $name
         )));
         $pagination = new Tinebase_Model_Pagination(array(
-            'sort'		=> 'start_time',
-            'dir'		=> 'DESC',
-            'limit'		=> 1,
+            'sort'        => 'seq',
+            'dir'         => 'DESC',
+            'limit'       => 1,
         ));
         $jobs = $this->_backend->search($filter, $pagination);
         $lastJob = $jobs->getFirstRecord();
@@ -135,7 +139,7 @@ class Tinebase_AsyncJob
             $result = $this->_createNewJob($_name, $nextSequence, $_timeout);
         } catch (Zend_Db_Statement_Exception $zdse) {
             if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
-                . ' Could not start job ' . $_name . ': ' . $zdse->getMessage());
+                . ' Could not start job ' . $_name . ': ' . $zdse);
         }
         
         return $result;
@@ -145,29 +149,53 @@ class Tinebase_AsyncJob
      * create new job
      * 
      * @param string $_name
-     * @param integer $_maxSeq
+     * @param integer $_sequence
      * @param int $timeout
      * @return Tinebase_Model_AsyncJob
      */
-    protected function _createNewJob($_name, $_maxSeq, $_timeout)
+    protected function _createNewJob($_name, $_sequence, $_timeout)
     {
         if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
-                . ' Creating new Job ' . $_name);
-                
+            . ' Creating new Job ' . $_name);
+        
         $date = new Tinebase_DateTime();
-        $date->addSecond($_timeout);            
+        $date->addSecond($_timeout);
         
         $job = new Tinebase_Model_AsyncJob(array(
             'name'              => $_name,
             'start_time'        => new Tinebase_DateTime(),
             'end_time'          => $date,
             'status'            => Tinebase_Model_AsyncJob::STATUS_RUNNING,
-            'seq'               => $_maxSeq + 1
+            'seq'               => $_sequence
         ));
         
         return $this->_backend->create($job);
     }
 
+    /**
+     * only keep the last 60 jobs and purge all other
+     * 
+     * @param Tinebase_Model_AsyncJob $job
+     */
+    protected function _purgeOldJobs(Tinebase_Model_AsyncJob $job)
+    {
+        $deleteBefore = $job->seq - 60;
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
+            . ' Purging old Jobs before sequence: ' . $deleteBefore);
+        
+        // avoid overloading by deleting old jobs in batches only
+        $idsToDelete = $this->_backend->search(new Tinebase_Model_AsyncJobFilter(array(
+            array(
+                'field'    => 'seq',
+                'operator' => 'less',
+                'value'    => $deleteBefore
+            )
+        )), new Tinebase_Model_Pagination(array('limit' => 10000)), true);
+        
+        $this->_backend->delete($idsToDelete);
+    }
+    
     /**
      * finish job
      *
@@ -178,24 +206,18 @@ class Tinebase_AsyncJob
      */
     public function finishJob(Tinebase_Model_AsyncJob $_asyncJob, $_status = Tinebase_Model_AsyncJob::STATUS_SUCCESS, $_message = NULL)
     {
-        try {
-            $db = $this->_backend->getAdapter();
-            $transactionId = Tinebase_TransactionManager::getInstance()->startTransaction($db);
-            
-            $_asyncJob->end_time = Tinebase_DateTime::now();
-            $_asyncJob->status = $_status;
-            if ($_message !== NULL) {
-                $_asyncJob->message = $_message;
-            }
-            
-            $result = $this->_backend->update($_asyncJob);
-            
-            Tinebase_TransactionManager::getInstance()->commitTransaction($transactionId);
-            
-        } catch (Exception $e) {
-            Tinebase_TransactionManager::getInstance()->rollBack();
-            throw $e;
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+            . ' Finishing job ' . $_asyncJob->name . ' with status ' . $_status);
+        
+        $this->_purgeOldJobs($_asyncJob);
+        
+        $_asyncJob->end_time = Tinebase_DateTime::now();
+        $_asyncJob->status = $_status;
+        if ($_message !== NULL) {
+            $_asyncJob->message = $_message;
         }
+        
+        $result = $this->_backend->update($_asyncJob);
         
         return $result;
     }

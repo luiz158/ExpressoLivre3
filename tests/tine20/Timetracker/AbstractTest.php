@@ -32,9 +32,9 @@ abstract class Timetracker_AbstractTest extends PHPUnit_Framework_TestCase
      */
     public static function main()
     {
-		$suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Timetracker Json Tests');
+        $suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Timetracker Json Tests');
         PHPUnit_TextUI_TestRunner::run($suite);
-	}
+    }
 
     /**
      * Sets up the fixture.
@@ -103,7 +103,7 @@ abstract class Timetracker_AbstractTest extends PHPUnit_Framework_TestCase
                 Timetracker_Model_TimeaccountGrants::BOOK_ALL           => TRUE,
                 Timetracker_Model_TimeaccountGrants::MANAGE_BILLABLE    => TRUE,
                 Tinebase_Model_Grants::GRANT_EXPORT                     => TRUE,
-                Tinebase_Model_Grants::GRANT_ADMIN                      => TRUE,
+                Tinebase_Model_Grants::GRANT_ADMIN                      => FALSE,
             )
         );
     }
@@ -212,9 +212,9 @@ abstract class Timetracker_AbstractTest extends PHPUnit_Framework_TestCase
             ),
         );
 
-        if ($_showClosed) {
+        if (! $_showClosed) {
             $result[] = array(
-                'field' => 'showClosed',
+                'field' => 'is_open',
                 'operator' => 'equals',
                 'value' => TRUE
             );

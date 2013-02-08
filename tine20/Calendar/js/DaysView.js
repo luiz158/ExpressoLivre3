@@ -352,7 +352,7 @@ Ext.extend(Tine.Calendar.DaysView, Ext.util.Observable, {
                     var d = Ext.get(event.ui.domIds[0]).dom.cloneNode(true);
                     d.id = Ext.id();
                     
-                    if (event.get('is_all_day_event')) { 
+                    if (event.get('is_all_day_event')) {
                         Ext.fly(d).setLeft(0);
                     } else {
                         var width = (Ext.fly(this.view.dayCols[0]).getWidth() * 0.9);
@@ -429,7 +429,7 @@ Ext.extend(Tine.Calendar.DaysView, Ext.util.Observable, {
                 throw new Ext.Error('no valid startime given');
             }
             
-            this.scrollTo(startTime)
+            this.scrollTo(startTime);
         } catch (e) {
             this.scrollTo();
         }
@@ -558,7 +558,11 @@ Ext.extend(Tine.Calendar.DaysView, Ext.util.Observable, {
         if (event == this.activeEvent) {
             this.activeEvent = null;
         }
-        
+
+        if(this.editing) {
+            this.abortCreateEvent(event);
+        }
+
         if (event.ui) {
             event.ui.remove();
         }
@@ -706,7 +710,7 @@ Ext.extend(Tine.Calendar.DaysView, Ext.util.Observable, {
         if (e && e.getKey() != e.ENTER) {
             return;
         }
-
+        
         // Validate Summary maxLength
         if (summary.length > field.maxLength) {
             field.markInvalid();
@@ -718,7 +722,7 @@ Ext.extend(Tine.Calendar.DaysView, Ext.util.Observable, {
         }
 
         // Validate Summary minLength
-        if (!summary || summary.length < field.minLength) {
+        if (!summary || summary.match(/^\s{1,}$/) || summary.length < field.minLength) {
             field.markInvalid();
             this.validateMsg = Ext.Msg.alert(this.app.i18n._('Summary too Short'), field.minLengthText, function(){
                 field.focus();
@@ -927,8 +931,16 @@ Ext.extend(Tine.Calendar.DaysView, Ext.util.Observable, {
         }
         
         var rzInfo = event.ui.getRzInfo(rz, width, height);
+
         if (rzInfo.diff != 0) {
-            event.set('dtend', rzInfo.dtend);
+            if (rzInfo.duration > 0) {
+                event.set('dtend', rzInfo.dtend);
+            } else {
+                // force event length to at least 1 minute
+                var date = new Date(event.get('dtstart').getTime());
+                date.setMinutes(date.getMinutes() + 1);
+                event.set('dtend', date);
+            }
         }
         
         if (event.summaryEditor) {
@@ -1186,7 +1198,8 @@ Ext.extend(Tine.Calendar.DaysView, Ext.util.Observable, {
 
         this.innerHd = this.mainHd.dom.firstChild;
         
-        this.wholeDayArea = this.innerHd.firstChild.childNodes[1];
+        this.wholeDayScroller = this.innerHd.firstChild.childNodes[1];
+        this.wholeDayArea = this.wholeDayScroller.firstChild;
         
         this.scroller = new E(this.mainWrap.dom.childNodes[1]);
         this.scroller.setStyle('overflow-x', 'hidden');
@@ -1246,27 +1259,23 @@ Ext.extend(Tine.Calendar.DaysView, Ext.util.Observable, {
         
         this.el.setSize(csize.width, csize.height);
         
-        this.layoutWholeDayHeader();
-        var hdHeight = this.mainHd.getHeight();
+        // layout whole day area
+        var wholeDayAreaEl = Ext.get(this.wholeDayArea);
+        for (var i=0, bottom = wholeDayAreaEl.getTop(); i<this.wholeDayArea.childNodes.length -1; i++) {
+            bottom = Math.max(parseInt(Ext.get(this.wholeDayArea.childNodes[i]).getBottom(), 10), bottom);
+        }
+        var wholeDayAreaHeight = bottom - wholeDayAreaEl.getTop() + 10;
+        // take one third of the available height maximum
+        wholeDayAreaEl.setHeight(wholeDayAreaHeight);
+        Ext.fly(this.wholeDayScroller).setHeight(Math.min(Math.round(csize.height/3), wholeDayAreaHeight));
         
+        var hdHeight = this.mainHd.getHeight();
         var vh = csize.height - (hdHeight);
-
+        
         this.scroller.setSize(vw, vh);
-        // we add 2 more pixel to have spare space for our left padding
-        this.innerHd.style.width = (vw + 2)+'px';
         
         // force positioning on scroll hints
         this.onScroll.defer(100, this);
-    },
-    
-    layoutWholeDayHeader: function() {
-        var headerEl = Ext.get(this.wholeDayArea);
-        
-        for (var i=0, bottom = headerEl.getTop(); i<this.wholeDayArea.childNodes.length -1; i++) {
-            bottom = Math.max(parseInt(Ext.get(this.wholeDayArea.childNodes[i]).getBottom(), 10), bottom);
-        }
-        
-        headerEl.setHeight(bottom - headerEl.getTop() + 10);
     },
     
     /**
@@ -1406,10 +1415,11 @@ Ext.extend(Tine.Calendar.DaysView, Ext.util.Observable, {
         );
         
         ts.header = new Ext.XTemplate(
-            '<div class="cal-daysviewpanel-daysheader">{daysHeader}</div>' +
-            
-            '<div class="cal-daysviewpanel-wholedayheader">' +
-                '<div class="cal-daysviewpanel-wholedayheader-daycols">{wholeDayCols}</div>' +
+            '<div class="cal-daysviewpanel-daysheader">{daysHeader}</div>',
+            '<div class="cal-daysviewpanel-wholedayheader-scroller">',
+                '<div class="cal-daysviewpanel-wholedayheader">',
+                    '<div class="cal-daysviewpanel-wholedayheader-daycols">{wholeDayCols}</div>',
+                '</div>',
             '</div>'
         );
         
@@ -1456,29 +1466,36 @@ Ext.extend(Tine.Calendar.DaysView, Ext.util.Observable, {
         );
         
         ts.event = new Ext.XTemplate(
-            '<div id="{id}" class="cal-daysviewpanel-event {extraCls}" style="width: {width}; height: {height}; left: {left}; top: {top}; z-index: {zIndex}; background-color: {bgColor}; border-color: {color};">' +
-                '<div class="cal-daysviewpanel-event-header" style="background-color: {color};">' +
-                    '<div class="cal-daysviewpanel-event-header-inner" style="color: {textColor}; background-color: {color}; z-index: {zIndex};">{startTime}</div>' +
-                    '<div class="cal-daysviewpanel-event-header-icons">' +
-                        '<tpl for="statusIcons">' +
-                            '<img src="', Ext.BLANK_IMAGE_URL, '" class="cal-status-icon {status}-{[parent.textColor == \'#FFFFFF\' ? \'white\' : \'black\']}" ext:qtip="{text}" />',
-                        '</tpl>' +
-                    '</div>' +
-                '</div>' +
-                '<div class="cal-daysviewpanel-event-body">{[Ext.util.Format.nl2br(Ext.util.Format.htmlEncode(values.summary))]}</div>' +
-            '</div>'
+            '<div id="{id}" class="cal-daysviewpanel-event {extraCls}" style="width: {width}; height: {height}; left: {left}; top: {top}; z-index: {zIndex}; background-color: {bgColor}; border-color: {color};">',
+                '<div class="cal-daysviewpanel-event-header" style="background-color: {color};">',
+                    '<div class="cal-daysviewpanel-event-header-inner" style="color: {textColor}; background-color: {color}; z-index: {zIndex};">{startTime}</div>',
+                    '<div class="cal-daysviewpanel-event-header-icons">',
+                        '<tpl for="statusIcons">',
+                            '<img src="', Ext.BLANK_IMAGE_URL, '" class="cal-status-icon {status}-{[parent.textColor == \'#FFFFFF\' ? \'white\' : \'black\']}" ext:qtip="{[this.encode(values.text)]}" />',
+                        '</tpl>',
+                    '</div>',
+                '</div>',
+                '<div class="cal-daysviewpanel-event-body">{[Ext.util.Format.nl2br(Ext.util.Format.htmlEncode(values.summary))]}</div>',
+                '<div class="cal-daysviewpanel-event-tags">{tagsHtml}</div>',
+            '</div>',
+            {
+                encode: function(v) { return Tine.Tinebase.common.doubleEncode(v); }
+            }
         );
         
         ts.wholeDayEvent = new Ext.XTemplate(
             '<div id="{id}" class="cal-daysviewpanel-event {extraCls}" style="width: {width}; height: {height}; left: {left}; top: {top}; z-index: {zIndex}; background-color: {bgColor}; border-color: {color};">' +
+            '<div class="cal-daysviewpanel-wholedayevent-tags">{tagsHtml}</div>' +
                 '<div class="cal-daysviewpanel-wholedayevent-body">{[Ext.util.Format.nl2br(Ext.util.Format.htmlEncode(values.summary))]}</div>' +
-//                '<div class="cal-daysviewpanel-wholedayevent-icons">' +
                 '<div class="cal-daysviewpanel-event-header-icons" style="background-color: {bgColor};" >' +
                     '<tpl for="statusIcons">' +
-                        '<img src="', Ext.BLANK_IMAGE_URL, '" class="cal-status-icon {status}-black" ext:qtip="{text}" />',
+                        '<img src="', Ext.BLANK_IMAGE_URL, '" class="cal-status-icon {status}-black" ext:qtip="{[this.encode(values.text)]}" />',
                     '</tpl>' +
                 '</div>' +
-            '</div>'
+            '</div>',
+            {
+                encode: function(v) { return Tine.Tinebase.common.doubleEncode(v); }
+            }
         );
         
         for(var k in ts){

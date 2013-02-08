@@ -101,13 +101,16 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
                 
                 defData.label = this.app.i18n._hidden(options && options.label ? options.label : defData.name);
                 
-                this.allowedFileExtensions = this.allowedFileExtensions.concat(extension);
+                if (this.allowedFileExtensions.indexOf(extension) == -1) {
+                    this.allowedFileExtensions = this.allowedFileExtensions.concat(extension);
+                }
                 
                 this.definitionsStore.addSorted(new Tine.Tinebase.Model.ImportExportDefinition(defData, defData.id));
             }, this);
+            this.definitionsStore.sort('label');
         }
-        if (! this.selectedDefinition && Tine.Addressbook.registry.get('defaultImportDefinition')) {
-            this.selectedDefinition = this.definitionsStore.getById(Tine.Addressbook.registry.get('defaultImportDefinition').id);
+        if (! this.selectedDefinition && Tine[this.appName].registry.get('defaultImportDefinition')) {
+            this.selectedDefinition = this.definitionsStore.getById(Tine[this.appName].registry.get('defaultImportDefinition').id);
         }
 
         // init exception store
@@ -147,7 +150,7 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
             timeout: 1800000, // 30 minutes
             callback: this.onImportResponse.createDelegate(this, [callback], true),
             params: {
-                method: this.appName + '.import' + this.recordClass.getMeta('recordsName'),
+                method: this.appName + '.import' + this.recordClass.getMeta('modelName')  + 's',
                 tempFileId: this.uploadButton.getTempFileId(),
                 definitionId: this.definitionCombo.getValue(),
                 importOptions: Ext.apply({
@@ -230,7 +233,7 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
                 height: 100,
                 items: [{
                     xtype: 'label',
-                    html: '<p>' + String.format(_('Please choose the file that contains the {0} you want to add to Tine 2.0'), this.recordClass.getRecordsName()).replace(/Tine 2\.0/g, Tine.title) + '</p><br />'
+                    html: '<p>' + _('Please choose the file that contains the records you want to add to Tine 2.0').replace(/Tine 2\.0/g, Tine.title) + '</p><br />'
                 }, {
                     xtype: 'tw.uploadbutton',
                     ref: '../../uploadButton',
@@ -443,7 +446,7 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
                 store: this.exceptionStore,
                 doLoad: this.loadConflict.createDelegate(this),
                 onLoad: Ext.emptyFn,
-                listeners: {afterrender: function(t){t.refresh.hide()}},
+                listeners: {afterrender: function(t){t.refresh.hide();}},
                 items: [this.conflictIndexText = new Ext.Toolbar.TextItem({}), '->', {
                     text: _('Conflict is resolved'),
                     xtype: 'splitbutton',
@@ -491,7 +494,7 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
                 return nextIsAllowed;
                 
             }).createDelegate(this)
-        }
+        };
     },
     
     /**
@@ -514,6 +517,10 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
         this.manageButtons();
         
         this.loadConflict(this.exceptionStore.getCount() > index ? index : index-1);
+        
+        if (Ext.isFunction(arguments[0])) {
+            return arguments[0].call(this);
+        }
     },
     
     /**
@@ -521,19 +528,15 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
      */
     onResolveAllConflict: function() {
         
-        // give DOM the time to show loadMask
-        if (this.conflictMask.hidden) {
+        // @TODO: disable grid to spedup things?
+        if (this.exceptionStore.getCount() > 0) {
             this.conflictMask.show();
             this.conflictMask.hidden = false;
             
-            return this.onResolveAllConflict.defer(200, this, arguments);
-        }
-        
-        while(this.exceptionStore.getCount() > 0) {
-            this.conflictMask.show();
-            this.conflictMask.hidden = false;
-            
-            this.onResolveConflict();
+            return this.onResolveConflict.defer(20, this, [this.onResolveAllConflict]);
+        } else {
+            this.conflictMask.hide();
+            this.conflictMask.hidden = true;
         }
     },
     
@@ -570,7 +573,8 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
         } else {
             resolveStore.removeAll();
             this.duplicateResolveGridPanel.getView().mainBody.update('<br />  ' + _('No conflict to resolve'));
-            this.navigate(+1);
+            // defer navigation to complete this step before
+            this.navigate.defer(200, this, [+1]);
         }
         
         
@@ -587,7 +591,7 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
         p.next.setDisabled(ap == ps);
         p.last.setDisabled(ap == ps);
         this.conflictIndexText.setText(nextRecord ? 
-            String.format(_('(This is record {0} in you import file)'), nextRecord.get('index') + 1) :
+            String.format(_('(This is record {0} in your import file)'), nextRecord.get('index') + 1) :
             _('No conflict to resolve')
         );
         
@@ -680,12 +684,23 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
                 });
                 
                 this.doImport(function(request, success, response) {
-                    // @todo: show errors and fence finish btn
-                    
                     this.importMask.hide();
                     
                     this.fireEvent('finish', this, this.layout.activeItem);
-                    this.window.close();
+                    
+                    if (Ext.isArray(response.exceptions) && response.exceptions.length > 0) {
+                        // show errors and fence finish/back btn
+                        this.backButton.setDisabled(true);
+                        this.finishButton.setHandler(function() {this.window.close()}, this);
+                        
+                        this.summaryPanelInfo.hide();
+                        this.exceptionStore.clearFilter(true);
+                        
+                        this.summaryPanelFailures.show();
+                        this.summaryPanelFailures.setTitle(String.format(_('{0} records had failures and where discarded.'), response.exceptions.length));
+                    } else {
+                        this.window.close();
+                    }
                 }, importOptions, clientRecordData);
                 
             }).createDelegate(this)
@@ -705,7 +720,7 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
         var rsp = this.lastImportResponse,
             totalcount = rsp.totalcount,
             failcount = 0,
-            mergecount = 0
+            mergecount = 0,
             discardcount = 0;
             
         this.exceptionStore.clearFilter();
@@ -746,11 +761,19 @@ Tine.widgets.dialog.ImportDialog = Ext.extend(Tine.widgets.dialog.WizardPanel, {
             }
             
             if (Ext.isArray(tags) && tags.length) {
-                var tagNames = [];
-                Ext.each(tags, function(tag) {tagNames.push(tag.name)});
-                info.push(String.format(_('All records will be tagged with: "{0}" so you can find them easily.'), tagNames.join(',')));
+                var tagNames = [],
+                    tagRecord = null;
+                Ext.each(tags, function(tag) {
+                    if (Ext.isString(tag)) {
+                        tagRecord = this.tagsPanel.recordTagsStore.getById(tag);
+                        tag = (tagRecord) ? tagRecord.data : null;
+                    }
+                    if (tag) {
+                        tagNames.push(tag.name)
+                    }
+                }, this);
+                info.push(String.format(_('All records will be tagged with: "{0}" so you can find them easily.'), tagNames.join(', ')));
             }
-            
             
         this.summaryPanelInfo.update('<div style="padding: 5px;">' + info.join('<br />') + '</div>');
         

@@ -30,10 +30,10 @@ class Phone_Controller extends Tinebase_Controller_Abstract
      */
     private function __construct() 
     {
-        $snomConfig = Tinebase_Config::getInstance()->getConfigAsArray('snom', 'Tinebase', array(
+        $snomConfig = Tinebase_Config::getInstance()->get('snom', new Tinebase_Config_Struct(array(
             'backend' => Phone_Backend_Factory::ASTERISK
-        ));
-        $this->_callBackendType = $snomConfig['backend']; 
+        )))->toArray();
+        $this->_callBackendType = $snomConfig['backend'];
         $this->_applicationName = 'Phone';
     }
 
@@ -42,7 +42,7 @@ class Phone_Controller extends Tinebase_Controller_Abstract
      *
      */
     private function __clone() 
-    {        
+    {
     }
 
     /**
@@ -81,7 +81,9 @@ class Phone_Controller extends Tinebase_Controller_Abstract
         $accountId = Tinebase_Core::getUser()->getId();
         $vmController = Voipmanager_Controller_Snom_Phone::getInstance();
         $backend = Phone_Backend_Factory::factory($this->_callBackendType);
-        
+
+        $number = $this->_cleanNumber($_number);
+
         if ($_phoneId === NULL && $_lineId === NULL) {
             
             // use first phone and first line
@@ -119,7 +121,7 @@ class Phone_Controller extends Tinebase_Controller_Abstract
             foreach ($vmController->search($filter) as $p) {
                 if ($p->id == $phone->id) {
                     // @todo http_user / http_pass
-                    $backend->dialNumber($p->ipaddress, $_number, null, null);
+                    $backend->dialNumber($p->ipaddress, $number, null, null);
                     break;
                 }
             }
@@ -127,9 +129,18 @@ class Phone_Controller extends Tinebase_Controller_Abstract
             $asteriskLine = Voipmanager_Controller_Asterisk_SipPeer::getInstance()->get($asteriskLineId);
             $asteriskContext = Voipmanager_Controller_Asterisk_Context::getInstance()->get($asteriskLine->context_id);
             
-            $backend->dialNumber('SIP/' . $asteriskLine->name, $asteriskContext->name, $_number, 1, "WD <$_number>");
+            $backend->dialNumber('SIP/' . $asteriskLine->name, $asteriskContext->name, $number, 1, "WD <$number>");
         }
-    }    
+    }
+    
+    /**
+     * removes illegal chars from telephone number
+     * @param string $_number
+     */
+    protected function _cleanNumber($_number)
+    {
+        return preg_replace('/[^\d+]/','',$_number);
+    }
     
     /**
      * Search for calls matching given filter
@@ -140,7 +151,7 @@ class Phone_Controller extends Tinebase_Controller_Abstract
      * @return Tinebase_Record_RecordSet
      */
     public function searchCalls(Phone_Model_CallFilter $_filter, Tinebase_Model_Pagination $_pagination)
-    {        
+    {
         $backend = Phone_Backend_Factory::factory(Phone_Backend_Factory::CALLHISTORY);
         $calls = $backend->search($_filter, $_pagination);
         
@@ -170,7 +181,7 @@ class Phone_Controller extends Tinebase_Controller_Abstract
      * @return Phone_Model_Call
      */
     public function callStarted(Phone_Model_Call $_call) 
-    {    
+    {
         $backend = Phone_Backend_Factory::factory(Phone_Backend_Factory::CALLHISTORY);
         
         $_call->start = Tinebase_DateTime::now();

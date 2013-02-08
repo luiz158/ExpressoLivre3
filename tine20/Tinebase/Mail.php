@@ -5,7 +5,7 @@
  * @package     Tinebase
  * @subpackage  Mail
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2008-2012 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2008-2013 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  */
 
@@ -66,16 +66,7 @@ class Tinebase_Mail extends Zend_Mail
         
         // append old body when no multipart/mixed
         if ($_replyBody !== null && $_zmm->headerExists('content-transfer-encoding')) {
-            $contentStream = fopen("php://temp", 'r+');
-            
-            stream_copy_to_stream($mp->getRawStream(), $contentStream);
-            
-            fputs($contentStream, $_replyBody);
-            
-            rewind($contentStream);
-            
-            // create decoded stream
-            $mp = new Zend_Mime_Part($contentStream);
+            $mp = self::_appendReplyBody($mp, $_replyBody);
             $mp->encoding = $_zmm->getHeader('content-transfer-encoding');
         }
         
@@ -93,7 +84,7 @@ class Tinebase_Mail extends Zend_Mail
             }
         } else {
             $mp->type = Zend_Mime::TYPE_TEXT;
-        }        
+        }
         
         $result = new Tinebase_Mail('utf-8');
         
@@ -179,6 +170,50 @@ class Tinebase_Mail extends Zend_Mail
         }
         
         return $result;
+    }
+    
+    /**
+     * appends old body to mime part
+     * 
+     * @param Zend_Mime_Part $mp
+     * @param string $replyBody
+     * @return Zend_Mime_Part
+     */
+    protected static function _appendReplyBody(Zend_Mime_Part $mp, $replyBody)
+    {
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) {
+            Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . " reply body: " . $replyBody);
+            Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . " mp content: " . $mp->getContent());
+            rewind($mp->getRawStream());
+        }
+        
+        $contentStream = fopen("php://temp", 'r+');
+        stream_copy_to_stream($mp->getRawStream(), $contentStream);
+        
+        // check if html message, append before </body></html>
+        // @todo might check content-type, too
+        rewind($mp->getRawStream());
+        if (preg_match('/(<\/body>[\s\r\n]*<\/html>)/i', $mp->getContent(), $matches)) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                . ' Appending reply body to html body.');
+            
+            require_once 'StreamFilter/StringReplace.php';
+            $filter = stream_filter_append($contentStream, 'str.replace', STREAM_FILTER_READ, array(
+                'search'            => $matches[1],
+                'replace'           => $replyBody . $matches[1]
+            ));
+        } else {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                . " Appending reply body to mime text part.");
+            
+            fputs($contentStream, $replyBody);
+        }
+        
+        // create decoded stream
+        rewind($contentStream);
+        $mp = new Zend_Mime_Part($contentStream);
+        
+        return $mp;
     }
     
     /**
@@ -345,8 +380,25 @@ class Tinebase_Mail extends Zend_Mail
             return sprintf($format, $encodedName, $email);
         }
     }
+
+    /**
+     * check if Zend_Mail_Message is/contains calendar iMIP message
+     * 
+     * @param Zend_Mail_Message $zmm
+     * @return boolean
+     */
+    public static function isiMIPMail(Zend_Mail_Message $zmm)
+    {
+        foreach ($zmm as $part) {
+            if (preg_match('/text\/calendar/', $part->contentType)) {
+                return TRUE;
+            }
+        }
+        
+        return FALSE;
+    }
     
-      /**
+    /**
      * Adds an existing attachment related to the HTML part of the message
      *
      * @param  Zend_Mime_Part $attachment

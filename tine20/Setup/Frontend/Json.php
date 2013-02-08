@@ -210,10 +210,10 @@ class Setup_Frontend_Json extends Tinebase_Frontend_Abstract
             'checkTmpDir'     => $this->_controller->checkDir('tmpdir'),
             'checkSessionDir' => $this->_controller->checkDir('path', 'session'),
             'checkFilesDir'   => $this->_controller->checkDir('filesdir'),
-            'setupRequired'	  => empty($checkDB) ? TRUE : $this->_controller->setupRequired(),
+            'setupRequired'      => empty($checkDB) ? TRUE : $this->_controller->setupRequired(),
         );
 
-        return $result;        
+        return $result;
     }
     
     /**
@@ -307,7 +307,7 @@ class Setup_Frontend_Json extends Tinebase_Frontend_Abstract
      */
     public function getRegistryData()
     {
-    	// anonymous registry
+        // anonymous registry
         $registryData =  array(
             'configExists'     => Setup_Core::configFileExists(),
             'version'          => array(
@@ -322,13 +322,13 @@ class Setup_Frontend_Json extends Tinebase_Frontend_Abstract
         // authenticated or non existent config
         if (! Setup_Core::configFileExists() || Setup_Core::isRegistered(Setup_Core::USER)) {
             $registryData = array_merge($registryData, $this->checkConfig());
-        	$registryData = array_merge($registryData, array(
-        	    'acceptedTermsVersion' => (! empty($registryData['checkDB']) && $this->_controller->isInstalled('Tinebase')) ? Setup_Controller::getInstance()->getAcceptedTerms() : 0,
-	            'setupChecks'          => $this->envCheck(),
-	            'configData'           => $this->loadConfig(),
-        	    'emailData'            => (! empty($registryData['checkDB']) && $this->_controller->isInstalled('Tinebase')) ? $this->getEmailConfig() : array(),
-                    'messengerData'        => (! empty($registryData['checkDB']) && $this->_controller->isInstalled('Tinebase')) ? $this->getMessengerConfig() : array(),
-	        ));
+            $registryData = array_merge($registryData, array(
+                'acceptedTermsVersion' => (! empty($registryData['checkDB']) && $this->_controller->isInstalled('Tinebase')) ? Setup_Controller::getInstance()->getAcceptedTerms() : 0,
+                'setupChecks'          => $this->envCheck(),
+                'configData'           => $this->loadConfig(),
+                'emailData'            => (! empty($registryData['checkDB']) && $this->_controller->isInstalled('Tinebase')) ? $this->getEmailConfig() : array(),
+                'messengerData'        => (! empty($registryData['checkDB']) && $this->_controller->isInstalled('Tinebase')) ? $this->getMessengerConfig() : array(),
+            ));
         }
         
         // if setup user is logged in
@@ -368,8 +368,6 @@ class Setup_Frontend_Json extends Tinebase_Frontend_Abstract
                 'packageString' => TINE20SETUP_PACKAGESTRING,
                 'releaseTime'   => TINE20SETUP_RELEASETIME
             ),
-        // no password changing in setup
-            'changepw'          => FALSE,
         );
         
         return $registryData;

@@ -19,7 +19,15 @@ error_reporting( E_ALL | E_STRICT );
 /*
  * Set white / black lists
  */
-PHPUnit_Util_Filter::addDirectoryToFilter(dirname(__FILE__));
+$phpUnitVersion = explode(' ',PHPUnit_Runner_Version::getVersionString());
+if (version_compare($phpUnitVersion[1], "3.6.0") >= 0) {
+    $filter = new PHP_CodeCoverage_Filter();
+    $filter->addDirectoryToBlacklist(dirname(__FILE__));
+} else if (version_compare($phpUnitVersion[1], "3.5.0") >= 0) {
+    PHP_CodeCoverage_Filter::getInstance()->addDirectoryToBlacklist(dirname(__FILE__));
+} else {
+    PHPUnit_Util_Filter::addDirectoryToFilter(dirname(__FILE__));
+}
 
 /*
  * Set include path
@@ -31,8 +39,8 @@ define('PATH_TO_TEST_DIR', dirname(__FILE__));
 $path = array(
     PATH_TO_REAL_DIR,
     get_include_path(),
-	PATH_TO_TEST_DIR,
-	PATH_TO_TINE_LIBRARY
+    PATH_TO_TEST_DIR,
+    PATH_TO_TINE_LIBRARY
 );
         
 set_include_path(implode(PATH_SEPARATOR, $path));
@@ -58,7 +66,7 @@ if(file_exists(dirname(__FILE__) . '/phpunitconfig.inc.php')) {
     throw new Exception("Couldn't find phpunitconfig.inc.php! \n");
 }
 
-$_SERVER['DOCUMENT_ROOT'] = $config->docroot;    
+$_SERVER['DOCUMENT_ROOT'] = $config->docroot;
 
 TestServer::getInstance()->initFramework();
 

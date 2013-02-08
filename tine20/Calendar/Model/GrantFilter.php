@@ -56,21 +56,33 @@ class Calendar_Model_GrantFilter extends Tinebase_Model_Filter_Abstract implemen
             throw new Tinebase_Exception_AccessDenied('No grants have been defined.');
         }
         
-        // it searches select columns
+        // PostgreSQL does not support aliases in having statements
+        // replace them with the real statements
         // return an array where each element has 3 items: 0 - table, 1 - field/expression, 2 - alias
-        $columns = $_select->getPart(Zend_Db_Select::COLUMNS);        
+        $columns = $_select->getPart(Zend_Db_Select::COLUMNS);
         
         // it gets an array with expressions used in having clause
-        $grants = array();
-        foreach($columns as $column)
-        {
-        	if (!empty($column[2])) $grants[$column[2]] = $column[1];
+        $grantStatements = array();
+        foreach($columns as $column) {
+            if (!empty($column[2])) {
+                $grantStatements[$column[2]] = $column[1];
+            }
         }
-                
+        
         // it uses into having clause expressions instead of aliases
         foreach ($this->_requiredGrants as $grant) {
-            $_select->orHaving($db->quoteInto($db->quoteIdentifier($grants[$grant]) . ' = ?', 1, Zend_Db::INT_TYPE));
-        }       
+            $_select->orHaving($db->quoteInto($db->quoteIdentifier($grantStatements[$grant]) . ' = ?', 1));
+        }
+    }
+    
+    /**
+     * get required grants
+     * 
+     * @return array
+     */
+    public function getRequiredGrants()
+    {
+        return $this->_requiredGrants;
     }
     
     /**

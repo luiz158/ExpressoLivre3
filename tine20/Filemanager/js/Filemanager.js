@@ -27,12 +27,37 @@ Tine.Filemanager.Application = Ext.extend(Tine.Tinebase.Application, {
     }
 });
 
+/*
+ * register additional action for genericpickergridpanel
+ */
+Tine.widgets.relation.MenuItemManager.register('Filemanager', 'Node', {
+    text: 'Save locally',   // _('Save locally')
+    iconCls: 'action_filemanager_save_all',
+    requiredGrant: 'readGrant',
+    actionType: 'download',
+    allowMultiple: false,
+    handler: function(action) {
+        var node = action.grid.store.getAt(action.gridIndex).get('related_record');
+        var downloadPath = node.path;
+        var downloader = new Ext.ux.file.Download({
+            params: {
+                method: 'Filemanager.downloadFile',
+                requestType: 'HTTP',
+                id: '',
+                path: downloadPath
+            }
+        }).start();
+    }
+});
+
 /**
  * @namespace Tine.Filemanager
  * @class Tine.Filemanager.MainScreen
  * @extends Tine.widgets.MainScreen
  */
-Tine.Filemanager.MainScreen = Ext.extend(Tine.widgets.MainScreen, {});
+Tine.Filemanager.MainScreen = Ext.extend(Tine.widgets.MainScreen, {
+    activeContentType: 'Node'
+});
 
 /**
  * generic exception handler for filemanager
@@ -48,6 +73,18 @@ Tine.Filemanager.handleRequestException = function(exception, request) {
         filenameWithoutPath = null;
     
     switch(exception.code) {
+        // overwrite default 503 handling and add a link to the wiki
+        case 503:
+            Ext.MessageBox.show({
+                buttons: Ext.Msg.OK,
+                icon: Ext.MessageBox.WARNING,
+                title: _('Service Unavailable'), 
+                msg: String.format(app.i18n._('The Filemanager is not configured correctly. Please refer to the {0}Tine 2.0 Admin FAQ{1} for configuration advice or contact your administrator.'),
+                    '<a href="http://www.tine20.org/wiki/index.php/Admin_FAQ#The_message_.22filesdir_config_value_not_set.22_appears_in_the_logfile_and_I_can.27t_open_the_Filemanager" target="_blank">',
+                    '</a>')
+            });
+            break;
+            
         case 901: 
             if (request) {
                 Tine.log.debug('Tine.Filemanager.handleRequestException - request exception:');
@@ -55,7 +92,7 @@ Tine.Filemanager.handleRequestException = function(exception, request) {
                 
                 if (exception.existingnodesinfo) {
                     for (i = 0; i < exception.existingnodesinfo.length; i++) {
-                        existingFilenames.push(exception.existingnodesinfo[i].name); 
+                        existingFilenames.push(exception.existingnodesinfo[i].name);
                     }
                 }
                 

@@ -6,12 +6,15 @@
 # $ ./build-tine20-packages.sh -s "http://git.tine20.org/git/tine20" -b master -r "2011_01_beta3-1" -c "Neele"
 # $ ./build-tine20-packages.sh -s "http://git.tine20.org/git/tine20" -b 2011-01 -r "2011-01-3" -c "Neele"
 
+# $ ./build-tine20-packages.sh -s "ssh://root@10.31.80.37/usr/local/git.repos/expresso3.git" -b master "V3" -c "Expresso-V3"
+
+
 ## GLOBAL VARIABLES ##
 BASEDIR="./tine20build"
 TEMPDIR="$BASEDIR/temp"
 MISCPACKAGESDIR="$BASEDIR/packages/misc"
 
-CODENAME="Milan"
+CODENAME="Joey"
 GITURL="http://git.tine20.org/git/tine20"
 
 RELEASE=""
@@ -26,12 +29,14 @@ function checkout()
     echo "checkout files from git url $1 to $TEMPDIR/tine20 ... "
     rm -rf $TEMPDIR/tine20
     rm -rf $TEMPDIR/debian
+    rm -rf $TEMPDIR/fedora
+    rm -rf $TEMPDIR/Univention
     
     rm -rf $TEMPDIR/tine20.git
     mkdir $TEMPDIR/tine20.git
     cd $TEMPDIR/tine20.git
     
-    git clone $1 .
+    git clone "$1" .
 
     if [ -n "$GITBRANCH" ]; then
         echo "checkout refspec"
@@ -65,6 +70,8 @@ function checkout()
 
     mv $TEMPDIR/tine20.git/tine20 $TEMPDIR/tine20
     mv $TEMPDIR/tine20.git/scripts/packaging/debian $TEMPDIR/debian
+    mv $TEMPDIR/tine20.git/scripts/packaging/fedora $TEMPDIR/fedora
+    mv $TEMPDIR/tine20.git/scripts/packaging/Univention $TEMPDIR/Univention
     rm -Rf $TEMPDIR/tine20.git
     
     echo "done"
@@ -215,9 +222,12 @@ function createArchives()
                     
                     # cleanup qCal
                     (cd $TEMPDIR/tine20/library/qCal;  rm -rf docs tests)
+
+                    # cleanup jsb2tk
+                    (cd $TEMPDIR/tine20/library/jsb2tk;  rm -rf JSBuilder2 tests)
                     
                     echo -n "building "
-                    local FILES="Addressbook Admin Setup Tinebase Zend images library styles config.inc.php.dist index.php langHelper.php LICENSE PRIVACY README RELEASENOTES setup.php tine20.php"
+                    local FILES="Addressbook Admin Setup Tinebase Zend images library styles docs config.inc.php.dist index.php langHelper.php LICENSE PRIVACY README RELEASENOTES CREDITS setup.php tine20.php bootstrap.php"
                     (cd $TEMPDIR/tine20; tar cjf ../../packages/tine20/$RELEASE/tine20-${UCFILE}_$RELEASE.tar.bz2 $FILES)
                     (cd $TEMPDIR/tine20; zip -qr ../../packages/tine20/$RELEASE/tine20-${UCFILE}_$RELEASE.zip     $FILES)
                     
@@ -300,23 +310,70 @@ function prepareDebianPackaging()
     
     # Replace all matches of - with .
     DEBIANVERSION=${RELEASE//-/.}
-    DEBIANVERSION=${DEBIANVERSION//\~*/}
 
     mkdir -p "$PACKAGEDIR/tine20-$DEBIANVERSION"
     
     echo -n "preparing debian packaging directory in $PACKAGEDIR/tine20-$DEBIANVERSION ... "
     
-    (cd $PACKAGEDIR/tine20-$DEBIANVERSION; tar xf ../../../tine20/$RELEASE/tine20-allinone_$RELEASE.tar.bz2)
+    tar -C $PACKAGEDIR/tine20-$DEBIANVERSION -xf $BASEDIR/packages/tine20/$RELEASE/tine20-allinone_$RELEASE.tar.bz2
+    tar -C $PACKAGEDIR/tine20-$DEBIANVERSION -xf $BASEDIR/packages/tine20/$RELEASE/tine20-courses_$RELEASE.tar.bz2
+    tar -C $PACKAGEDIR/tine20-$DEBIANVERSION -xf $BASEDIR/packages/tine20/$RELEASE/tine20-humanresources_$RELEASE.tar.bz2
     cp $BASEDIR/packages/tine20/$RELEASE/tine20-allinone_$RELEASE.tar.bz2 $PACKAGEDIR/tine20_$DEBIANVERSION.orig.tar.bz2
+    cp $BASEDIR/packages/tine20/$RELEASE/tine20-courses_$RELEASE.tar.bz2 $PACKAGEDIR/tine20_$DEBIANVERSION.orig-Courses.tar.bz2
+    cp $BASEDIR/packages/tine20/$RELEASE/tine20-humanresources_$RELEASE.tar.bz2 $PACKAGEDIR/tine20_$DEBIANVERSION.orig-HumanResources.tar.bz2
     cp -r $BASEDIR/temp/debian $PACKAGEDIR/tine20-$DEBIANVERSION
 
     echo "done"
 }
 
+function prepareUniventionPackaging()
+{
+    PACKAGEDIR="$BASEDIR/packages/univention/$RELEASE"
+    rm -rf $PACKAGEDIR
+    
+    # Replace all matches of - with .
+    DEBIANVERSION=${RELEASE//-/.}
+
+    mkdir -p "$PACKAGEDIR/tine20-$DEBIANVERSION"
+    
+    echo -n "preparing univention packaging directory in $PACKAGEDIR/tine20-$DEBIANVERSION ... "
+    
+    tar -C $PACKAGEDIR/tine20-$DEBIANVERSION -xf $BASEDIR/packages/tine20/$RELEASE/tine20-allinone_$RELEASE.tar.bz2
+    tar -C $PACKAGEDIR/tine20-$DEBIANVERSION -xf $BASEDIR/packages/tine20/$RELEASE/tine20-courses_$RELEASE.tar.bz2
+    tar -C $PACKAGEDIR/tine20-$DEBIANVERSION -xf $BASEDIR/packages/tine20/$RELEASE/tine20-humanresources_$RELEASE.tar.bz2
+    cp $BASEDIR/packages/tine20/$RELEASE/tine20-allinone_$RELEASE.tar.bz2 $PACKAGEDIR/tine20_$DEBIANVERSION.orig.tar.bz2
+    cp $BASEDIR/packages/tine20/$RELEASE/tine20-courses_$RELEASE.tar.bz2 $PACKAGEDIR/tine20_$DEBIANVERSION.orig-Courses.tar.bz2
+    cp $BASEDIR/packages/tine20/$RELEASE/tine20-humanresources_$RELEASE.tar.bz2 $PACKAGEDIR/tine20_$DEBIANVERSION.orig-HumanResources.tar.bz2
+    cp -r $BASEDIR/temp/Univention/* $PACKAGEDIR/tine20-$DEBIANVERSION
+
+    echo "done"
+}
+
+function prepareFedoraPackaging()
+{
+    PACKAGEDIR="$BASEDIR/packages/fedora/$RELEASE"
+    rm -rf $PACKAGEDIR
+    
+    # Replace all matches of - with .
+    RPMVERSION=${RELEASE//-/.}
+
+    mkdir -p "$PACKAGEDIR/tine20-$RPMVERSION"
+    
+    echo -n "preparing fedora packaging directory in $PACKAGEDIR/tine20-$RPMVERSION ... "
+    
+    cp -r $BASEDIR/temp/fedora/* $PACKAGEDIR/tine20-$RPMVERSION/
+    
+    cp $BASEDIR/packages/tine20/$RELEASE/tine20-allinone_$RELEASE.tar.bz2 $PACKAGEDIR/tine20-$RPMVERSION/SOURCES/
+    cp $BASEDIR/packages/tine20/$RELEASE/tine20-courses_$RELEASE.tar.bz2 $PACKAGEDIR/tine20-$RPMVERSION/SOURCES/
+    cp $BASEDIR/packages/tine20/$RELEASE/tine20-humanresources_$RELEASE.tar.bz2 $PACKAGEDIR/tine20-$RPMVERSION/SOURCES/
+
+    echo "done"
+}
+
 getOptions $*
-                 
+
 createDirectories
-checkout $GITURL $GITBRANCH
+checkout "$GITURL" $GITBRANCH
 setupPackageDir
 activateReleaseMode
 buildClient
@@ -325,3 +382,5 @@ createSpecialArchives
 packageTranslations
 buildChecksum
 prepareDebianPackaging
+prepareFedoraPackaging
+prepareUniventionPackaging

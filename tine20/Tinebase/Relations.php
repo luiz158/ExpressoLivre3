@@ -5,7 +5,7 @@
  * @package     Tinebase
  * @subpackage  Relations
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2008 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2008-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Cornelius Weiss <c.weiss@metaways.de>
  * 
  * @todo        re-enable the caching (but check proper invalidation first) -> see task #232
@@ -95,17 +95,17 @@ class Tinebase_Relations
         $toDel = array_diff($currentIds, $relationsIds);
         $toUpdate = array_intersect($currentIds, $relationsIds);
         
+        // break relations
+        foreach ($toDel as $relationId) {
+            $this->_backend->breakRelation($relationId);
+        }
+
         // add new relations
         foreach ($toAdd as $idx) {
             if(empty($relations[$idx]->related_id)) {
                 $this->_setAppRecord($relations[$idx]);
             }
             $this->_addRelation($relations[$idx]);
-        }
-        
-        // break relations
-        foreach ($toDel as $relationId) {
-            $this->_backend->breakRelation($relationId);
         }
         
         // update relations
@@ -165,7 +165,7 @@ class Tinebase_Relations
     
         $result = $this->_backend->getAllRelations($_model, $_backend, $_id, $_degree, $_type);
         $this->resolveAppRecords($result, $_ignoreACL);
-            
+        
         return $result;
     }
     
@@ -220,12 +220,9 @@ class Tinebase_Relations
                 continue;
             }
             
-            // records need to be presented as JSON strings
-            if (is_array($relation->related_record)) {
-                $json = Zend_Json::encode($relation->related_record);
-            }
+            $data = Zend_Json::encode($relation->related_record);
             $relation->related_record = new $relation->related_model();
-            $relation->related_record->setFromJsonInUsersTimezone($json);
+            $relation->related_record->setFromJsonInUsersTimezone($data);
         }
     }
     
@@ -239,9 +236,13 @@ class Tinebase_Relations
      */
     protected function _setAppRecord($_relation)
     {
+        if (! $_relation->related_record instanceof Tinebase_Record_Abstract) {
+            throw new Tinebase_Exception_UnexpectedValue('Related record is missing from relation.');
+        }
+        
         $appController = Tinebase_Core::getApplicationInstance($_relation->related_model);
         
-        if (!$_relation->related_record->getId()) {
+        if (! $_relation->related_record->getId()) {
             $method = 'create';
         } else {
             $method = 'update';
@@ -255,7 +256,7 @@ class Tinebase_Relations
         
         switch ($_relation->related_model) {
             case 'Addressbook_Model_Contact':
-                $_relation->related_backend = Addressbook_Backend_Factory::SQL;
+                $_relation->related_backend = ucfirst(Addressbook_Backend_Factory::SQL);
                 break;
             case 'Tasks_Model_Task':
                 $_relation->related_backend = Tasks_Backend_Factory::SQL;
@@ -304,9 +305,19 @@ class Tinebase_Relations
             } else {
                 try {
                     $appController = Tinebase_Core::getApplicationInstance($modelName);
-                    $records = $appController->$getMultipleMethod($relations->related_id, $_ignoreACL);
+                    if (method_exists($appController, $getMultipleMethod)) {
+                        $records = $appController->$getMultipleMethod($relations->related_id, $_ignoreACL);
+                        
+                        // resolve record alarms
+                        if (count($records) > 0 && $records->getFirstRecord()->has('alarms')) {
+                            $appController->getAlarms($records);
+                        }
+                    } else {
+                        throw new Tinebase_Exception_AccessDenied('Controller ' . get_class($appController) . ' has no method ' . $getMultipleMethod);
+                    }
                 } catch (Tinebase_Exception_AccessDenied $tea) {
-                    // remove relations, user has no permission
+                    if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
+                        . ' Removing relations from result. Got exception: ' . $tea);
                     $_relations->removeRecords($relations);
                     continue;
                 }
@@ -347,7 +358,7 @@ class Tinebase_Relations
      * @return  Tinebase_Model_Relation|NULL the new relation
      * @throws  Tinebase_Exception_Record_Validation
      */
-    protected function _addRelation($_relation)
+    protected function _addRelation(Tinebase_Model_Relation $_relation)
     {
         $_relation->created_by = Tinebase_Core::getUser()->getId();
         $_relation->creation_time = Tinebase_DateTime::now();
@@ -356,7 +367,7 @@ class Tinebase_Relations
         }
         
         try {
-            $result = $this->_backend->addRelation($_relation);            
+            $result = $this->_backend->addRelation($_relation);
         } catch(Zend_Db_Statement_Exception $zse) {
             Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ . ' Could not add relation: ' . $zse->getMessage());
             $result = NULL;

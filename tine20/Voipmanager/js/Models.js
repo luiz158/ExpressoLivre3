@@ -19,7 +19,7 @@ Ext.ns('Tine.Voipmanager', 'Tine.Voipmanager.Model');
  * @type {Array}
  * Voipmanager model fields
  */
-Tine.Voipmanager.Model.SnomPhoneArray = Tine.Tinebase.Model.genericFields.concat([ 
+Tine.Voipmanager.Model.SnomPhoneArray = Tine.Tinebase.Model.modlogFields.concat([ 
     {name: 'id'},
     {name: 'macaddress'},
     {name: 'description'},
@@ -86,7 +86,7 @@ Tine.Voipmanager.Model.SnomPhone = Tine.Tinebase.data.Record.create(Tine.Voipman
         return this.get('description') ? (this.get('description') + ' ' + this.get('macaddress')) : false;
     }
 });
-Tine.Voipmanager.Model.SnomPhone.getDefaultData = function() { 
+Tine.Voipmanager.Model.SnomPhone.getDefaultData = function() {
     return {
         
     };
@@ -95,7 +95,7 @@ Tine.Voipmanager.Model.SnomPhone.getDefaultData = function() {
 
 
 
-Tine.Voipmanager.Model.SnomLocationArray = Tine.Tinebase.Model.genericFields.concat([
+Tine.Voipmanager.Model.SnomLocationArray = Tine.Tinebase.Model.modlogFields.concat([
     {name: 'id'},
     {name: 'name'},
     {name: 'description'},
@@ -137,7 +137,7 @@ Tine.Voipmanager.Model.SnomLocation = Tine.Tinebase.data.Record.create(Tine.Voip
         return this.get('name') ? this.get('name') : false;
     }
 });
-Tine.Voipmanager.Model.SnomLocation.getDefaultData = function() { 
+Tine.Voipmanager.Model.SnomLocation.getDefaultData = function() {
     return {
         
     };
@@ -146,7 +146,7 @@ Tine.Voipmanager.Model.SnomLocation.getDefaultData = function() {
 
 
 
-Tine.Voipmanager.Model.SnomTemplateArray = Tine.Tinebase.Model.genericFields.concat([
+Tine.Voipmanager.Model.SnomTemplateArray = Tine.Tinebase.Model.modlogFields.concat([
     {name: 'id'},
     {name: 'name'},
     {name: 'description'},
@@ -174,7 +174,7 @@ Tine.Voipmanager.Model.SnomTemplate = Tine.Tinebase.data.Record.create(Tine.Voip
         return this.get('name') ? this.get('name') : false;
     }
 });
-Tine.Voipmanager.Model.SnomTemplate.getDefaultData = function() { 
+Tine.Voipmanager.Model.SnomTemplate.getDefaultData = function() {
     return {
      
     };
@@ -183,7 +183,7 @@ Tine.Voipmanager.Model.SnomTemplate.getDefaultData = function() {
 
 
 
-Tine.Voipmanager.Model.SnomSoftwareArray = Tine.Tinebase.Model.genericFields.concat([
+Tine.Voipmanager.Model.SnomSoftwareArray = Tine.Tinebase.Model.modlogFields.concat([
     {name: 'id'},
     {name: 'name'},
     {name: 'description'},
@@ -212,7 +212,7 @@ Tine.Voipmanager.Model.SnomSoftware = Tine.Tinebase.data.Record.create(Tine.Voip
         return this.get('name') ? this.get('name') : false;
     }
 });
-Tine.Voipmanager.Model.SnomSoftware.getDefaultData = function() { 
+Tine.Voipmanager.Model.SnomSoftware.getDefaultData = function() {
     return {
         
     };
@@ -221,7 +221,7 @@ Tine.Voipmanager.Model.SnomSoftware.getDefaultData = function() {
 
 
 
-Tine.Voipmanager.Model.SnomSoftwareImageArray = Tine.Tinebase.Model.genericFields.concat([
+Tine.Voipmanager.Model.SnomSoftwareImageArray = Tine.Tinebase.Model.modlogFields.concat([
     {name: 'model'},
     {name: 'softwareimage'}
 ]);
@@ -245,13 +245,13 @@ Tine.Voipmanager.Model.SnomSoftwareImage = Tine.Tinebase.data.Record.create(Tine
         return this.get('name') ? this.get('name') : false;
     }
 });
-Tine.Voipmanager.Model.SnomSoftwareImage.getDefaultData = function() { 
+Tine.Voipmanager.Model.SnomSoftwareImage.getDefaultData = function() {
     return {
         
     };
 };
 
-Tine.Voipmanager.Model.SnomLineArray = Tine.Tinebase.Model.genericFields.concat([
+Tine.Voipmanager.Model.SnomLineArray = Tine.Tinebase.Model.modlogFields.concat([
     {name: 'asteriskline_id'},
     {name: 'id'},
     {name: 'idletext'},
@@ -286,7 +286,7 @@ Tine.Voipmanager.Model.SnomLine = Tine.Tinebase.data.Record.create(Tine.Voipmana
         return this.get('name') ? this.get('name') : false;
     }
 });
-Tine.Voipmanager.Model.SnomLine.getDefaultData = function() { 
+Tine.Voipmanager.Model.SnomLine.getDefaultData = function() {
     return {
         
     };
@@ -294,7 +294,7 @@ Tine.Voipmanager.Model.SnomLine.getDefaultData = function() {
 
 
 
-Tine.Voipmanager.Model.SnomSettingArray = Tine.Tinebase.Model.genericFields.concat([
+Tine.Voipmanager.Model.SnomSettingArray = Tine.Tinebase.Model.modlogFields.concat([
     {name: 'id'},
     {name: 'name'},
     {name: 'description'},        
@@ -343,7 +343,7 @@ Tine.Voipmanager.Model.SnomSetting = Tine.Tinebase.data.Record.create(Tine.Voipm
         return this.get('name') ? this.get('name') : false;
     }
 });
-Tine.Voipmanager.Model.SnomSetting.getDefaultData = function() { 
+Tine.Voipmanager.Model.SnomSetting.getDefaultData = function() {
     return {
         
     };
@@ -364,7 +364,7 @@ Tine.Voipmanager.Model.SnomPhoneRight = Ext.data.Record.create([
  *  ASTERISK
  */
 
-Tine.Voipmanager.Model.AsteriskSipPeerArray = Tine.Tinebase.Model.genericFields.concat([
+Tine.Voipmanager.Model.AsteriskSipPeerArray = Tine.Tinebase.Model.modlogFields.concat([
     {name: 'id'},
     {name: 'name'},
     {name: 'accountcode'},
@@ -438,7 +438,7 @@ Tine.Voipmanager.Model.AsteriskSipPeer = Tine.Tinebase.data.Record.create(Tine.V
         return this.get('name') ? this.get('name') : false;
     }
 });
-Tine.Voipmanager.Model.AsteriskSipPeer.getDefaultData = function() { 
+Tine.Voipmanager.Model.AsteriskSipPeer.getDefaultData = function() {
     return {
         
     };
@@ -447,7 +447,7 @@ Tine.Voipmanager.Model.AsteriskSipPeer.getDefaultData = function() {
 
 
 
-Tine.Voipmanager.Model.AsteriskContextArray = Tine.Tinebase.Model.genericFields.concat([
+Tine.Voipmanager.Model.AsteriskContextArray = Tine.Tinebase.Model.modlogFields.concat([
     {name: 'id'},
     {name: 'name'},
     {name: 'description'}
@@ -472,7 +472,7 @@ Tine.Voipmanager.Model.AsteriskContext = Tine.Tinebase.data.Record.create(Tine.V
         return this.get('name') ? this.get('name') : false;
     }
 });
-Tine.Voipmanager.Model.AsteriskContext.getDefaultData = function() { 
+Tine.Voipmanager.Model.AsteriskContext.getDefaultData = function() {
     return {
         
     };
@@ -482,7 +482,7 @@ Tine.Voipmanager.Model.AsteriskContext.getDefaultData = function() {
 
 
 
-Tine.Voipmanager.Model.AsteriskVoicemailArray = Tine.Tinebase.Model.genericFields.concat([
+Tine.Voipmanager.Model.AsteriskVoicemailArray = Tine.Tinebase.Model.modlogFields.concat([
     {name: 'id'},
     {name: 'context_id'},
     {name: 'context'},
@@ -528,17 +528,17 @@ Tine.Voipmanager.Model.AsteriskVoicemail = Tine.Tinebase.data.Record.create(Tine
         return this.get('mailbox') ? this.get('mailbox') : false;
     }
 });
-Tine.Voipmanager.Model.AsteriskVoicemail.getDefaultData = function() { 
+Tine.Voipmanager.Model.AsteriskVoicemail.getDefaultData = function() {
     return {
         
     };
 };
 
-Tine.Voipmanager.Model.AsteriskMeetmeArray = Tine.Tinebase.Model.genericFields.concat([
+Tine.Voipmanager.Model.AsteriskMeetmeArray = Tine.Tinebase.Model.modlogFields.concat([
     {name: 'id'},
     {name: 'confno'},
     {name: 'pin'},
-	{name: 'adminpin'}
+    {name: 'adminpin'}
 ]);
 /**
  * @type {Tine.Tinebase.data.Record}
@@ -560,7 +560,7 @@ Tine.Voipmanager.Model.AsteriskMeetme = Tine.Tinebase.data.Record.create(Tine.Vo
         return this.get('number') ? (this.get('number') + ' ' + this.get('confno')) : false;
     }
 });
-Tine.Voipmanager.Model.AsteriskMeetme.getDefaultData = function() { 
+Tine.Voipmanager.Model.AsteriskMeetme.getDefaultData = function() {
     return {
         
     };

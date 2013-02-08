@@ -163,8 +163,8 @@ class Calendar_Controller_EventGrantsTests extends Calendar_TestCase
         
         $loadedEvent = $this->_uit->get($persistentEvent->getId());
         $this->assertEquals($persistentEvent->summary, $loadedEvent->summary);
-        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_EDIT});
-        $this->assertFalse((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_DELETE});
+        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_EDIT}, Tinebase_Model_Grants::GRANT_EDIT);
+        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_DELETE}, Tinebase_Model_Grants::GRANT_DELETE);
     }
     
     /**
@@ -178,8 +178,6 @@ class Calendar_Controller_EventGrantsTests extends Calendar_TestCase
         $loadedEvent = $this->_uit->get($persistentEvent->getId());
         
         $this->assertEquals($persistentEvent->summary, $loadedEvent->summary);
-        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_EDIT});
-        $this->assertFalse((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_DELETE});
     }
     
     /**
@@ -198,8 +196,6 @@ class Calendar_Controller_EventGrantsTests extends Calendar_TestCase
         $this->assertEquals(1, count($loadedEvent), 'event not found with search action!');
         $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_READ}, 'event not readable');
         $this->assertEquals($persistentEvent->summary, $loadedEvent->summary);
-        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_EDIT});
-        $this->assertFalse((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_DELETE});
     }
     
     /**
@@ -218,9 +214,9 @@ class Calendar_Controller_EventGrantsTests extends Calendar_TestCase
         
         $this->assertFalse(empty($event), 'no event found, but freebusy info should be');
         $this->assertTrue(empty($event->summary), 'event with freebusy only is not cleaned up');
-        $this->assertFalse((bool)$event->{Tinebase_Model_Grants::GRANT_READ});
-        $this->assertFalse((bool)$event->{Tinebase_Model_Grants::GRANT_EDIT});
-        $this->assertFalse((bool)$event->{Tinebase_Model_Grants::GRANT_DELETE});
+        $this->assertFalse((bool)$event->{Tinebase_Model_Grants::GRANT_READ}, Tinebase_Model_Grants::GRANT_READ);
+        $this->assertFalse((bool)$event->{Tinebase_Model_Grants::GRANT_EDIT}, Tinebase_Model_Grants::GRANT_EDIT);
+        $this->assertFalse((bool)$event->{Tinebase_Model_Grants::GRANT_DELETE}, Tinebase_Model_Grants::GRANT_DELETE);
         
         // direct get of freebusy only events is not allowed
         $this->setExpectedException('Tinebase_Exception_AccessDenied');
@@ -236,8 +232,8 @@ class Calendar_Controller_EventGrantsTests extends Calendar_TestCase
         $persistentEvent = $this->_createEventInPersonasCalendar('jmcblack', 'jmcblack', 'jmcblack', Calendar_Model_Event::CLASS_PRIVATE);
         $loadedEvent = $this->_uit->get($persistentEvent->getId());
         $this->assertEquals($persistentEvent->summary, $loadedEvent->summary);
-        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_READ});
-        $this->assertFalse((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_DELETE});
+        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_READ}, Tinebase_Model_Grants::GRANT_READ);
+        $this->assertFalse((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_DELETE}, Tinebase_Model_Grants::GRANT_DELETE);
     }
     
     /**
@@ -274,9 +270,9 @@ class Calendar_Controller_EventGrantsTests extends Calendar_TestCase
         $persistentEvent = $this->_createEventInPersonasCalendar('rwright', NULL, 'rwright', Calendar_Model_Event::CLASS_PRIVATE);
         $loadedEvent = $this->_uit->get($persistentEvent->getId());
         $this->assertEquals($persistentEvent->summary, $loadedEvent->summary);
-        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_READ});
-        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_EDIT});
-        $this->assertFalse((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_DELETE});
+        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_READ}, Tinebase_Model_Grants::GRANT_READ);
+        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_EDIT}, Tinebase_Model_Grants::GRANT_EDIT);
+        $this->assertTrue((bool)$loadedEvent->{Tinebase_Model_Grants::GRANT_DELETE}, Tinebase_Model_Grants::GRANT_DELETE);
     }
     
     /**
@@ -314,6 +310,45 @@ class Calendar_Controller_EventGrantsTests extends Calendar_TestCase
         
     }
     
+    /**
+     * jmcblack organises with rwright
+     *  => testuser shuld see freebusy of rwright
+     *  
+     *  @see #6388: freebusy info missing if user has only access to display calendar
+     */
+    public function testFreeBusyViaAttendee()
+    {
+        // whipe grants from jmcblack
+        Tinebase_Container::getInstance()->setGrants($this->_personasDefaultCals['jmcblack'], new Tinebase_Record_RecordSet('Tinebase_Model_Grants', array(array(
+            'account_id'    => $this->_personas['jmcblack']->getId(),
+            'account_type'  => 'user',
+            Tinebase_Model_Grants::GRANT_READ     => true,
+            Tinebase_Model_Grants::GRANT_ADD      => true,
+            Tinebase_Model_Grants::GRANT_EDIT     => true,
+            Tinebase_Model_Grants::GRANT_DELETE   => true,
+            Tinebase_Model_Grants::GRANT_PRIVATE  => true,
+            Tinebase_Model_Grants::GRANT_ADMIN    => true,
+            Tinebase_Model_Grants::GRANT_FREEBUSY => true,
+        ))), TRUE);
+        
+        $persistentEvent = $this->_createEventInPersonasCalendar('jmcblack', 'jmcblack', 'rwright');
+        
+        $events = $this->_uit->search(new Calendar_Model_EventFilter(array(
+            array('condition' => 'OR', 'filters' => array(
+                array('condition' => 'AND', 'filters' =>
+                    array(
+                        array('field' => 'id', 'operator' => 'equals', 'value' => $persistentEvent->getId()),
+                        array('field' => 'attender', 'operator' => 'in', 'value' => array(array(
+                            'user_type' => 'user',
+                            'user_id'   => $this->_personas['rwright']->contact_id,
+                        ))),
+                    )
+                )
+            ))
+        )), NULL, FALSE, FALSE);
+        
+        $this->assertEquals(1, count($events), 'failed to search fb event');
+    }
 //    /**
 //     * search for an attender we have no cal grants for
 //     * 
@@ -587,28 +622,28 @@ class Calendar_Controller_EventGrantsTests extends Calendar_TestCase
     {
         foreach ($this->_personasDefaultCals as $loginName => $calendar) {
             Tinebase_Container::getInstance()->setGrants($calendar, new Tinebase_Record_RecordSet('Tinebase_Model_Grants', array(array(
-	            'account_id'    => $this->_personas[$loginName]->getId(),
-	            'account_type'  => 'user',
-	            Tinebase_Model_Grants::GRANT_READ     => true,
-	            Tinebase_Model_Grants::GRANT_ADD      => true,
-	            Tinebase_Model_Grants::GRANT_EDIT     => true,
-	            Tinebase_Model_Grants::GRANT_DELETE   => true,
-	            Tinebase_Model_Grants::GRANT_PRIVATE  => true,
-	            Tinebase_Model_Grants::GRANT_ADMIN    => true,
-	        ))), true);
-	        
-	        $events = $this->_backend->search(new Calendar_Model_EventFilter(array(
-	            array('field' => 'container_id', 'operator' => 'equals', 'value' => $calendar->getId()),
-	        )), new Tinebase_Model_Pagination(array()));
-	        
-	        // delete alarms
-	        Tinebase_Alarm::getInstance()->deleteAlarmsOfRecord('Calendar_Model_Event', $events->getArrayOfIds());
-	        
-	        // delete events
-	        foreach ($events as $event) {
-	            $this->_backend->delete($event->getId());
-	        }
-    	}
+                'account_id'    => $this->_personas[$loginName]->getId(),
+                'account_type'  => 'user',
+                Tinebase_Model_Grants::GRANT_READ     => true,
+                Tinebase_Model_Grants::GRANT_ADD      => true,
+                Tinebase_Model_Grants::GRANT_EDIT     => true,
+                Tinebase_Model_Grants::GRANT_DELETE   => true,
+                Tinebase_Model_Grants::GRANT_PRIVATE  => true,
+                Tinebase_Model_Grants::GRANT_ADMIN    => true,
+            ))), true);
+            
+            $events = $this->_backend->search(new Calendar_Model_EventFilter(array(
+                array('field' => 'container_id', 'operator' => 'equals', 'value' => $calendar->getId()),
+            )), new Tinebase_Model_Pagination(array()));
+            
+            // delete alarms
+            Tinebase_Alarm::getInstance()->deleteAlarmsOfRecord('Calendar_Model_Event', $events->getArrayOfIds());
+            
+            // delete events
+            foreach ($events as $event) {
+                $this->_backend->delete($event->getId());
+            }
+        }
     }
 }
     

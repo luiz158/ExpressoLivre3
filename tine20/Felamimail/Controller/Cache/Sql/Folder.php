@@ -63,9 +63,7 @@ class Felamimail_Controller_Cache_Sql_Folder extends Felamimail_Controller_Cache
      */
     public function updateCacheFolder($_accountId, $_folderName = '', $_recursive = FALSE)
     {
-    	if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .  ' getting (sub) folder and creating folders in db backend cache');
-    	
-        $account = ($_accountId instanceof Felamimail_Model_Account) ? $_accountId : Felamimail_Controller_Account::getInstance()->get($_accountId);
+    	$account = ($_accountId instanceof Felamimail_Model_Account) ? $_accountId : Felamimail_Controller_Account::getInstance()->get($_accountId);
         $this->_delimiter = $account->delimiter;
         
         try {
@@ -81,9 +79,6 @@ class Felamimail_Controller_Cache_Sql_Folder extends Felamimail_Controller_Cache
         } catch (Zend_Mail_Protocol_Exception $zmpe) {
             Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' IMAP Protocol Exception: ' . $zmpe->getMessage());
             $result = new Tinebase_Record_RecordSet('Felamimail_Model_Folder');
-        } catch (Exception $e) {
-       		Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' unexpected Exception: ' . $e->getMessage());
-       		$result = new Tinebase_Record_RecordSet('Felamimail_Model_Folder');
         }
         
         return $result;

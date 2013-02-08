@@ -6,7 +6,7 @@
  * @subpackage  Controller
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  */
 
@@ -23,13 +23,13 @@ class Timetracker_Controller_Timeaccount extends Tinebase_Controller_Record_Abst
      *
      * don't use the constructor. use the singleton 
      */
-    private function __construct() {        
+    private function __construct() {
         $this->_applicationName = 'Timetracker';
         $this->_backend = new Timetracker_Backend_Timeaccount();
         $this->_modelName = 'Timetracker_Model_Timeaccount';
-        $this->_currentAccount = Tinebase_Core::getUser();   
         $this->_purgeRecords = FALSE;
-    }    
+        $this->_resolveCustomFields = TRUE;
+    }
     
     /**
      * holds the instance of the singleton
@@ -64,7 +64,7 @@ class Timetracker_Controller_Timeaccount extends Tinebase_Controller_Record_Abst
      * @todo    check if container name exists ?
      */
     public function create(Tinebase_Record_Interface $_record)
-    {   
+    {
         $this->_checkRight('create');
         
         // create container and add container_id to record
@@ -76,10 +76,11 @@ class Timetracker_Controller_Timeaccount extends Tinebase_Controller_Record_Abst
             'name'              => $containerName,
             'type'              => Tinebase_Model_Container::TYPE_SHARED,
             'backend'           => $this->_backend->getType(),
-            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName)->getId() 
+            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName)->getId(),
+            'model'             => 'Timetracker_Model_Timeaccount'
         ));
         $grants = new Tinebase_Record_RecordSet('Timetracker_Model_TimeaccountGrants', array(array(
-            'account_id'    => $this->_currentAccount->getId(),
+            'account_id'    => Tinebase_Core::getUser()->getId(),
             'account_type'  => Tinebase_Acl_Rights::ACCOUNT_TYPE_USER,
             Timetracker_Model_TimeaccountGrants::BOOK_OWN           => TRUE,
             Timetracker_Model_TimeaccountGrants::VIEW_ALL           => TRUE,
@@ -121,8 +122,7 @@ class Timetracker_Controller_Timeaccount extends Tinebase_Controller_Record_Abst
         $this->_checkRight('get');
         
         $filter = new Timetracker_Model_TimeaccountFilter(array(
-            array('field' => 'id',          'operator' => 'in',     'value' => $_ids),
-            array('field' => 'showClosed',  'operator' => 'equals', 'value' => TRUE),
+            array('field' => 'id',          'operator' => 'in',     'value' => $_ids)
         ));
         $records = $this->search($filter);
 
@@ -154,7 +154,7 @@ class Timetracker_Controller_Timeaccount extends Tinebase_Controller_Record_Abst
      * @param Tinebase_Record_Interface $_record
      */
     protected function _deleteLinkedObjects(Tinebase_Record_Interface $_record)
-    {    
+    {
         // delete linked timesheets
         $timesheets = Timetracker_Controller_Timesheet::getInstance()->getTimesheetsByTimeaccountId($_record->getId());
         Timetracker_Controller_Timesheet::getInstance()->delete($timesheets->getArrayOfIds());
@@ -264,7 +264,7 @@ class Timetracker_Controller_Timeaccount extends Tinebase_Controller_Record_Abst
                     Tinebase_Model_Grants::GRANT_EXPORT,
                     Tinebase_Model_Grants::GRANT_ADMIN,
                 ));
-                break;                
+                break;
             default:
                 throw new Timetracker_Exception_UnexpectedValue('Unknown action: ' . $_action);
         }

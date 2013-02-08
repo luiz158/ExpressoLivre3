@@ -38,7 +38,14 @@ class Crm_Backend_Lead extends Tinebase_Backend_Sql_Abstract
      * @var boolean
      */
     protected $_modlogActive = TRUE;
-        
+
+    /**
+     * default column(s) for count
+     *
+     * @var string
+     */
+    protected $_defaultCountCol = 'id';
+
     /**
      * getGroupCountForField
      * 
@@ -49,17 +56,17 @@ class Crm_Backend_Lead extends Tinebase_Backend_Sql_Abstract
      * @todo generalize
      */
     public function getGroupCountForField($_filter, $_field)
-    {     
+    {
         $select = $this->_db->select();
         
         if ($this->_modlogActive) {
             // don't fetch deleted objects
-            $select->where($this->_db->quoteIdentifier($this->_tableName . '.is_deleted') . ' = 0');                        
+            $select->where($this->_db->quoteIdentifier($this->_tableName . '.is_deleted') . ' = 0');
         }
-                
+        
         $select->from(array($this->_tableName => $this->_tablePrefix . $this->_tableName), array(
             $_field             => $_field,
-            'count'             => 'COUNT(' . $_field . ')',
+            'count'             => 'COUNT(' . $this->_db->quoteIdentifier($_field) . ')',
         ));
         $select->group($_field);
         $this->_addFilter($select, $_filter);
@@ -96,5 +103,5 @@ class Crm_Backend_Lead extends Tinebase_Backend_Sql_Abstract
         }
         
         return $select;
-    }    
+    }
 }

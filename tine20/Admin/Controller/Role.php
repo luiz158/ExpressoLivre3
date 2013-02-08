@@ -26,7 +26,6 @@ class Admin_Controller_Role extends Tinebase_Controller_Abstract
      */
     private function __construct() 
     {
-        $this->_currentAccount = Tinebase_Core::getUser();        
         $this->_applicationName = 'Admin';
     }
 
@@ -35,7 +34,7 @@ class Admin_Controller_Role extends Tinebase_Controller_Abstract
      *
      */
     private function __clone() 
-    {        
+    {
     }
 
     /**
@@ -117,7 +116,7 @@ class Admin_Controller_Role extends Tinebase_Controller_Abstract
         Tinebase_Acl_Roles::getInstance()->setRoleMembers($role->getId(), $_roleMembers);
         Tinebase_Acl_Roles::getInstance()->setRoleRights($role->getId(), $_roleRights);
         
-        return $role;            
+        return $role;
     }  
 
    /**
@@ -136,7 +135,7 @@ class Admin_Controller_Role extends Tinebase_Controller_Abstract
         Tinebase_Acl_Roles::getInstance()->setRoleMembers($role->getId(), $_roleMembers);
         Tinebase_Acl_Roles::getInstance()->setRoleRights($role->getId(), $_roleRights);
         
-        return $role;            
+        return $role;
     }  
     
     /**
@@ -146,7 +145,7 @@ class Admin_Controller_Role extends Tinebase_Controller_Abstract
      * @void
      */
     public function delete($_roleIds)
-    {        
+    {
         $this->checkRight('MANAGE_ROLES');
         
         Tinebase_Acl_Roles::getInstance()->deleteRoles($_roleIds);

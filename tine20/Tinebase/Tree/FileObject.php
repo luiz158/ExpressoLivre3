@@ -67,7 +67,7 @@ class Tinebase_Tree_FileObject extends Tinebase_Backend_Sql_Abstract
             /* table  */ array($this->_revisionsTableName => $this->_tablePrefix . $this->_revisionsTableName), 
             /* on     */ $this->_db->quoteIdentifier($this->_tableName . '.id') . ' = ' . $this->_db->quoteIdentifier($this->_revisionsTableName . '.id') . ' AND ' 
                 . $this->_db->quoteIdentifier($this->_tableName . '.revision') . ' = ' . $this->_db->quoteIdentifier($this->_revisionsTableName . '.revision'),
-            /* select */ array('revision', 'hash', 'size')
+            /* select */ array('hash', 'size')
         );
             
         return $select;
@@ -93,7 +93,7 @@ class Tinebase_Tree_FileObject extends Tinebase_Backend_Sql_Abstract
         $queryResult = $stmt->fetchAll();
         
         // increase revision
-        $where = $this->_db->quoteInto('id = ?', $objectId);
+        $where = $this->_db->quoteInto($this->_db->quoteIdentifier('id') . ' = ?', $objectId);
         $data  = array('revision' => new Zend_Db_Expr($this->_db->quoteIdentifier('revision') . ' + 1'));
         $this->_db->update($this->_tablePrefix . $this->_tableName, $data, $where);
 

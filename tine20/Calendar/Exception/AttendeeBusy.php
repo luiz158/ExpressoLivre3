@@ -18,9 +18,15 @@ class Calendar_Exception_AttendeeBusy extends Exception
      * 
      * @var Tinebase_Record_RecordSet
      */
-	protected $_fbInfo = NULL;
-	
-	/**
+    protected $_fbInfo = NULL;
+    
+    /**
+     * conflict base event
+     * @var Calendar_Model_Event
+     */
+    protected $_event = NULL;
+    
+    /**
      * construct
      * 
      * @param string $_message
@@ -36,31 +42,52 @@ class Calendar_Exception_AttendeeBusy extends Exception
      * 
      * @param Tinebase_Record_RecordSet $_fbInfo
      */
-	public function setFreeBusyInfo(Tinebase_Record_RecordSet $_fbInfo)
-	{
-	   $this->_fbInfo = $_fbInfo;
-	}
-	
-	/**
-	 * get fb info
-	 * 
-	 * @return Tinebase_Record_RecordSet
-	 */
-	public function getFreeBusyInfo()
-	{
-	    return $this->_fbInfo ? $this->_fbInfo : new Tinebase_Record_RecordSet('Calendar_Model_FreeBusy');
-	}
-	
-	/**
-	 * returns free busy info as array
-	 * 
-	 * @return array
-	 */
+    public function setFreeBusyInfo(Tinebase_Record_RecordSet $_fbInfo)
+    {
+       $this->_fbInfo = $_fbInfo;
+    }
+    
+    /**
+     * get fb info
+     * 
+     * @return Tinebase_Record_RecordSet
+     */
+    public function getFreeBusyInfo()
+    {
+        return $this->_fbInfo ? $this->_fbInfo : new Tinebase_Record_RecordSet('Calendar_Model_FreeBusy');
+    }
+    
+    /**
+     * set conflict base event
+     *
+     * @param Calendar_Model_Event $_event
+     */
+    public function setEvent(Calendar_Model_Event $_event)
+    {
+        $this->_event = $_event;
+    }
+    
+    /**
+     * get conflict base event
+     *
+     * @return Calendar_Model_Event
+     */
+    public function getEvent()
+    {
+        return $this->_event instanceof Calendar_Model_Event ? $this->_event : new Calendar_Model_Event(array(), TRUE);
+    }
+    
+    /**
+     * returns free busy info as array
+     * 
+     * @return array
+     */
     public function toArray()
     {
         $this->getFreeBusyInfo()->setTimezone(Tinebase_Core::get('userTimeZone'));
         return array(
-            'freebusyinfo' => $this->getFreeBusyInfo()->toArray()
+            'freebusyinfo' => $this->getFreeBusyInfo()->toArray(),
+            'event'        => $this->getEvent()->toArray(),
         );
     }
 }

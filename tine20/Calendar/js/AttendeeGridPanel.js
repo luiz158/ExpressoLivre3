@@ -4,7 +4,7 @@
  * @package     Calendar
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2009-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  */
  
@@ -321,7 +321,7 @@ Tine.Calendar.AttendeeGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
         e.preventDefault();
         var row = this.getView().findRowIndex(target);
         var attender = this.store.getAt(row);
-        if (attender) {
+        if (attender && ! this.disabled) {
             // don't delete 'add' row
             var attender = this.store.getAt(row);
             if (! attender.get('user_id')) {
@@ -482,6 +482,7 @@ Tine.Calendar.AttendeeGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
     },
     
     renderAttenderUserName: function(name) {
+        name = name || "";
         if (typeof name.get == 'function' && name.get('n_fileas')) {
             return Ext.util.Format.htmlEncode(name.get('n_fileas'));
         }
@@ -584,10 +585,15 @@ Tine.Calendar.AttendeeGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
     
     renderAttenderType: function(type, metadata, attender) {
         metadata.css = 'tine-grid-cell-no-dirty';
-        var cssClass = '';
+        var cssClass = '',
+            qtipText =  '',
+            userId = attender.get('user_id'),
+            hasAccount = userId && ((userId.get && userId.get('account_id')) || userId.account_id);
+            
         switch (type) {
             case 'user':
-                cssClass = 'renderer_accountUserIcon';
+                cssClass = hasAccount || ! userId ? 'renderer_typeAccountIcon' : 'renderer_typeContactIcon';
+                qtipText = hasAccount || ! userId ? '' : Tine.Tinebase.appMgr.get('Calendar').i18n._('External Attendee');
                 break;
             case 'group':
                 cssClass = 'renderer_accountGroupIcon';
@@ -597,12 +603,27 @@ Tine.Calendar.AttendeeGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
                 break;
         }
         
-        var result = '<div style="background-position:0px;" class="' + cssClass + '">&#160</div>';
+        var qtip = qtipText ? 'ext:qtip="' + Tine.Tinebase.common.doubleEncode(qtipText) + '" ': '';
+        
+        var result = '<div ' + qtip + 'style="background-position:0px;" class="' + cssClass + '">&#160</div>';
         
         if (! attender.get('user_id')) {
             result = Tine.Tinebase.common.cellEditorHintRenderer(result);
         }
         
         return result;
+    },
+    
+    /**
+     * disable contents not panel
+     */
+    setDisabled: function(v) {
+        this.disabled = v;
+        if (v) {
+            // remove "add new attender" row
+            this.store.filterBy(function(r) {return ! (r.id && r.id.match(/^new-/))});
+        } else {
+            this.store.clearFilter();
+        }
     }
 });

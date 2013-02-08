@@ -128,14 +128,14 @@ class Tinebase_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
     protected function _getCronuserFromConfigOrCreateOnTheFly()
     {
         try {
-            $cronuserId = Tinebase_Config::getInstance()->getConfig(Tinebase_Config::CRONUSERID)->value;
+            $cronuserId = Tinebase_Config::getInstance()->get(Tinebase_Config::CRONUSERID);
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Setting user with id ' . $cronuserId . ' as cronuser.');
             $cronuser = Tinebase_User::getInstance()->getFullUserById($cronuserId);
         } catch (Tinebase_Exception_NotFound $tenf) {
             if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' ' . $tenf->getMessage());
             
             $cronuser = $this->_createCronuser();
-            Tinebase_Config::getInstance()->setConfigForApplication(Tinebase_Config::CRONUSERID, $cronuser->getId());
+            Tinebase_Config::getInstance()->set(Tinebase_Config::CRONUSERID, $cronuser->getId());
         }
         
         return $cronuser;
@@ -160,29 +160,39 @@ class Tinebase_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
             'accountDisplayName'    => 'cronuser',
             'accountExpires'        => NULL,
         ));
-        return Tinebase_User::getInstance()->addUser($cronuser);
+        $cronuser = Tinebase_User::getInstance()->addUser($cronuser);
+        Tinebase_Group::getInstance()->addGroupMember($cronuser->accountPrimaryGroup, $cronuser->getId());
+        
+        return $cronuser;
     }
     
     /**
-     * process queue tasks (simple queue processing, intended to be executed from system cron job)
-     *  optional --numtasks param
+     * process given queue job
+     *  --message json encoded task
      *
+     * @TODO rework user management, jobs should be executed as the right user in future
+     * 
      * @param Zend_Console_Getopt $_opts
      * @return boolean success
      */
-    public function processQueue($_opts)
+    public function executeQueueJob($_opts)
     {
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .' Start a worker for action queye from CLI.');
-        
         try {
             $cronuser = Tinebase_User::getInstance()->getFullUserByLoginName($_opts->username);
         } catch (Tinebase_Exception_NotFound $tenf) {
             $cronuser = $this->_getCronuserFromConfigOrCreateOnTheFly();
         }
+        
         Tinebase_Core::set(Tinebase_Core::USER, $cronuser);
         
-        $actionQueue = Tinebase_ActionQueue::getInstance();
-        $r = $_opts->numtasks ? $actionQueue->processQueue($_opts->numtasks) : $actionQueue->processQueue();
+        $args = $_opts->getRemainingArgs();
+        $message = preg_replace('/^message=/', '', $args[0]);
+        
+        if (! $message) {
+            throw new Tinebase_Exception_InvalidArgument('mandatory parameter "message" is missing');
+        }
+        
+        Tinebase_ActionQueue::getInstance()->executeAction($message);
         
         return TRUE;
     }
@@ -224,9 +234,14 @@ class Tinebase_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
                     }
                     break;
                 case 'async_job':
-                    $db->query(
-                        'delete FROM ' . SQL_TABLE_PREFIX . 'async_job' .
-                        " WHERE status='success'");
+                    $where = ($dateString) ? array(
+                        $db->quoteInto($db->quoteIdentifier('end_time') . ' < ?', $dateString)
+                    ) : array();
+                    $where[] = $db->quoteInto($db->quoteIdentifier('status') . ' < ?', 'success');
+                    
+                    echo "\nRemoving all successful async_job entries " . ($dateString ? "before $dateString " : "") . "...";
+                    $deleteCount = $db->delete(SQL_TABLE_PREFIX . $table, $where);
+                    echo "\nRemoved $deleteCount records.";
                     break;
                 case 'credential_cache':
                     Tinebase_Auth_CredentialCache::getInstance()->clearCacheTable($dateString);
@@ -259,7 +274,7 @@ class Tinebase_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
             return FALSE;
         }
 
-        $args = $this->_parseArgs($_opts, array(), 'tables'); 
+        $args = $this->_parseArgs($_opts, array(), 'tables');
 
         if (! array_key_exists('tables', $args) || empty($args['tables'])) {
             echo "No tables given.\nPurging records from all tables!\n";
@@ -281,7 +296,7 @@ class Tinebase_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
     
         foreach ($args['tables'] as $table) {
             try {
-                $schema = $db->describeTable(SQL_TABLE_PREFIX . $table);
+                $schema = Tinebase_Db_Table::getTableDescriptionFromCache(SQL_TABLE_PREFIX . $table);
             } catch (Zend_Db_Statement_Exception $zdse) {
                 echo "\nCould not get schema (" . $zdse->getMessage() ."). Skipping table $table";
                 continue;
@@ -410,7 +425,11 @@ class Tinebase_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
         $configfile = Setup_Core::getConfigFilePath();
         if ($configfile) {
             $configfile = escapeshellcmd($configfile);
-            exec("php -l $configfile 2> /dev/null", $error, $code);
+            if (preg_match('/^win/i', PHP_OS)) {
+                exec("php -l $configfile 2> NUL", $error, $code);
+            } else {
+                exec("php -l $configfile 2> /dev/null", $error, $code);
+            }
             if ($code == 0) {
                 $configcheck = TRUE;
             } else {
@@ -502,5 +521,42 @@ class Tinebase_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
         
         echo $message . "\n";
         return $result;
+    }
+    
+    /**
+     * undo changes to records defined by certain criteria (user, date, fields, ...)
+     * 
+     * @param Zend_Console_Getopt $opts
+     */
+    public function undo(Zend_Console_Getopt $opts)
+    {
+        if (! $this->_checkAdminRight()) {
+            return FALSE;
+        }
+        
+        $data = $this->_parseArgs($opts, array('record_type', 'modification_time', 'modification_account'));
+        
+        // build filter from params
+        $filterData = array();
+        foreach ($data as $key => $value) {
+            $operator = ($key === 'modification_time') ? 'within' : 'equals';
+            $filterData[] = array('field' => $key, 'operator' => $operator, 'value' => $value);
+        }
+        $filter = new Tinebase_Model_ModificationLogFilter($filterData);
+        
+        $dryrun = $opts->d;
+        $result = Tinebase_Timemachine_ModificationLog::getInstance()->undo($filter, FALSE, $dryrun);
+        
+        if (! $dryrun) {
+            echo 'Reverted ' . $result['totalcount'] . " change(s)\n";
+        } else {
+            echo "Dry run\n";
+            echo 'Would revert ' . $result['totalcount'] . " change(s):\n";
+            foreach ($result['undoneModlogs'] as $modlog) {
+                echo 'id ' . $modlog->record_id . ' [' . $modlog->modified_attribute . ']: ' . $modlog->new_value . ' -> ' . $modlog->old_value . "\n";
+            }
+        }
+        echo 'Failcount: ' . $result['failcount'] . "\n";
+        return 0;
     }
 }

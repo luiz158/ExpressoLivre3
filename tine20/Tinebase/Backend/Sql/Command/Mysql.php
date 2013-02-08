@@ -18,92 +18,103 @@
 class Tinebase_Backend_Sql_Command_Mysql implements Tinebase_Backend_Sql_Command_Interface
 {
     /**
-     * setAutocommit
      * 
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param boolean $on
+     * @var Zend_Db_Adapter_Abstract
      */
-    public static function setAutocommit($adapter, $on)
-    {
-        if ($on) {
-            $adapter->query('SET AUTOCOMMIT=1;');
-        } else {
-            $adapter->query('SET AUTOCOMMIT=0;');
-        }
-    }
-    
-	/**
-     * 
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param string $field
-     * @return string
-     */    
-    public static function getAggregateFunction($adapter, $field)
-    {
-        return "GROUP_CONCAT( DISTINCT $field)";
-    } 
+    protected $_adapter;
     
     /**
-     * 
      * @param Zend_Db_Adapter_Abstract $adapter
+     */
+    public function __construct(Zend_Db_Adapter_Abstract $adapter)
+    {
+        $this->_adapter = $adapter;
+    }
+    
+    /**
+     * @param string $field
+     * @return string
+     */
+    public function getAggregate($field)
+    {
+        $quotedField = $this->_adapter->quoteIdentifier($field);
+        
+        return new Zend_Db_Expr("GROUP_CONCAT( DISTINCT $quotedField)");
+    }
+
+    /**
      * @param string $field
      * @param mixed $returnIfTrue
      * @param mixed $returnIfFalse
      */
-    public static function getIfIsNull($adapter, $field, $returnIfTrue, $returnIfFalse)
+    public function getIfIsNull($field, $returnIfTrue, $returnIfFalse)
     {
-        return "(CASE WHEN $field IS NULL THEN " . (string) $returnIfTrue . " ELSE " . (string) $returnIfFalse . " END)";
-    }   
+        $quotedField = $this->_adapter->quoteIdentifier($field);
+        
+        return new Zend_Db_Expr("(CASE WHEN $quotedField IS NULL THEN " . (string) $returnIfTrue . " ELSE " . (string) $returnIfFalse . " END)");
+    }
     
     /**
-      * 
-      * @param Zend_Db_Adapter_Abstract $adapter
-      * @return string
-      */
-    public static function getLike($adapter)
+     *
+     * @param string $condition
+     * @param string $returnIfTrue
+     * @param string $returnIfFalse
+     * @return string
+     */
+    public function getIfElse($condition, $returnIfTrue, $returnIfFalse)
+    {
+        return new Zend_Db_Expr("(IF($condition, $returnIfTrue, $returnIfFalse))");
+    }
+    
+    /**
+     * @param string $date
+     * @return string
+     */
+    public function setDate($date)
+    {
+        return "DATE({$date})";
+    }
+
+    /**
+     * @param string $value
+     * @return string
+     */
+    public function setDateValue($value)
+    {
+        return $this->_adapter->quote($value);
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getFalseValue()
+    {
+        return 'FALSE';
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getTrueValue()
+    {
+        return 'TRUE';
+    }
+
+    /**
+     * @return string
+     */
+    public function setDatabaseJokerCharacters()
+    {
+        return array('%', '\_');
+    }
+
+    /**
+     * get like keyword
+     * 
+     * @return string
+     */
+    public function getLike()
     {
         return 'LIKE';
     }
-    
-    /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param string $date
-     * @return string 
-     */
-    public static function setDate($adapter, $date)
-    {
-    	return "DATE({$date})";
-    }
-    
-    /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param string $value
-     * @return string 
-     */
-    public static function setDateValue($adapter, $value)
-    {
-    	return $value;
-    }    
-
-    /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @return mixed
-     */
-    public static function getFalseValue($adapter = null)
-    {
-    	return 'FALSE';
-    }
-    
-    /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @return mixed
-     */
-    public static function getTrueValue($adapter = null)
-    {
-    	return 'TRUE';
-    }    
 }

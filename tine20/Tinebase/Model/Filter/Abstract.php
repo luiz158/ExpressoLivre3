@@ -5,7 +5,7 @@
  * @package     Tinebase
  * @subpackage  Filter
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Cornelius Weiss <c.weiss@metaways.de>
  */
 
@@ -55,7 +55,12 @@ abstract class Tinebase_Model_Filter_Abstract
      * @var array special options
      */
     protected $_options = NULL;
-    
+
+    /**
+     * @var Tinebase_Backend_Sql_Command_Interface
+     */
+    protected $_dbCommand;
+
     /**
      * filter is implicit, this is returned in toArray
      * - this is only needed to detect acl filters that have been added by a controller
@@ -77,11 +82,14 @@ abstract class Tinebase_Model_Filter_Abstract
      */
     public function __construct($_fieldOrData, $_operator = NULL, $_value = NULL, array $_options = array())
     {
+        $this->_db = Tinebase_Core::getDb();
+        $this->_dbCommand = Tinebase_Backend_Sql_Command::factory($this->_db);
+
         if (is_array($_fieldOrData)) {
             $data = $_fieldOrData;
         } else {
-            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' ' 
-                . 'Using deprecated constructor syntax. Please pass all filter data in one array.');
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__
+                . ' Using deprecated constructor syntax. Please pass all filter data in one array (filter field: ' . $_fieldOrData . ').');
             
             $data = array(
                 'field'     => $_fieldOrData,
@@ -108,6 +116,27 @@ abstract class Tinebase_Model_Filter_Abstract
         if (isset($data['label'])) {
             $this->setLabel($data['label']);
         }
+    }
+    
+    /**
+     * returns operators of this filter model
+     * @return array
+     */
+    public function getOperators()
+    {
+        return $this->_operators;
+    }
+    
+    /**
+     * returns operator sql mapping
+     * @return array
+     */
+    public function getOpSqlMap()
+    {
+        if($this->_opSqlMap) {
+            return $this->_opSqlMap;
+        }
+        return NULL;
     }
     
     /**
@@ -156,6 +185,8 @@ abstract class Tinebase_Model_Filter_Abstract
         }
         
         if (! in_array($_operator, $this->_operators)) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' 
+                . ' Allowed operators: ' . print_r($this->_operators, TRUE));
             throw new Tinebase_Exception_UnexpectedValue("operator $_operator is not defined");
         }
         
@@ -228,12 +259,30 @@ abstract class Tinebase_Model_Filter_Abstract
     
     /**
      * set implicit
+     * @deprecated use isImplicit()
      *
      * @param boolean $_isImplicit
      */
     public function setIsImplicit($_isImplicit)
     {
         $this->_isImplicit = ($_isImplicit === TRUE);
+    }
+    
+    /**
+     * set implicit
+     *
+     * @param  boolean optional
+     * @return boolean
+     */
+    public function isImplicit()
+    {
+        $value = (func_num_args() === 1) ? (bool) func_get_arg(0) : NULL;
+        $currValue = $this->_isImplicit;
+        if ($value !== NULL) {
+            $this->_isImplicit = $value;
+        }
+        
+        return $currValue;
     }
     
     /**
@@ -345,7 +394,7 @@ abstract class Tinebase_Model_Filter_Abstract
         $action = $this->_opSqlMap[$this->_operator];
         
         // replace wildcards from user ()
-        $returnValue = str_replace(array('*', '_'), array('%', '\_'), $value);
+        $returnValue = str_replace(array('*', '_'),  $this->_dbCommand->setDatabaseJokerCharacters(), $value);
         
         // add wildcard to value according to operator
         $returnValue = str_replace('?', $returnValue, $action['wildcards']);

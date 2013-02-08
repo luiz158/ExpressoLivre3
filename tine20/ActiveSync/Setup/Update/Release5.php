@@ -3,14 +3,18 @@
  * Tine 2.0
  *
  * @package     ActiveSync
- * @license     http://www.tine20.org/licenses/agpl-nonus.txt AGPL Version 1 (Non-US)
- *              NOTE: According to sec. 8 of the AFFERO GENERAL PUBLIC LICENSE (AGPL), 
- *              Version 1, the distribution of the Tine 2.0 ActiveSync module in or to the 
- *              United States of America is excluded from the scope of this license.
- * @copyright   Copyright (c) 2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @subpackage  Setup
+ * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @copyright   Copyright (c) 2011-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  */
 
+/**
+ * updates for major release 5
+ *
+ * @package     ActiveSync
+ * @subpackage  Setup
+ */
 class ActiveSync_Setup_Update_Release5 extends Setup_Update_Abstract
 {
     /**
@@ -60,7 +64,7 @@ class ActiveSync_Setup_Update_Release5 extends Setup_Update_Abstract
                 </reference>
             </index>   
         ');
-        $this->_backend->addForeignKey('acsync_synckey', $declaration);        
+        $this->_backend->addForeignKey('acsync_synckey', $declaration);
         
         $declaration = new Setup_Backend_Schema_Field_Xml('
             <field>
@@ -247,6 +251,12 @@ class ActiveSync_Setup_Update_Release5 extends Setup_Update_Abstract
         $this->setApplicationVersion('ActiveSync', '5.5');
     }
     
+    /**
+     * update to 5.6
+     * - fix acsync_content keys
+     * 
+     * @return void
+     */
     public function update_5()
     {
         $this->validateTableVersion('acsync_content', '3');
@@ -272,22 +282,7 @@ class ActiveSync_Setup_Update_Release5 extends Setup_Update_Abstract
         ');
         $this->_backend->addIndex('acsync_content', $declaration);
         
-        $declaration = new Setup_Backend_Schema_Index_Xml('
-            <index>
-                <name>acsync_content::device_id--acsync_device::id</name>
-                <field>
-                    <name>device_id</name>
-                </field>
-                <foreign>true</foreign>
-                <reference>
-                    <table>acsync_device</table>
-                    <field>id</field>
-                    <ondelete>cascade</ondelete>
-                    <onupdate>cascade</onupdate>
-                </reference>
-            </index>
-        ');
-        $this->_backend->addForeignKey('acsync_content', $declaration);
+        $this->_addContentDeviceFK();
         
         $declaration = new Setup_Backend_Schema_Index_Xml('
             <index>
@@ -304,10 +299,33 @@ class ActiveSync_Setup_Update_Release5 extends Setup_Update_Abstract
                 </reference>
             </index>   
         ');
-        $this->_backend->addForeignKey('acsync_content', $declaration);        
+        $this->_backend->addForeignKey('acsync_content', $declaration);
                 
         $this->setTableVersion('acsync_content', '4');
         $this->setApplicationVersion('ActiveSync', '5.6');
+    }
+    
+    /**
+     * add acsync_content::device_id--acsync_device::id to content table
+     */
+    protected function _addContentDeviceFK()
+    {
+        $declaration = new Setup_Backend_Schema_Index_Xml('
+            <index>
+                <name>acsync_content::device_id--acsync_device::id</name>
+                <field>
+                    <name>device_id</name>
+                </field>
+                <foreign>true</foreign>
+                <reference>
+                    <table>acsync_device</table>
+                    <field>id</field>
+                    <ondelete>cascade</ondelete>
+                    <onupdate>cascade</onupdate>
+                </reference>
+            </index>
+        ');
+        $this->_backend->addForeignKey('acsync_content', $declaration);
     }
     
     /**
@@ -342,7 +360,10 @@ class ActiveSync_Setup_Update_Release5 extends Setup_Update_Abstract
         
         $this->_resetSyncKeyFK();
 
+        // drop acsync_content FK before truncating acsync_device -> @see 0005942: problems with update script 5.6 -> 5.7
+        $this->_backend->dropForeignKey('acsync_content', 'acsync_content::device_id--acsync_device::id');
         $this->_backend->truncateTable('acsync_device');
+        $this->_addContentDeviceFK();
         
         $declaration = new Setup_Backend_Schema_Index_Xml('
             <index>
@@ -415,11 +436,11 @@ class ActiveSync_Setup_Update_Release5 extends Setup_Update_Abstract
         
         $this->setApplicationVersion('ActiveSync', '5.8');
     }
-    
-    /**
+
+   /*
      * update to 5.9
      * - Alter field lenght
-    *
+     *
      * @return void
      */
     public function update_8()
@@ -440,5 +461,14 @@ class ActiveSync_Setup_Update_Release5 extends Setup_Update_Abstract
     	$this->setApplicationVersion('ActiveSync', '5.9');
     }
 
-    
+    /**
+    * update to 6.0
+    *
+    * @return void
+    */
+    public function update_9()
+    {
+        $this->setApplicationVersion('ActiveSync', '6.0');
+    }
+   
 }

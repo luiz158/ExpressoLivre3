@@ -3,7 +3,7 @@
  * 
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 
 Ext.ns('Tine.widgets.customfields');
@@ -67,7 +67,16 @@ Tine.widgets.customfields.EditDialogPlugin.prototype = {
                 }
                 
                 if (field) {
-                    field.setValue(this.customfieldsValue[name]);
+                    if(field.isXType('combo') && Ext.isObject(this.customfieldsValue[name])) {
+                        var phpClassName = cfConfig.get('model').split('_'),
+                            recordClass = Tine[phpClassName[0]].Model[phpClassName[2]],
+                            record = new recordClass(this.customfieldsValue[name]);
+                            
+                        field.setValue(record.getId());
+                        field.selectedRecord = record.data; 
+                    } else {
+                        field.setValue(this.customfieldsValue[name]);
+                    }
                 }
             }
         }
@@ -81,13 +90,11 @@ Tine.widgets.customfields.EditDialogPlugin.prototype = {
         
         form.items.each(function(f) {
             var name = f.getName();
-            // MOD: if name is empty ignore
-            if (! Ext.isEmpty(name)) {
-	            if (name.match(/^customfield_(.+)$/)) {
-	                name = name.match(/^customfield_(.+)$/)[1];
-	                
-	                this.customfieldsValue[name] = f.getValue();
-	            }
+            
+            if (name.match(/^customfield_(.+)$/)) {
+                name = name.match(/^customfield_(.+)$/)[1];
+                
+                this.customfieldsValue[name] = f.getValue();
             }
         }, this);
         
@@ -105,40 +112,50 @@ Tine.widgets.customfields.EditDialogPlugin.prototype = {
         var modelName = this.editDialog.recordClass.getMeta('appName') + '_Model_' + this.editDialog.recordClass.getMeta('modelName'),
             allCfConfigs = Tine.widgets.customfields.ConfigManager.getConfigs(this.app, modelName),
             form = this.editDialog.getForm(),
-            cfConfigs = [];
+            cfConfigs = new Ext.util.MixedCollection();
         
-        // remove already applied cf's
+        // remove already applied cfs / fill the mixed collection
         Ext.each(allCfConfigs, function(cfConfig) {
             if (! form.findField('customfield_' + cfConfig.get('name'))) {
-                cfConfigs.push(cfConfig);
+                cfConfigs.add(cfConfig.id, cfConfig);
             }
         }, this);
         
         // auto add cf tab
-        if (cfConfigs.length) {
+        if (cfConfigs.getCount()) {
             this.addCFTab(cfConfigs);
-            this.editDialog.cfConfigs = cfConfigs;  // used for multipleEdit 
         }
     },
     
     /**
      * create a cf tab
      * 
-     * @param {Array} cfConfigs
+     * @param {Ext.util.MixedCollection} cfConfigs
      */
     addCFTab: function(cfConfigs) {
         this.cfTabItems = [];
         this.fieldsets = {};
         
-        Ext.each(cfConfigs, function(cfConfig) {
+        cfConfigs.sort('ASC', function(r1, r2) {
+            var o1 = (r1.get('definition').uiconfig && r1.get('definition').uiconfig.order) ? r1.get('definition').uiconfig.order : 0,
+                o2 = (r2.get('definition').uiconfig && r2.get('definition').uiconfig.order) ? r2.get('definition').uiconfig.order : 0;
+            return o1 > o2 ? 1 : 0;
+        });
+
+        var definition = null,
+            fieldObj = null,
+            uiConfig = null,
+            group = null;
+        
+        cfConfigs.each(function(cfConfig) {
             try {
-                var definition = cfConfig.get('definition'),
-                    fieldObj = Tine.widgets.customfields.Field.get(this.app, cfConfig, {anchor: '95%'}),
-                    uiConfig = definition.uiconfig ? definition.uiconfig : {},
-                    order = (uiConfig.order) ? uiConfig.order : (order ? order++ : 1),
-                    group = uiConfig.group ? uiConfig.group : _('General');
+                definition = cfConfig.get('definition');
+                fieldObj = Tine.widgets.customfields.Field.get(this.app, cfConfig, {anchor: '95%'}, this.editDialog);
+                uiConfig = definition.uiconfig ? definition.uiconfig : {};
+                group = uiConfig.group ? uiConfig.group : _('General');
                 
-                this.getFieldSet(group).insert(order, fieldObj);
+                Tine.log.debug('Tine.widgets.customfields.EditDialogPlugin::addCFTab() - Adding ' + cfConfig.get('name') + ' to group ' + group);
+                this.getFieldSet(group).add(fieldObj);
                 
             } catch (e) {
                 Tine.log.debug(e);

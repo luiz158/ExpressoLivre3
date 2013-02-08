@@ -59,7 +59,7 @@ Tine.Addressbook.SearchCombo = Ext.extend(Tine.Tinebase.widgets.form.RecordPicke
     allowBlank: false,
     
     itemSelector: 'div.search-item',
-    minListWidth: 200,
+    minListWidth: 350,
     
     //private
     initComponent: function(){
@@ -76,7 +76,7 @@ Tine.Addressbook.SearchCombo = Ext.extend(Tine.Tinebase.widgets.form.RecordPicke
      */
     processValue: function(value) {
         if (this.useAccountRecord) {
-            if(value == '') {
+            if (value == '') {
                 this.accountId = null;
                 this.selectedRecord = null;
             }
@@ -117,6 +117,7 @@ Tine.Addressbook.SearchCombo = Ext.extend(Tine.Tinebase.widgets.form.RecordPicke
                 '<tpl for="."><div class="search-item">',
                     '<table cellspacing="0" cellpadding="2" border="0" style="font-size: 11px;" width="100%">',
                         '<tr>',
+                            '<td style="min-width: 20px;">{[this.getIcon(values)]}</td>',
                             '<td width="30%"><b>{[this.encode(values.n_fileas)]}</b><br/>{[this.encode(values.org_name)]}</td>',
                             '<td width="25%">{[this.encode(values.adr_one_street)]}<br/>',
                                 '{[this.encode(values.adr_one_postalcode)]} {[this.encode(values.adr_one_locality)]}</td>',
@@ -128,6 +129,9 @@ Tine.Addressbook.SearchCombo = Ext.extend(Tine.Tinebase.widgets.form.RecordPicke
                     '</table>',
                 '</div></tpl>',
                 {
+                    getIcon: function(contactData) {
+                        return Tine.Addressbook.ContactGridPanel.prototype.contactTypeRenderer.call(this, null, null, contactData);
+                    },
                     encode: function(value) {
                          if (value) {
                             return Ext.util.Format.htmlEncode(value);
@@ -153,7 +157,6 @@ Tine.Addressbook.SearchCombo = Ext.extend(Tine.Tinebase.widgets.form.RecordPicke
     },
 
     setValue: function (value) {
-
         if (this.useAccountRecord) {
             if (value) {
                 if(value.accountId) {
@@ -168,7 +171,6 @@ Tine.Addressbook.SearchCombo = Ext.extend(Tine.Tinebase.widgets.form.RecordPicke
             } else {
                 this.accountId = null;
                 this.selectedRecord = null;
-                
             }
         }
         return Tine.Addressbook.SearchCombo.superclass.setValue.call(this, value);
@@ -176,4 +178,5 @@ Tine.Addressbook.SearchCombo = Ext.extend(Tine.Tinebase.widgets.form.RecordPicke
 
 });
 
+Ext.reg('addressbookcontactpicker', Tine.Addressbook.SearchCombo);
 Tine.widgets.form.RecordPickerManager.register('Addressbook', 'Contact', Tine.Addressbook.SearchCombo);

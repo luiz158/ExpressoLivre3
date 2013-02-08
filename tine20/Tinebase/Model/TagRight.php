@@ -26,7 +26,7 @@ class Tinebase_Model_TagRight extends Tinebase_Record_Abstract
      */
     const USE_RIGHT = 'use';
     
-	/**
+    /**
      * key in $_validators/$_properties array for the filed which 
      * represents the identifier
      * 
@@ -92,10 +92,16 @@ class Tinebase_Model_TagRight extends Tinebase_Record_Abstract
     public static function applyAclSql($_select, $_right = self::VIEW_RIGHT, $_idProperty = 'id')
     {
         $db = Tinebase_Core::getDb();
-        // TODO: how quota default value
         if($_idProperty == 'id'){
-        	$_idProperty = $db->quoteIdentifier('id');
+            $_idProperty = $db->quoteIdentifier('id');
         }
+        
+        if (! is_object(Tinebase_Core::getUser())) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ .
+                ' Cannot apply ACL, no user object found. This might happen during setup/update.');
+            return;
+        }
+        
         $currentAccountId = Tinebase_Core::getUser()->getId();
         $currentGroupIds = Tinebase_Group::getInstance()->getGroupMemberships($currentAccountId);
         $groupCondition = ( !empty($currentGroupIds) ) ? ' OR (' . $db->quoteInto($db->quoteIdentifier('acl.account_type') . ' = ?', Tinebase_Acl_Rights::ACCOUNT_TYPE_GROUP) .

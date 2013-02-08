@@ -3,14 +3,18 @@
  * Tine 2.0
  *
  * @package     ActiveSync
- * @license     http://www.tine20.org/licenses/agpl-nonus.txt AGPL Version 1 (Non-US)
- *              NOTE: According to sec. 8 of the AFFERO GENERAL PUBLIC LICENSE (AGPL), 
- *              Version 1, the distribution of the Tine 2.0 ActiveSync module in or to the 
- *              United States of America is excluded from the scope of this license.
- * @copyright   Copyright (c) 2009 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @subpackage  Setup
+ * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  */
 
+/**
+ * updates for major release 0
+ *
+ * @package     ActiveSync
+ * @subpackage  Setup
+ */
 class ActiveSync_Setup_Update_Release0 extends Setup_Update_Abstract
 {
     /**
@@ -91,7 +95,7 @@ class ActiveSync_Setup_Update_Release0 extends Setup_Update_Abstract
             </table>        
         ');
     
-        $table = Setup_Backend_Schema_Table_Factory::factory('Xml', $tableDefinition); 
+        $table = Setup_Backend_Schema_Table_Factory::factory('Xml', $tableDefinition);
         $this->_backend->createTable($table);
                 
         $this->setApplicationVersion('ActiveSync', '0.2');
@@ -264,7 +268,7 @@ class ActiveSync_Setup_Update_Release0 extends Setup_Update_Abstract
             </table>
         ');
     
-        $table = Setup_Backend_Schema_Table_Factory::factory('Xml', $tableDefinition); 
+        $table = Setup_Backend_Schema_Table_Factory::factory('Xml', $tableDefinition);
         $this->_backend->createTable($table);
                 
         $this->setApplicationVersion('ActiveSync', '0.5');
@@ -335,7 +339,7 @@ class ActiveSync_Setup_Update_Release0 extends Setup_Update_Abstract
                 <onupdate>cascade</onupdate>
             </index>
         ');
-        $this->_backend->addForeignKey('acsync_content', $declaration);   
+        $this->_backend->addForeignKey('acsync_content', $declaration);
                      
         $this->setApplicationVersion('ActiveSync', '0.7');
     }

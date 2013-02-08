@@ -37,7 +37,7 @@ Tine.widgets.grid.PickerGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
      * @cfg {bool}
      * enable top toolbar (with search combo)
      */
-    enableTbar: false,
+    enableTbar: true,
     
     /**
      * store to hold records
@@ -114,6 +114,9 @@ Tine.widgets.grid.PickerGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
         this.configColumns = (this.configColumns !== null) ? this.configColumns : [];
         this.searchComboConfig = this.searchComboConfig || {};
         
+        this.labelField = this.labelField ? this.labelField : (this.recordClass && this.recordClass.getMeta ? this.recordClass.getMeta('titleProperty') : null);
+        this.autoExpandColumn = this.autoExpandColumn? this.autoExpandColumn : this.labelField;
+        
         this.initStore();
         this.initActionsAndToolbars();
         this.initGrid();
@@ -127,7 +130,7 @@ Tine.widgets.grid.PickerGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
      */
     initStore: function() {
         
-        if (this.store === null) {
+        if (!this.store) {
             this.store = new Ext.data.SimpleStore({
                 fields: this.recordClass
             });
@@ -168,32 +171,49 @@ Tine.widgets.grid.PickerGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
             items: contextItems.concat(this.contextMenuItems)
         });
         
+        // removes temporarly added items
+        this.contextMenu.on('hide', function() {
+            if(this.contextMenu.hasOwnProperty('tempItems') && this.contextMenu.tempItems.length) {
+                Ext.each(this.contextMenu.tempItems, function(item) {
+                    this.contextMenu.remove(item.itemId);
+                }, this);
+            }
+            this.contextMenu.tempItems = [];
+        }, this);
+        
         if (this.enableBbar) {
             this.bbar = new Ext.Toolbar({
                 items: [
                     this.actionRemove
-                ]
+                ].concat(this.contextMenuItems)
             });
         }
 
         if (this.enableTbar) {
-            this.tbar = new Ext.Toolbar({
-                items: [
-                    this.getSearchCombo()
-                ],
-                listeners: {
-                    scope: this,
-                    resize: this.onTbarResize
-                }
-            });
+            this.initTbar();
         }
+    },
+    
+    /**
+     * init top toolbar
+     */
+    initTbar: function() {
+        this.tbar = new Ext.Toolbar({
+            items: [
+                this.getSearchCombo()
+            ],
+            listeners: {
+                scope: this,
+                resize: this.onTbarResize
+            }
+        });
     },
     
     onTbarResize: function(tbar) {
         if (tbar.items.getCount() == 1) {
             var combo = tbar.items.get(0),
                 gridWidth = this.getGridEl().getWidth(),
-                offsetWidth = combo.getEl().getLeft() - this.getGridEl().getLeft();
+                offsetWidth = combo.getEl() ? combo.getEl().getLeft() - this.getGridEl().getLeft() : 0;
             
             if (tbar.items.getCount() == 1) {
                 tbar.items.get(0).setWidth(gridWidth - offsetWidth);
@@ -228,15 +248,40 @@ Tine.widgets.grid.PickerGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
         }, this);
         
         // on rowcontextmenu handler
-        this.on('rowcontextmenu', function(grid, row, e) {
-            e.stopEvent();
-            var selModel = grid.getSelectionModel();
-            if(!selModel.isSelected(row)) {
-                selModel.selectRow(row);
-            }
-            
-            this.contextMenu.showAt(e.getXY());
-        }, this);
+        this.on('rowcontextmenu', this.onRowContextMenu.createDelegate(this), this);
+    },
+    
+    getColumnModel: function() {
+        var labelColumn = {id: this.labelField, header: String.format(_('Selected  {0}'), this.recordClass.getMeta('recordsName')), dataIndex: this.labelField};
+        if (this.labelRenderer != Ext.emptyFn) {
+            labelColumn.renderer = this.labelRenderer;
+        }
+        
+        return new Ext.grid.ColumnModel({
+            defaults: {
+                sortable: false
+            },
+            columns:  [ labelColumn ]
+        });
+    },
+    
+    /**
+     * that's the context menu handler
+     * @param {} grid
+     * @param {} row
+     * @param {} e
+     */
+    onRowContextMenu: function(grid, row, e) {
+        e.stopEvent();
+        
+        this.fireEvent('beforecontextmenu', grid, row, e);
+        
+        var selModel = grid.getSelectionModel();
+        if(!selModel.isSelected(row)) {
+            selModel.selectRow(row);
+        }
+        
+        this.contextMenu.showAt(e.getXY());
     },
     
     /**
@@ -246,31 +291,29 @@ Tine.widgets.grid.PickerGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
         var searchComboClass = (this.searchComboClass !== null) ? this.searchComboClass : Tine.Tinebase.widgets.form.RecordPickerComboBox;
         
         return new searchComboClass(Ext.apply({
-            recordStore: this.store,
             blurOnSelect: true,
             recordClass: (this.searchRecordClass !== null) ? this.searchRecordClass : this.recordClass,
-            newRecordClass: this.recordClass,
-            newRecordDefaults: this.recordDefaults,
             emptyText: _('Search for records ...'),
-            onSelect: this.onAddRecordFromCombo
-        }, this.searchComboConfig));        
+            listeners: {
+                scope: this,
+                'select': this.onAddRecordFromCombo
+            }
+        }, this.searchComboConfig));
     },
     
     /**
+     * @param {Ext.form.ComboBox} picker
      * @param {Record} recordToAdd
-     * 
-     * TODO make reset work correctly -> show emptyText again
      */
-    onAddRecordFromCombo: function(recordToAdd) {
-        var record = new this.newRecordClass(Ext.applyIf(recordToAdd, this.newRecordDefaults), recordToAdd.id);
+    onAddRecordFromCombo: function(picker, recordToAdd) {
+        var record = new this.recordClass(Ext.applyIf(recordToAdd.data, this.recordDefaults || {}), recordToAdd.id);
         
         // check if already in
-        if (! this.recordStore.getById(record.id)) {
-            this.recordStore.add([record]);
+        if (! this.store.getById(record.id)) {
+            this.store.add([record]);
         }
-        this.collapse();
-        this.clearValue();
-        this.reset();
+        
+        picker.reset();
     },
     
     /**
@@ -279,7 +322,7 @@ Tine.widgets.grid.PickerGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
      * @param {} button
      * @param {} event
      */
-    onRemove: function(button, event) {                       
+    onRemove: function(button, event) {
         var selectedRows = this.getSelectionModel().getSelections();
         for (var i = 0; i < selectedRows.length; ++i) {
             this.store.remove(selectedRows[i]);

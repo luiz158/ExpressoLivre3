@@ -64,7 +64,7 @@ class Calendar_Frontend_WebDAV_Container extends Tinebase_WebDav_Container_Abstr
         
         $httpRequest = new Sabre_HTTP_Request();
         
-        // lie about existance of event of request is a PUT request from an ATTENDEE for an already existing event 
+        // lie about existence of event of request is a PUT request from an ATTENDEE for an already existing event 
         // to prevent ugly (and not helpful) error messages on the client
         if (isset($_SERVER['REQUEST_METHOD']) && $httpRequest->getMethod() == 'PUT' && $httpRequest->getHeader('If-None-Match') === '*') {
             if (
@@ -104,12 +104,12 @@ class Calendar_Frontend_WebDAV_Container extends Tinebase_WebDav_Container_Abstr
                 'value'     => $this->_container->getId()
             ),
             array(
-        		'field'    => 'period', 
-        		'operator'  => 'within', 
-        		'value'     => array(
-        			'from'  => Tinebase_DateTime::now()->subWeek(4),
-        			'until' => Tinebase_DateTime::now()->addYear(4)
-    			)
+                'field'    => 'period', 
+                'operator'  => 'within', 
+                'value'     => array(
+                    'from'  => Tinebase_DateTime::now()->subWeek(4),
+                    'until' => Tinebase_DateTime::now()->addYear(4)
+                )
             )
         ));
     
@@ -152,8 +152,8 @@ class Calendar_Frontend_WebDAV_Container extends Tinebase_WebDav_Container_Abstr
             '{http://calendarserver.org/ns/}getctag' => $ctags?$ctags:1,
             'id'                => $this->_container->getId(),
             'uri'               => $this->_useIdAsName == true ? $this->_container->getId() : $this->_container->name,
-        	'{DAV:}resource-id'	=> 'urn:uuid:' . $this->_container->getId(),
-        	'{DAV:}owner'       => new Sabre_DAVACL_Property_Principal(Sabre_DAVACL_Property_Principal::HREF, 'principals/users/' . Tinebase_Core::getUser()->contact_id),
+            '{DAV:}resource-id'    => 'urn:uuid:' . $this->_container->getId(),
+            '{DAV:}owner'       => new Sabre_DAVACL_Property_Principal(Sabre_DAVACL_Property_Principal::HREF, 'principals/users/' . Tinebase_Core::getUser()->contact_id),
             #'principaluri'      => $principalUri,
             '{DAV:}displayname' => $displayName,
             '{http://apple.com/ns/ical/}calendar-color' => (empty($this->_container->color)) ? '#000000' : $this->_container->color,
@@ -165,7 +165,7 @@ class Calendar_Frontend_WebDAV_Container extends Tinebase_WebDav_Container_Abstr
         );
         
         if (!empty(Tinebase_Core::getUser()->accountEmailAddress)) {
-            $properties['{' . Sabre_CalDAV_Plugin::NS_CALDAV . '}calendar-user-address-set'	] = new Sabre_DAV_Property_HrefList(array('mailto:' . Tinebase_Core::getUser()->accountEmailAddress), false); 
+            $properties['{' . Sabre_CalDAV_Plugin::NS_CALDAV . '}calendar-user-address-set'    ] = new Sabre_DAV_Property_HrefList(array('mailto:' . Tinebase_Core::getUser()->accountEmailAddress), false);
         }
         
         if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . print_r($properties, true));
@@ -181,6 +181,84 @@ class Calendar_Frontend_WebDAV_Container extends Tinebase_WebDav_Container_Abstr
         if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . print_r($response, true));
         
         return $response;
+    }
+    
+    /**
+     * Updates properties on this node,
+     *
+     * The properties array uses the propertyName in clark-notation as key,
+     * and the array value for the property value. In the case a property
+     * should be deleted, the property value will be null.
+     *
+     * This method must be atomic. If one property cannot be changed, the
+     * entire operation must fail.
+     *
+     * If the operation was successful, true can be returned.
+     * If the operation failed, false can be returned.
+     *
+     * Deletion of a non-existant property is always succesful.
+     *
+     * Lastly, it is optional to return detailed information about any
+     * failures. In this case an array should be returned with the following
+     * structure:
+     *
+     * array(
+     *   403 => array(
+     *      '{DAV:}displayname' => null,
+     *   ),
+     *   424 => array(
+     *      '{DAV:}owner' => null,
+     *   )
+     * )
+     *
+     * In this example it was forbidden to update {DAV:}displayname.
+     * (403 Forbidden), which in turn also caused {DAV:}owner to fail
+     * (424 Failed Dependency) because the request needs to be atomic.
+     *
+     * @param array $mutations
+     * @return bool|array
+     */
+    public function updateProperties($mutations)
+    {
+        if (!Tinebase_Core::getUser()->hasGrant($this->_container, Tinebase_Model_Grants::GRANT_ADMIN)) {
+            throw new Sabre_DAV_Exception_Forbidden('permission to update container denied');
+        }
+        
+        $result = array(
+            200 => array(),
+            403 => array()
+        );
+        
+        foreach ($mutations as $key => $value) {
+            switch ($key) {
+                case '{DAV:}displayname':
+                    $this->_container->name = $value;
+                    $result['200'][$key] = null;
+                    break;
+                    
+                case '{' . Sabre_CalDAV_Plugin::NS_CALDAV . '}calendar-description':
+                    // fake success
+                    $result['200'][$key] = null;
+                    break;
+                    
+                case '{' . Sabre_CalDAV_Plugin::NS_CALDAV . '}calendar-timezone':
+                    // fake success
+                    $result['200'][$key] = null;
+                    break;
+                    
+                case '{http://apple.com/ns/ical/}calendar-color':
+                    $this->_container->color = substr($value, 0, 7);
+                    $result['200'][$key] = null;
+                    break;
+                    
+                default:
+                    $result['403'][$key] = null;
+            }
+        }
+        
+        Tinebase_Container::getInstance()->update($this->_container);
+        
+        return $result;
     }
     
     protected function _getController()

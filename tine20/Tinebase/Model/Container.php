@@ -89,13 +89,14 @@ class Tinebase_Model_Container extends Tinebase_Record_Abstract
         'content_seq'       => array('allowEmpty' => true),
     
     // modlog fields
-        'created_by'             => array('allowEmpty' => true),
-        'creation_time'          => array('allowEmpty' => true),
-        'last_modified_by'       => array('allowEmpty' => true),
-        'last_modified_time'     => array('allowEmpty' => true),
-        'is_deleted'             => array('allowEmpty' => true),
-        'deleted_time'           => array('allowEmpty' => true),
-        'deleted_by'             => array('allowEmpty' => true),
+        'created_by'         => array('allowEmpty' => true),
+        'creation_time'      => array('allowEmpty' => true),
+        'last_modified_by'   => array('allowEmpty' => true),
+        'last_modified_time' => array('allowEmpty' => true),
+        'is_deleted'         => array('allowEmpty' => true),
+        'deleted_time'       => array('allowEmpty' => true),
+        'deleted_by'         => array('allowEmpty' => true),
+        'seq'                    => array('allowEmpty' => true),
     );
     
     /**
@@ -107,7 +108,7 @@ class Tinebase_Model_Container extends Tinebase_Record_Abstract
         'creation_time',
         'last_modified_time',
         'deleted_time',
-    );    
+    );
     
     /**
     * name of fields that should not be persisted during create/update in backend

@@ -17,7 +17,7 @@ Tine.Admin = function () {
     /**
      * builds the admin applications tree
      */
-    var getInitialTree = function (translation) { 
+    var getInitialTree = function (translation) {
         
         return [{
             text: translation.ngettext('User', 'Users', 50),
@@ -133,6 +133,17 @@ Tine.Admin = function () {
             expanded: true,
             dataPanelType: "customfields",
             viewRight: 'customfields'
+        }, {
+            text: translation.gettext('Server Information'),
+            cls: "treemain",
+            iconCls: 'admin-node-computers',
+            allowDrag: false,
+            allowDrop: true,
+            id: "serverinfo",
+            children: [],
+            leaf: null,
+            expanded: true,
+            dataPanelType: "serverinfo"
         }];
     };
 
@@ -196,7 +207,9 @@ Tine.Admin = function () {
             }
             
             var currentToolbar = Tine.Tinebase.MainScreen.getActiveToolbar();
-
+            
+            Tine.Tinebase.MainScreen.setActiveModulePanel(new Ext.Panel({html:'', border: false, frame: false}), true);
+            
             switch (node.attributes.dataPanelType) {
             case 'accesslog':
                 Tine.Admin.accessLog.show();
@@ -222,9 +235,38 @@ Tine.Admin = function () {
             case 'containers':
                 Tine.Admin.container.show();
                 break;
-               case 'customfields':
+           case 'customfields':
                 Tine.Admin.customfield.show();
                 break;
+           case 'serverinfo':
+               Tine.Admin.getServerInfo(function(response) {
+                   Tine.log.debug('Tine.Admin.getServerInfo()');
+                   
+                   if (! this.infoPanel) {
+                       this.infoPanel = new Ext.Panel({
+                           html: response.html,
+                           autoScroll: true
+                       });
+                   } else {
+                       this.infoPanel.update(response.html);
+                   }
+                   if (! this.infoPanelToolbar) {
+                       // TODO add correct Tine 2.0 Toolbar layout with border
+                       this.infoPanelToolbar = new Ext.Toolbar({items: [{
+                           text: translation.gettext('Refresh'),
+                           handler: function() {
+                               node.fireEvent('click', node);
+                           },
+                           iconCls: 'action_login',
+                           scale: 'medium',
+                           rowspan: 2,
+                           iconAlign: 'top'
+                       }]});
+                   }
+                   Tine.Tinebase.MainScreen.setActiveContentPanel(this.infoPanel, true);
+                   Tine.Tinebase.MainScreen.setActiveToolbar(this.infoPanelToolbar, true);
+               }, this);
+               break;
             }
         }, this);
 

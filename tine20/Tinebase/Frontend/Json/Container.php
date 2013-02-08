@@ -27,21 +27,25 @@ class Tinebase_Frontend_Json_Container
      * @param  string $application
      * @param  string $containerType
      * @param  string $owner
+     * @param  array $requiredGrants
      * @return array
      */
-    public function getContainer($application, $containerType, $owner)
-    {       
+    public function getContainer($application, $containerType, $owner, $requiredGrants = NULL)
+    {
+        if (!$requiredGrants) {
+            $requiredGrants = Tinebase_Model_Grants::GRANT_READ;
+        }
         switch($containerType) {
             case Tinebase_Model_Container::TYPE_PERSONAL:
-                $containers = Tinebase_Container::getInstance()->getPersonalContainer(Tinebase_Core::getUser(), $application, $owner, Tinebase_Model_Grants::GRANT_READ);
+                $containers = Tinebase_Container::getInstance()->getPersonalContainer(Tinebase_Core::getUser(), $application, $owner, $requiredGrants);
                 break;
                 
             case Tinebase_Model_Container::TYPE_SHARED:
-                $containers = Tinebase_Container::getInstance()->getSharedContainer(Tinebase_Core::getUser(), $application, Tinebase_Model_Grants::GRANT_READ);
+                $containers = Tinebase_Container::getInstance()->getSharedContainer(Tinebase_Core::getUser(), $application, $requiredGrants);
                 break;
                 
             case Tinebase_Model_Container::TYPE_OTHERUSERS:
-                $containers = Tinebase_Container::getInstance()->getOtherUsers(Tinebase_Core::getUser(), $application, Tinebase_Model_Grants::GRANT_READ);
+                $containers = Tinebase_Container::getInstance()->getOtherUsers(Tinebase_Core::getUser(), $application, $requiredGrants);
                 break;
                 
             default:
@@ -71,16 +75,24 @@ class Tinebase_Frontend_Json_Container
      * @param   string $application
      * @param   string $containerName
      * @param   string $containerType
+     * @param   string $modelName
      * @return  array new container
      * @throws  Tinebase_Exception_InvalidArgument
      */
-    public function addContainer($application, $name, $containerType)
+    public function addContainer($application, $name, $containerType, $modelName = '')
     {
+        if (empty($modelName)) {
+            $modelName = Tinebase_Core::getApplicationInstance($application)->getDefaultModel();
+        } else {
+            $modelName = strstr($modelName, '_Model_') ? $modelName : $application . '_Model_' . $modelName;
+        }
+        
         $newContainer = new Tinebase_Model_Container(array(
             'name'              => $name,
             'type'              => $containerType,
             'backend'           => 'Sql',
-            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName($application)->getId() 
+            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName($application)->getId(), 
+            'model'             => $modelName
         ));
         
         if($newContainer->type !== Tinebase_Model_Container::TYPE_PERSONAL and $newContainer->type !== Tinebase_Model_Container::TYPE_SHARED) {
@@ -202,7 +214,7 @@ class Tinebase_Frontend_Json_Container
                     break;
                 default:
                     throw new Tinebase_Exception_InvalidArgument('Unsupported accountType.');
-                    break;    
+                    break;
             }
         }
         
@@ -238,7 +250,7 @@ class Tinebase_Frontend_Json_Container
      */
     public function moveRecordsToContainer($targetContainerId, $filterData, $applicationName, $model)
     {
-        $filterModel = $applicationName . '_Model_' . $model . 'Filter'; 
+        $filterModel = $applicationName . '_Model_' . $model . 'Filter';
         $filter = new $filterModel(array());
         $filter->setFromArrayInUsersTimezone($filterData);
         

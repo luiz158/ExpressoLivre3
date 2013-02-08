@@ -104,6 +104,35 @@ class Setup_Backend_Mysql extends Setup_Backend_Abstract
     }
     
     /**
+     * (non-PHPdoc)
+     * @see Setup_Backend_Interface::getExistingForeignKeys()
+     */
+    public function getExistingForeignKeys($tableName)
+    {
+        $select = $this->_db->select()
+            ->from(array('table_constraints' => 'INFORMATION_SCHEMA.TABLE_CONSTRAINTS'), array('TABLE_NAME', 'CONSTRAINT_NAME'))
+            ->join(
+                array('key_column_usage' => 'INFORMATION_SCHEMA.KEY_COLUMN_USAGE'), 
+                $this->_db->quoteIdentifier('table_constraints.CONSTRAINT_NAME') . '=' . $this->_db->quoteIdentifier('key_column_usage.CONSTRAINT_NAME'),
+                array()
+            )
+            ->where($this->_db->quoteIdentifier('table_constraints.CONSTRAINT_SCHEMA')    . ' = ?', $this->_config->database->dbname)
+            ->where($this->_db->quoteIdentifier('table_constraints.CONSTRAINT_TYPE')      . ' = ?', 'FOREIGN KEY')
+            ->where($this->_db->quoteIdentifier('key_column_usage.REFERENCED_TABLE_NAME') . ' = ?', SQL_TABLE_PREFIX . $tableName);
+        
+        $foreignKeyNames = array();
+        
+        $stmt = $select->query();
+        while ($row = $stmt->fetch()) {
+            $foreignKeyNames[$row['CONSTRAINT_NAME']] = array(
+                'table_name'      => str_replace(SQL_TABLE_PREFIX, '', $row['TABLE_NAME']), 
+                'constraint_name' => str_replace(SQL_TABLE_PREFIX, '', $row['CONSTRAINT_NAME']));
+        }
+        
+        return $foreignKeyNames;
+    }
+    
+    /**
      * Get schema of existing table
      * 
      * @param String $_tableName
@@ -203,7 +232,7 @@ class Setup_Backend_Mysql extends Setup_Backend_Abstract
         }
         
         $statement .= " `" . $oldName .  "` " . $this->getFieldDeclarations($_declaration);
-        $this->execQueryVoid($statement);    
+        $this->execQueryVoid($statement);
     }
  
     /**
@@ -216,7 +245,7 @@ class Setup_Backend_Mysql extends Setup_Backend_Abstract
     {
         $statement = "ALTER TABLE `" . SQL_TABLE_PREFIX . $_tableName . "` ADD "
                     . $this->getIndexDeclarations($_declaration);
-        $this->execQueryVoid($statement);    
+        $this->execQueryVoid($statement);
     }
 
     /**
@@ -228,7 +257,7 @@ class Setup_Backend_Mysql extends Setup_Backend_Abstract
      * @throws  Setup_Exception_NotFound
      */
     public function getIndexDeclarations(Setup_Backend_Schema_Index_Abstract $_key, $_tableName = '')
-    {    
+    {
         $keys = array();
 
         $snippet = "  KEY `" . $_key->name . "`";
@@ -262,7 +291,7 @@ class Setup_Backend_Mysql extends Setup_Backend_Abstract
      * @return string
      */
     public function getForeignKeyDeclarations(Setup_Backend_Schema_Index_Abstract $_key)
-    { 
+    {
         $snippet = '  CONSTRAINT `' . SQL_TABLE_PREFIX . $_key->name . '` FOREIGN KEY ';
         $snippet .= '(`' . $_key->field . "`) REFERENCES `" . SQL_TABLE_PREFIX
                     . $_key->referenceTable . 

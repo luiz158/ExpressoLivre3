@@ -7,6 +7,8 @@
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
  * @copyright   Copyright (c) 2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * 
+ * @todo 0007376: Tinebase_FileSystem / Node model refactoring: move all container related functionality to Filemanager
  */
 
 /**
@@ -83,7 +85,7 @@ class Tinebase_Model_Tree_Node_Path extends Tinebase_Record_Abstract
         'streamwrapperpath' => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'application'       => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'container'         => array(Zend_Filter_Input::ALLOW_EMPTY => true),
-        'user'			    => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'user'              => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'name'              => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'parentrecord'      => array(Zend_Filter_Input::ALLOW_EMPTY => true),
     );
@@ -139,12 +141,12 @@ class Tinebase_Model_Tree_Node_Path extends Tinebase_Record_Abstract
      * removes app id (and /folders namespace) from a path
      * 
      * @param string $_flatpath
-     * @param Tinebase_Model_Application $_application
+     * @param Tinebase_Model_Application|string $_application
      * @return string
      */
     public static function removeAppIdFromPath($_flatpath, $_application)
     {
-        $appId = $_application->getId();
+        $appId = (is_string($_application)) ? Tinebase_Application::getInstance()->getApplicationById($_application)->getId() : $_application->getId();
         return preg_replace('@^/' . $appId . '/folders@', '', $_flatpath);
     }
     
@@ -182,8 +184,12 @@ class Tinebase_Model_Tree_Node_Path extends Tinebase_Record_Abstract
      * 
      * @param string $_path
      */
-    protected function _parsePath($_path)
+    protected function _parsePath($_path = NULL)
     {
+        if ($_path === NULL) {
+            $_path = $this->flatpath;
+        }
+        
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
             . ' Parsing path: ' . $_path);
         
@@ -206,10 +212,13 @@ class Tinebase_Model_Tree_Node_Path extends Tinebase_Record_Abstract
      * @return array
      * @throws Tinebase_Exception_InvalidArgument
      */
-    protected function _getPathParts($_path)
+    protected function _getPathParts($_path = NULL)
     {
+        if ($_path === NULL) {
+            $_path = $this->flatpath;
+        }
         if (! is_string($_path)) {
-            throw new Tinebase_Exception_InvalidArgument('Path needs to be an array!');
+            throw new Tinebase_Exception_InvalidArgument('Path needs to be a string!');
         }
         $pathParts = explode('/', trim($_path, '/'));
         if (count($pathParts) < 1) {
@@ -324,8 +333,8 @@ class Tinebase_Model_Tree_Node_Path extends Tinebase_Record_Abstract
         }
         
         return $result;
-    }    
-        
+    }
+    
     /**
      * do path replacements (container name => container id, account name => account id)
      * 
@@ -375,7 +384,14 @@ class Tinebase_Model_Tree_Node_Path extends Tinebase_Record_Abstract
         if (count($pathParts) > 3) {
             // replace account login name with id
             if ($this->containerOwner) {
-                $pathParts[3] = Tinebase_User::getInstance()->getFullUserByLoginName($this->containerOwner)->getId();
+                try {
+                    $pathParts[3] = Tinebase_User::getInstance()->getFullUserByLoginName($this->containerOwner)->getId();
+                } catch (Tinebase_Exception_NotFound $tenf) {
+                    // try again with id
+                    $user = Tinebase_User::getInstance()->getFullUserById($this->containerOwner);
+                    $pathParts[3] = $user->getId();
+                    $this->containerOwner = $user->accountLoginName;
+                }
             }
         
             // replace container name with id
@@ -436,5 +452,27 @@ class Tinebase_Model_Tree_Node_Path extends Tinebase_Record_Abstract
         
         $this->statpath             = $this->_getStatPath();
         $this->streamwrapperpath    = self::STREAMWRAPPERPREFIX . $this->statpath;
+    }
+
+    /**
+     * validate node/container existance
+     * 
+     * @throws Tinebase_Exception_NotFound
+     */
+    public function validateExistance()
+    {
+        if (! $this->containerType || ! $this->statpath) {
+            $this->_parsePath();
+        }
+        
+        $pathParts = $this->_getPathParts();
+        if (! $this->container) {
+            $containerPart = ($this->containerType === Tinebase_Model_Container::TYPE_PERSONAL) ? 5 : 4;
+            if (count($pathParts) >= $containerPart) {
+                throw new Tinebase_Exception_NotFound('Container not found');
+            }
+        } else if (! Tinebase_FileSystem::getInstance()->fileExists($this->statpath)) {
+             throw new Tinebase_Exception_NotFound('Node not found');
+        }
     }
 }

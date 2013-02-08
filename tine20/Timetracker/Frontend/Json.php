@@ -33,6 +33,11 @@ class Timetracker_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     protected $_timeaccountController = NULL;
 
     /**
+     * @see Tinebase_Frontend_Json_Abstract
+     */
+    protected $_relatableModels = array('Sales_Model_Contract');
+
+    /**
      * the constructor
      *
      */
@@ -93,13 +98,14 @@ class Timetracker_Frontend_Json extends Tinebase_Frontend_Json_Abstract
 
     /**
      * returns multiple records prepared for json transport
-     *
      * NOTE: we can't use parent::_multipleRecordsToJson here because of the different container handling
      *
-     * @param Tinebase_Record_RecordSet $_leads Crm_Model_Lead
+     * @param Tinebase_Record_RecordSet $_records Tinebase_Record_Abstract
+     * @param Tinebase_Model_Filter_FilterGroup
+     * @param Tinebase_Model_Pagination $_pagination
      * @return array data
      */
-    protected function _multipleRecordsToJson(Tinebase_Record_RecordSet $_records, $_filter=NULL)
+    protected function _multipleRecordsToJson(Tinebase_Record_RecordSet $_records, $_filter = NULL, $_pagination = NULL)
     {
         if (count($_records) == 0) {
             return array();

@@ -26,11 +26,11 @@ class Admin_Controller_Group extends Tinebase_Controller_Abstract
      * @var Admin_Controller_Group
      */
     private static $_instance = NULL;
-		
-	/**
-	 * @var Tinebase_SambaSAM_Ldap
-	 */
-	protected $_samBackend = NULL;
+        
+    /**
+     * @var Tinebase_SambaSAM_Ldap
+     */
+    protected $_samBackend = NULL;
 
     /**
      * the constructor
@@ -39,7 +39,6 @@ class Admin_Controller_Group extends Tinebase_Controller_Abstract
      */
     private function __construct() 
     {
-        $this->_currentAccount = Tinebase_Core::getUser();        
         $this->_applicationName = 'Admin';
     }
 
@@ -48,7 +47,7 @@ class Admin_Controller_Group extends Tinebase_Controller_Abstract
      *
      */
     private function __clone() 
-    {        
+    {
     }
 
     /**
@@ -115,7 +114,7 @@ class Admin_Controller_Group extends Tinebase_Controller_Abstract
             $_groupIds = $_groupIds->getArrayOfIds();
         }
         
-        if(count($_groupIds) === 0) {
+        if (count($_groupIds) === 0) {
             throw new Tinebase_Exception_InvalidArgument('user must belong to at least one group');
         }
         
@@ -136,7 +135,12 @@ class Admin_Controller_Group extends Tinebase_Controller_Abstract
         }
         
         foreach ($removeGroupMemberships as $groupId) {
-            $this->removeGroupMember($groupId, $userId);
+            try {
+                $this->removeGroupMember($groupId, $userId);
+            } catch (Tinebase_Exception_Record_NotDefined $tern) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::WARN)) Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ 
+                    . ' Could not remove group member from group ' . $groupId . ': ' . $tern);
+            }
         }
         
         return Tinebase_Group::getInstance()->getGroupMemberships($userId);
@@ -240,7 +244,7 @@ class Admin_Controller_Group extends Tinebase_Controller_Abstract
         $event->group = $group;
         Tinebase_Event::fireEvent($event);
         
-        return $group;            
+        return $group;
     }
     
     /**
@@ -260,8 +264,15 @@ class Admin_Controller_Group extends Tinebase_Controller_Abstract
             $group = $this->get($_groupId);
             $user  = Tinebase_User::getInstance()->getUserById($_userId);
             
-            if (!empty($user->contact_id) && !empty($group->list_id)) {
-                Addressbook_Controller_List::getInstance()->addListMember($group->list_id, $user->contact_id);
+            if (! empty($user->contact_id) && ! empty($group->list_id)) {
+                if (! Addressbook_Controller_List::getInstance()->exists($group->list_id)) {
+                    if (Tinebase_Core::isLogLevel(Zend_Log::WARN)) Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ 
+                        . ' Could not add member to list ' . $group->list_id . ' (it does not exist)');
+                } else {
+                    $aclChecking = Addressbook_Controller_List::getInstance()->doContainerACLChecks(FALSE);
+                    Addressbook_Controller_List::getInstance()->addListMember($group->list_id, $user->contact_id);
+                    Addressbook_Controller_List::getInstance()->doContainerACLChecks($aclChecking);
+                }
             }
         }
         
@@ -290,7 +301,9 @@ class Admin_Controller_Group extends Tinebase_Controller_Abstract
             
             if (!empty($user->contact_id) && !empty($group->list_id)) {
                 try {
+                    $aclChecking = Addressbook_Controller_List::getInstance()->doContainerACLChecks(FALSE);
                     Addressbook_Controller_List::getInstance()->removeListMember($group->list_id, $user->contact_id);
+                    Addressbook_Controller_List::getInstance()->doContainerACLChecks($aclChecking);
                 } catch (Tinebase_Exception_NotFound $tenf) {
                     if (Tinebase_Core::isLogLevel(Zend_Log::WARN)) 
                         Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ . ' catched exception: ' . get_class($tenf));
@@ -316,7 +329,7 @@ class Admin_Controller_Group extends Tinebase_Controller_Abstract
      * @return  void
      */
     public function delete($_groupIds)
-    {        
+    {
         $this->checkRight('MANAGE_ACCOUNTS');
         
         // check default user group / can't delete this group
@@ -349,7 +362,6 @@ class Admin_Controller_Group extends Tinebase_Controller_Abstract
                 if (!empty($group->list_id)) {
                     $listIds[] = $group->list_id;
                 }
-                
             }
             
             if (!empty($listIds)) {
@@ -363,7 +375,7 @@ class Admin_Controller_Group extends Tinebase_Controller_Abstract
         $event = new Admin_Event_DeleteGroup();
         $event->groupIds = $_groupIds;
         Tinebase_Event::fireEvent($event);
-    }    
+    }
     
     /**
      * get list of groupmembers

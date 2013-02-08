@@ -3,7 +3,7 @@
  * Tinebase Abstract export class
  *
  * @package     Tinebase
- * @subpackage	Export
+ * @subpackage    Export
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
  * @copyright   Copyright (c) 2010-2011 Metaways Infosystems GmbH (http://www.metaways.de)
@@ -14,7 +14,7 @@
  * Tinebase Abstract export class
  * 
  * @package     Tinebase
- * @subpackage	Export
+ * @subpackage    Export
  * 
  */
 abstract class Tinebase_Export_Abstract
@@ -131,6 +131,13 @@ abstract class Tinebase_Export_Abstract
     protected $_getRelations = FALSE;
     
     /**
+     * custom field names for this model
+     * 
+     * @var array
+     */
+    protected $_customFieldNames = NULL;
+    
+    /**
      * the constructor
      *
      * @param Tinebase_Model_Filter_FilterGroup $_filter
@@ -154,6 +161,20 @@ abstract class Tinebase_Export_Abstract
      * @return mixed filename/generated object/...
      */
     abstract public function generate();
+    
+    /**
+     * get custom field names for this app
+     * 
+     * @return array
+     */
+    protected function _getCustomFieldNames()
+    {
+        if ($this->_customFieldNames === NULL) {
+            $this->_customFieldNames = Tinebase_CustomField::getInstance()->getCustomFieldsForApplication($this->_applicationName, $this->_modelName)->name;
+        }
+        
+        return $this->_customFieldNames;
+    }
     
     /**
      * get export format string (csv, ...)
@@ -196,9 +217,9 @@ abstract class Tinebase_Export_Abstract
             'iteratable' => $this,
             'controller' => $this->_controller,
             'filter'     => $this->_filter,
-            'options'	 => array(
+            'options'     => array(
                 'searchAction' => 'export',
-                'sortInfo'	   => $this->_sortInfo,
+                'sortInfo'       => $this->_sortInfo,
                 'getRelations' => $this->_getRelations,
             ),
         ));
@@ -209,7 +230,7 @@ abstract class Tinebase_Export_Abstract
     }
     
     /**
-     * resolve records
+     * resolve records and prepare for export (set user timezone, ...)
      *
      * @param Tinebase_Record_RecordSet $_records
      */
@@ -245,6 +266,8 @@ abstract class Tinebase_Export_Abstract
         if (in_array('container_id', $types)) {
             Tinebase_Container::getInstance()->getGrantsOfRecords($_records, Tinebase_Core::getUser());
         }
+        
+        $_records->setTimezone(Tinebase_Core::get(Tinebase_Core::USERTIMEZONE));
     }
 
     /**
@@ -326,7 +349,10 @@ abstract class Tinebase_Export_Abstract
             }
         }
         
-        return Tinebase_ImportExportDefinition::getInstance()->getOptionsAsZendConfigXml($definition, $_additionalOptions);
+        $config = Tinebase_ImportExportDefinition::getInstance()->getOptionsAsZendConfigXml($definition, $_additionalOptions);
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' export config: ' . print_r($config->toArray(), TRUE));
+        
+        return $config;
     }
 
     /**
@@ -352,29 +378,37 @@ abstract class Tinebase_Export_Abstract
      */
     protected function _getContainer(Tinebase_Record_Abstract $_record, $_field = 'id', $_property = 'container_id')
     {
-        $container = $_record->{$_property}; 
+        $container = $_record->{$_property};
         return $container[$_field];
     }
     
     /**
      * add relation values from related records
      * 
-     * @param Tinebase_Record_Abstract $_record
-     * @param string $_fieldName
-     * @param string $_recordField
+     * @param Tinebase_Record_Abstract $record
+     * @param string $relationType
+     * @param string $recordField
+     * @param boolean $onlyFirstRelation
      * @return string
      */
-    protected function _addRelations(Tinebase_Record_Abstract $_record, $_fieldName, $_recordField = NULL)
+    protected function _addRelations(Tinebase_Record_Abstract $record, $relationType, $recordField = NULL, $onlyFirstRelation = FALSE)
     {
-        $_record->relations->addIndices(array('type'));
-        $matchingRelations = $_record->relations->filter('type', $_fieldName);
+        $record->relations->addIndices(array('type'));
+        $matchingRelations = $record->relations->filter('type', $relationType);
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' '
+            . 'Found ' . count($matchingRelations) . ' relations of type ' . $relationType . ' (' . $recordField . ')');
         
         $resultArray = array();
         foreach ($matchingRelations as $relation) {
-            if ($_recordField !== NULL) {
-                $resultArray[] = $relation->related_record->{$_recordField};
+            if ($recordField !== NULL) {
+                $resultArray[] = $relation->related_record->{$recordField};
             } else {
                 $resultArray[] = $this->_getRelationSummary($relation->related_record);
+            }
+            
+            if ($onlyFirstRelation) {
+                break;
             }
         }
         

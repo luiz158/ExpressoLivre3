@@ -19,20 +19,27 @@
 class Tinebase_Server_Json implements Tinebase_Server_Interface
 {
     /**
+     * handled request methods
+     * 
+     * @var array
+     */
+    protected $_methods = array();
+    
+    /**
      * handle request
      * 
      * @return void
-     */	
-	public function handle()
-	{
-	    try {
-    	    Tinebase_Core::initFramework();
-    	    $exception = FALSE;
-	    } catch (Exception $exception) {
-	        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .' initFramework exception: ' . $exception);
+     */    
+    public function handle()
+    {
+        try {
+            Tinebase_Core::initFramework();
+            $exception = FALSE;
+        } catch (Exception $exception) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .' initFramework exception: ' . $exception);
             
-	        // handle all kind of session exceptions as 'Not Authorised'
-	        if ($exception instanceof Zend_Session_Exception) {
+            // handle all kind of session exceptions as 'Not Authorised'
+            if ($exception instanceof Zend_Session_Exception) {
                 $exception = new Tinebase_Exception_AccessDenied('Not Authorised', 401);
                 
                 // expire session cookie for client
@@ -40,19 +47,14 @@ class Tinebase_Server_Json implements Tinebase_Server_Interface
             }
         }
         
-        $server = new Zend_Json_Server();
-        $server->setAutoEmitResponse(false);
-        $server->setAutoHandleExceptions(false);
-        //$server->setUseNamedParams(true);
-        
         $json = file_get_contents('php://input');
         if (substr($json, 0, 1) == '[') {
-        	if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' batched request'); 
-        	$isBatchedRequest = true;
-        	$requests = Zend_Json::decode($json);
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' batched request');
+            $isBatchedRequest = true;
+            $requests = Zend_Json::decode($json);
         } else {
-        	$isBatchedRequest = false;
-        	$requests = array(Zend_Json::decode($json));
+            $isBatchedRequest = false;
+            $requests = array(Zend_Json::decode($json));
         }
         
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
@@ -68,49 +70,117 @@ class Tinebase_Server_Json implements Tinebase_Server_Interface
         $response = array();
         foreach ($requests as $requestOptions) {
             if ($requestOptions !== NULL) {
-            	$request = new Zend_Json_Server_Request();
-            	$request->setOptions($requestOptions);
-            	
-            	$response[] = $exception ? 
-            	   $this->_handleException($server, $request, $exception) :
-            	   $this->_handle($server, $request);
+                $request = new Zend_Json_Server_Request();
+                $request->setOptions($requestOptions);
+                
+                $response[] = $exception ? 
+                   $this->_handleException($request, $exception) :
+                   $this->_handle($request);
             } else {
                 if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' Got empty request options: skip request.');
                 $response[] = NULL;
             }
         }
         
+        header('Content-type: application/json');
         echo $isBatchedRequest ? '['. implode(',', $response) .']' : $response[0];
-	}
-	
+    }
+    
+    /**
+     * get JSON from cache or new instance
+     * 
+     * @param array $classes for Zend_Cache_Frontend_File
+     * @return Zend_Json_Server
+     */
+    protected static function _getServer($classes = null)
+    {
+        // setup cache if available
+        if (is_array($classes) && Tinebase_Core::getCache()) {
+            $masterFiles = array();
+        
+            $dirname = dirname(__FILE__) . '/../../';
+            foreach ($classes as $class => $namespace) {
+                $masterFiles[] = $dirname . str_replace('_', '/', $class) . '.php';
+            }
+        
+            try {
+                $cache = new Zend_Cache_Frontend_File(array(
+                    'master_files'              => $masterFiles,
+                    'lifetime'                  => null,
+                    'automatic_serialization'   => true, // turn that off for more speed
+                    'automatic_cleaning_factor' => 0,    // no garbage collection as this is done by a scheduler task
+                    'write_control'             => false, // don't read cache entry after it got written
+                    'logging'                   => (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)),
+                    'logger'                    => Tinebase_Core::getLogger(),
+                ));
+                $cache->setBackend(Tinebase_Core::getCache()->getBackend());
+                $cacheId = '_handle_' . sha1(Zend_Json_Encoder::encode($classes));
+            } catch (Zend_Cache_Exception $zce) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__
+                    . " Failed to create cache. Exception: \n". $zce);
+            }
+        }
+        
+        if (isset($cache) && $cache->test($cacheId)) {
+            $server = $cache->load($cacheId);
+            if ($server instanceof Zend_Json_Server) {
+                return $server;
+            }
+        }
+        
+        $server = new Zend_Json_Server();
+        $server->setAutoEmitResponse(false);
+        $server->setAutoHandleExceptions(false);
+        
+        if (is_array($classes)) {
+            foreach ($classes as $class => $namespace) {
+                try {
+                    $server->setClass($class, $namespace);
+                } catch (Exception $e) {
+                    if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                        . " Failed to add JSON API for '$class' => '$namespace' Exception: \n". $e);
+                }
+            }
+        }
+        
+        if (isset($cache)) {
+            $cache->save($server, $cacheId, array(), null);
+        }
+        
+        return $server;
+    }
+    
     /**
      * handler for JSON api requests
      * @todo session expire handling
      * 
+     * @param $request
      * @return JSON
      */
-    protected function _handle($server, $request)
+    protected function _handle($request)
     {
         try {
-            $method  = $request->getMethod();
+            $method = $request->getMethod();
             Tinebase_Core::getLogger()->INFO(__METHOD__ . '::' . __LINE__ .' is JSON request. method: ' . $method);
             
             $jsonKey = (isset($_SERVER['HTTP_X_TINE20_JSONKEY'])) ? $_SERVER['HTTP_X_TINE20_JSONKEY'] : '';
             $this->_checkJsonKey($method, $jsonKey);
             
-            // add json apis which require no auth
-            $server->setClass('Tinebase_Frontend_Json', 'Tinebase');
-            $server->setClass('Tinebase_Frontend_Json_UserRegistration', 'Tinebase_UserRegistration');
-            
-            if(empty($method)) {
+            if (empty($method)) {
                 // SMD request
                 return self::getServiceMap();
             }
             
+            $this->_methods[] = $method;
+            
+            $classes = array();
+            
+            // add json apis which require no auth
+            $classes['Tinebase_Frontend_Json'] = 'Tinebase';
+            $classes['Tinebase_Frontend_Json_UserRegistration'] = 'Tinebase_UserRegistration';
+            
             // register additional Json apis only available for authorised users
-            if (Zend_Auth::getInstance()->hasIdentity()) {
-                
-                //if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " user data: " . print_r(Tinebase_Core::getUser()->toArray(), true));
+            if (Zend_Session::isStarted() && Zend_Auth::getInstance()->hasIdentity()) {
                 
                 $applicationParts = explode('.', $method);
                 $applicationName = ucfirst($applicationParts[0]);
@@ -118,47 +188,46 @@ class Tinebase_Server_Json implements Tinebase_Server_Interface
                 switch($applicationName) {
                     // additional Tinebase json apis
                     case 'Tinebase_Container':
-                        $server->setClass('Tinebase_Frontend_Json_Container', 'Tinebase_Container');                
+                        $classes['Tinebase_Frontend_Json_Container'] = 'Tinebase_Container';
                         break;
                     case 'Tinebase_PersistentFilter':
-                        $server->setClass('Tinebase_Frontend_Json_PersistentFilter', 'Tinebase_PersistentFilter');                
+                        $classes['Tinebase_Frontend_Json_PersistentFilter'] = 'Tinebase_PersistentFilter';
                         break;
                         
                     default;
                         if(Tinebase_Core::getUser() && Tinebase_Core::getUser()->hasRight($applicationName, Tinebase_Acl_Rights_Abstract::RUN)) {
-                            try {
-                                $server->setClass($applicationName.'_Frontend_Json', $applicationName);
-                            } catch (Exception $e) {
-                                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " Failed to add JSON API for application '$applicationName' Exception: \n". $e);
-                            }
+                            $classes[$applicationName.'_Frontend_Json'] = $applicationName;
                         }
                         break;
                 }
             }
-
+            
+            $server = self::_getServer($classes);
+            
             // handle response
             return $server->handle($request);
             
         } catch (Exception $exception) {
-            return $this->_handleException($server, $request, $exception);
+            return $this->_handleException($request, $exception);
         }
     }
     
     /**
      * handle exceptions
      * 
-     * @param Zend_Json_Server $server
      * @param Zend_Json_Server_Request_Http $request
      * @param Exception $exception
      * @return Zend_Json_Server_Response
      */
-    protected function _handleException($server, $request, $exception)
+    protected function _handleException($request, $exception)
     {
+        $server = self::_getServer();
+        
         $exceptionData = method_exists($exception, 'toArray')? $exception->toArray() : array();
         $exceptionData['message'] = htmlentities($exception->getMessage(), ENT_COMPAT, 'UTF-8');
         $exceptionData['code']    = $exception->getCode();
 
-        if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' ' . get_class($exception) . ' -> ' . $exception->getMessage());
+        Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ . ' ' . get_class($exception) . ' -> ' . $exception->getMessage());
         if (Tinebase_Core::getConfig()->suppressExceptionTraces !== TRUE) {
             $exceptionData['trace'] = $this->_getTraceAsArray($exception);
             $this->_logExceptionTrace($exception);
@@ -258,21 +327,23 @@ class Tinebase_Server_Json implements Tinebase_Server_Interface
      */
     public static function getServiceMap()
     {
-        $server = new Zend_Json_Server();
+        $classes = array();
         
-        $server->setClass('Tinebase_Frontend_Json', 'Tinebase');
-        $server->setClass('Tinebase_Frontend_Json_UserRegistration', 'Tinebase_UserRegistration');
+        $classes['Tinebase_Frontend_Json'] = 'Tinebase';
+        $classes['Tinebase_Frontend_Json_UserRegistration'] = 'Tinebase_UserRegistration';
         
-        if (Tinebase_Core::isRegistered(Tinebase_Core::USER)) { 
-            $server->setClass('Tinebase_Frontend_Json_Container', 'Tinebase_Container');
-            $server->setClass('Tinebase_Frontend_Json_PersistentFilter', 'Tinebase_PersistentFilter');
+        if (Tinebase_Core::isRegistered(Tinebase_Core::USER)) {
+            $classes['Tinebase_Frontend_Json_Container'] = 'Tinebase_Container';
+            $classes['Tinebase_Frontend_Json_PersistentFilter'] = 'Tinebase_PersistentFilter';
             
             $userApplications = Tinebase_Core::getUser()->getApplications(TRUE);
             foreach($userApplications as $application) {
                 $jsonAppName = $application->name . '_Frontend_Json';
-                $server->setClass($jsonAppName, $application->name);
+                $classes[$jsonAppName] = $application->name;
             }
         }
+        
+        $server = self::_getServer($classes);
         
         $server->setTarget('index.php')
                ->setEnvelope(Zend_Json_Server_Smd::ENV_JSONRPC_2);
@@ -317,5 +388,15 @@ class Tinebase_Server_Json implements Tinebase_Server_Interface
                 throw new Tinebase_Exception_AccessDenied('Not Authorised', 401);
             }
         }
+    }
+    
+    /**
+    * returns request method
+    *
+    * @return string|NULL
+    */
+    public function getRequestMethod()
+    {
+        return (! empty($this->_methods)) ? implode('|', $this->_methods) : NULL;
     }
 }

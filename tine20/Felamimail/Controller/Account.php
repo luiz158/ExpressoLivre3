@@ -62,7 +62,8 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
      *
      * don't use the constructor. use the singleton
      */
-    private function __construct() {
+    private function __construct()
+    {
         $this->_modelName = 'Felamimail_Model_Account';
         $this->_doContainerACLChecks = FALSE;
         $this->_doRightChecks = TRUE;
@@ -70,9 +71,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
         
         $this->_backend = new Felamimail_Backend_Account();
         
-        $this->_currentAccount = Tinebase_Core::getUser();
-        
-        $this->_imapConfig = Tinebase_Config::getInstance()->getConfigAsArray(Tinebase_Config::IMAP);
+        $this->_imapConfig = Tinebase_Config::getInstance()->get(Tinebase_Config::IMAP, new Tinebase_Config_Struct())->toArray();
         $this->_useSystemAccount = (array_key_exists('useSystemAccount', $this->_imapConfig) && $this->_imapConfig['useSystemAccount']);
     }
     
@@ -81,7 +80,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -91,7 +90,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
      */
     public static function getInstance() 
     {
-        if (self::$_instance === NULL) {            
+        if (self::$_instance === NULL) {
             self::$_instance = new Felamimail_Controller_Account();
         }
         
@@ -167,7 +166,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
             $this->_addSystemAccountConfigValues($record);
         }
         
-        return $record;    
+        return $record;
     }
     
     /**
@@ -200,8 +199,8 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
         $userFilter = $_filter->getFilter('user_id');
         
         // force a $userFilter filter (ACL)
-        if ($userFilter === NULL || $userFilter->getOperator() !== 'equals' || $userFilter->getValue() !== $this->_currentAccount->getId()) {
-            $userFilter = $_filter->createFilter('user_id', 'equals', $this->_currentAccount->getId());
+        if ($userFilter === NULL || $userFilter->getOperator() !== 'equals' || $userFilter->getValue() !== Tinebase_Core::getUser()->getId()) {
+            $userFilter = $_filter->createFilter('user_id', 'equals', Tinebase_Core::getUser()->getId());
             $_filter->addFilter($userFilter);
         }
     }
@@ -216,7 +215,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
     protected function _inspectBeforeCreate(Tinebase_Record_Interface $_record)
     {
         // add user id
-        $_record->user_id = $this->_currentAccount->getId();
+        $_record->user_id = Tinebase_Core::getUser()->getId();
         
         // use the imap host as smtp host if empty
         if (! $_record->smtp_hostname) {
@@ -225,7 +224,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
         
         if (! $_record->user || ! $_record->password) {
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' No username or password given for new account.');
-            return;    
+            return;
         }
         
         // add imap & smtp credentials
@@ -235,6 +234,25 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
             $_record->smtp_credentials_id = $this->_createCredentials($_record->smtp_user, $_record->smtp_password);
         } else {
             $_record->smtp_credentials_id = $_record->credentials_id;
+        }
+        
+        $this->_checkSignature($_record);
+    }
+    
+    /**
+     * convert signature to text to remove all html tags and spaces/linebreaks, if the remains are empty -> set empty signature
+     * 
+     * @param Felamimail_Model_Account $account
+     */
+    protected function _checkSignature($account)
+    {
+        if (empty($account->signature)) {
+            return;
+        }
+        
+        $plainTextSignature = Felamimail_Message::convertFromHTMLToText($account->signature, "\n");
+        if (! preg_match('/[^\s^\\n]/', $plainTextSignature, $matches)) {
+            $account->signature = '';
         }
     }
 
@@ -269,6 +287,8 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
         } else {
             $this->_beforeUpdateStandardAccount($_record, $_oldRecord);
         }
+        
+        $this->_checkSignature($_record);
     }
     
     /**
@@ -286,6 +306,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
             'name',
             'signature',
             'signature_position',
+            'display_format',
             'has_children_support',
             'delimiter',
             'ns_personal',
@@ -294,7 +315,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
             'last_modified_time',
             'last_modified_by',
         );
-        $diff = $_record->diff($_oldRecord);
+        $diff = $_record->diff($_oldRecord)->diff;
         foreach ($diff as $key => $value) {
             if (! in_array($key, $allowedFields)) {
                 // setting old value
@@ -314,7 +335,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
     {
         $this->_beforeUpdateStandardAccountCredentials($_record, $_oldRecord);
         
-        $diff = $_record->diff($_oldRecord);
+        $diff = $_record->diff($_oldRecord)->diff;
         
         // delete message body cache because display format has changed
         if (array_key_exists('display_format', $diff)) {
@@ -322,10 +343,10 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
         }
         
         // reset capabilities if imap host / port changed
-        if (isset($_SESSION[$this->_applicationName]) && (array_key_exists('host', $diff) || array_key_exists('port', $diff))) {
+        if (isset(Tinebase_Core::getSession()->Felamimail) && (array_key_exists('host', $diff) || array_key_exists('port', $diff))) {
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
                 . ' Resetting capabilities for account ' . $_record->name);
-            unset($_SESSION[$this->_applicationName][$_record->getId()]);
+            unset(Tinebase_Core::getSession()->Felamimail[$_record->getId()]);
         }
     }
 
@@ -343,7 +364,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
         $userCredentialCache = Tinebase_Core::get(Tinebase_Core::USERCREDENTIALCACHE);
         
         if ($userCredentialCache !== NULL) {
-                $credentialsBackend->getCachedCredentials($userCredentialCache);
+            $credentialsBackend->getCachedCredentials($userCredentialCache);
         } else {
             Tinebase_Core::getLogger()->crit(__METHOD__ . '::' . __LINE__ 
                 . ' Something went wrong with the CredentialsCache / use given username/password instead.'
@@ -409,7 +430,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
                 if (! Tinebase_Core::getUser()->hasRight($this->_applicationName, Felamimail_Acl_Rights::ADD_ACCOUNTS)) {
                     throw new Tinebase_Exception_AccessDenied("You don't have the right to add accounts!");
                 }
-                break;                
+                break;
             case 'update':
             case 'delete':
                 if (! Tinebase_Core::getUser()->hasRight($this->_applicationName, Felamimail_Acl_Rights::MANAGE_ACCOUNTS)) {
@@ -488,9 +509,9 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
      */
     public function updateCapabilities(Felamimail_Model_Account $_account, Felamimail_Backend_ImapProxy $_imapBackend = NULL)
     {
-        if (isset($_SESSION[$this->_applicationName]) && array_key_exists($_account->getId(), $_SESSION[$this->_applicationName])) {
+        if (isset(Tinebase_Core::getSession()->Felamimail) && array_key_exists($_account->getId(), Tinebase_Core::getSession()->Felamimail)) {
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Getting capabilities of account ' . $_account->name . ' from SESSION.');
-            return $_SESSION[$this->_applicationName][$_account->getId()];
+            return Tinebase_Core::getSession()->Felamimail[$_account->getId()];
         }
         
         $imapBackend = ($_imapBackend !== NULL) ? $_imapBackend : $this->_getIMAPBackend($_account, TRUE);
@@ -516,7 +537,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
         }
         
         // save capabilities in SESSION
-        $_SESSION[$this->_applicationName][$_account->getId()] = $capabilities;
+        Tinebase_Core::getSession()->Felamimail[$_account->getId()] = $capabilities;
         
         return $capabilities;
     }
@@ -753,7 +774,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
      */
     protected function _addSystemAccount(Tinebase_Record_RecordSet $_accounts)
     {
-        $userId = $this->_currentAccount->getId();
+        $userId = Tinebase_Core::getUser()->getId();
         $fullUser = Tinebase_User::getInstance()->getFullUserById($userId);
         $email = $this->_getAccountEmail($fullUser);
         
@@ -858,7 +879,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
             if ($_username !== NULL) {
                 $message .= ' for username ' . $_username;
             } 
-            Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . $message);    
+            Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . $message);
         }
         
         if (Tinebase_Core::isRegistered(Tinebase_Core::USERCREDENTIALCACHE)) {
@@ -877,7 +898,8 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
         $accountCredentials = Tinebase_Auth_CredentialCache::getInstance()->cacheCredentials(
             ($_username !== NULL) ? $_username : $userCredentialCache->username,
             ($_password !== NULL) ? $_password : $userCredentialCache->password,
-            $userCredentialCache->password
+            $userCredentialCache->password,
+            TRUE // save in DB
         );
         
         return $accountCredentials->getId();
@@ -917,7 +939,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
         
         $this->_addUserValues($_account);
         
-        //if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . print_r($_account->toArray(), TRUE)); 
+        //if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . print_r($_account->toArray(), TRUE));
     }
     
     /**
@@ -930,9 +952,8 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
      */
     protected function _addConfigValuesToAccount(Felamimail_Model_Account $_account, $_configKey, $_keysOverwrite = array(), $_defaults = array())
     {
-        $config = ($_configKey == Tinebase_Config::IMAP) ? $this->_imapConfig : Tinebase_Config::getInstance()->getConfigAsArray($_configKey, 'Tinebase', $_defaults);
+        $config = ($_configKey == Tinebase_Config::IMAP) ? $this->_imapConfig : Tinebase_Config::getInstance()->get($_configKey, new Tinebase_Config_Struct($_defaults))->toArray();
         $prefix = ($_configKey == Tinebase_Config::IMAP) ? '' : strtolower($_configKey) . '_';
-        
         if (! is_array($config)) {
             throw new Felamimail_Exception('Invalid config found for ' . $_configKey);
         }
@@ -955,7 +976,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Abstract
     protected function _addUserValues(Felamimail_Model_Account $_account, Tinebase_Model_FullUser $_user = NULL, $_email = NULL)
     {
         if ($_user === NULL) {
-            $_user = Tinebase_User::getInstance()->getFullUserById($this->_currentAccount->getId());
+            $_user = Tinebase_User::getInstance()->getFullUserById(Tinebase_Core::getUser()->getId());
         }
         
         if ($_email === NULL) {

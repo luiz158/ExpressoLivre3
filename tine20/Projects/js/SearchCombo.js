@@ -36,7 +36,7 @@ Ext.ns('Tine.Projects');
  */
 Tine.Projects.SearchCombo = Ext.extend(Tine.Tinebase.widgets.form.RecordPickerComboBox, {
     
-
+    allowBlank: false,
     itemSelector: 'div.search-item',
     minListWidth: 200,
     
@@ -83,7 +83,7 @@ Tine.Projects.SearchCombo = Ext.extend(Tine.Tinebase.widgets.form.RecordPickerCo
                         
                     }
                 }
-            );       
+            );
         }
     },
     
@@ -91,7 +91,7 @@ Tine.Projects.SearchCombo = Ext.extend(Tine.Tinebase.widgets.form.RecordPickerCo
             return Tine.Projects.SearchCombo.superclass.getValue.call(this);
     },
 
-    setValue: function (value) {       
+    setValue: function (value) {
         return Tine.Projects.SearchCombo.superclass.setValue.call(this, value);
     }
 

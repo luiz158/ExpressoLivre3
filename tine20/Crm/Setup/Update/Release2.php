@@ -19,18 +19,16 @@ class Crm_Setup_Update_Release2 extends Setup_Update_Abstract
      */
     public function update_0()
     {
-        $config = Tinebase_Core::getConfig();
-    	if (isset($config->crm)) {
-    	    $defaults = array(
-                'leadstate_id'  => (isset($config->crm->defaultstate))  ? Tinebase_Core::getConfig()->crm->defaultstate     : 1,
-                'leadtype_id'   => (isset($config->crm->defaulttype))   ? Tinebase_Core::getConfig()->crm->defaulttype      : 1,
-                'leadsource_id' => (isset($config->crm->defaultsource)) ? Tinebase_Core::getConfig()->crm->defaultsource    : 1,    	    
-    	    );
-    	    
-    	    Tinebase_Config::getInstance()->setConfigForApplication(Tinebase_Config::APPDEFAULTS, Zend_Json::encode($defaults), 'Crm');
-    	}
-    	
-    	$this->setApplicationVersion('Crm', '2.1');
+        $config = Crm_Config::getInstance();
+        $defaults = array(
+            'leadstate_id'  => $config->get(defaultstate, 1),
+            'leadtype_id'   => $config->get(defaulttype, 1),
+            'leadsource_id' => $config->get(defaultsource, 1),
+        );
+        
+        Crm_Config::getInstance()->set(Tinebase_Config::APPDEFAULTS, $defaults);
+        
+        $this->setApplicationVersion('Crm', '2.1');
     }
 
     /**
@@ -67,7 +65,7 @@ class Crm_Setup_Update_Release2 extends Setup_Update_Abstract
             $queryResult = $stmt->fetchAll();
 
             // save to config
-            Tinebase_Config::getInstance()->setConfigForApplication($config['cfgId'], Zend_Json::encode($queryResult), 'Crm');
+            Crm_Config::getInstance()->set($config['cfgId'], Zend_Json::encode($queryResult));
             
             // remove tables and constraints
             try {

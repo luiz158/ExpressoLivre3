@@ -48,18 +48,6 @@ Tine.Crm.LeadEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
     tasksGrid: null,
     
     /**
-     * New contacts when adding contacts from addressbook
-     * @type Array 
-     */
-    additionalContacts: null,
-    
-    /**
-     * New contacts' role when adding contacts from addressbook
-     * @type String 
-     */
-    additionalContactsRole: null,
-    
-    /**
      * @private
      */
     windowNamePrefix: 'LeadEditWindow_',
@@ -68,49 +56,25 @@ Tine.Crm.LeadEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
     recordProxy: Tine.Crm.leadBackend,
     tbarItems: [{xtype: 'widget-activitiesaddbutton'}],
     showContainerSelector: true,
-    
     /**
-     * Init this component
+     * ignore these models in relation grid
+     * @type {Array}
      */
-    initComponent: function() {
-        this.additionalContacts = Ext.decode(this.additionalContacts);
-        Tine.Crm.LeadEditDialog.superclass.initComponent.apply(this, arguments);
-    },
-
+    ignoreRelatedModels: ['Sales_Model_Product', 'Addressbook_Model_Contact', 'Tasks_Model_Task'],
+    
     /**
      * executed after record got updated from proxy
      * 
      * @private
      */
-    onRecordLoad: function() {
-        // add contacts from addressbook if any
-        if(this.additionalContacts) { 
-            var relations = this.record.get('relations');
-            Ext.each(this.additionalContacts, function(contact) {
-                var add = true;
-                Ext.each(this.record.get('relations'), function(existingRelation){
-                    if(contact.id == existingRelation.related_record.id) {
-                        add = false;
-                        return false;
-                    }
-                });
-                if(add) {
-                    relations.push({
-                        type: this.additionalContactsRole,
-                        related_record: contact
-                    });
-                }
-            }, this);
-            
-            this.record.set('relations', relations);
-        }
-        
+    onAfterRecordLoad: function() {
+        Tine.Crm.LeadEditDialog.superclass.onAfterRecordLoad.call(this);
         // load contacts/tasks/products into link grid (only first time this function gets called/store is empty)
         if (this.contactGrid && this.tasksGrid && this.productsGrid 
             && this.contactGrid.store.getCount() == 0 
             && (! this.tasksGrid.store || this.tasksGrid.store.getCount() == 0) 
             && (! this.productsGrid.store || this.productsGrid.store.getCount() == 0)) {
-                    
+            
             var relations = this.splitRelations();
             
             this.contactGrid.store.loadData(relations.contacts, true);
@@ -122,19 +86,19 @@ Tine.Crm.LeadEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                 this.productsGrid.store.loadData(relations.products, true);
             }
         }
-        
-        Tine.Crm.LeadEditDialog.superclass.onRecordLoad.call(this);        
     },
-    
+
     /**
-     * executed when record gets updated from form
-     * - add attachments to record here
-     * 
-     * @private
+     * is called from onApplyChanges
+     * @param {Boolean} closeWindow
      */
-    onRecordUpdate: function() {
-        Tine.Crm.LeadEditDialog.superclass.onRecordUpdate.call(this);
-        this.getAdditionalData();        
+    doApplyChanges: function(closeWindow) {
+        this.getAdditionalData();
+        
+        var relations = [].concat(this.record.get('relations'));
+        this.record.data.relations = relations;
+        
+        Tine.Crm.LeadEditDialog.superclass.doApplyChanges.call(this, closeWindow);
     },
     
     /**
@@ -145,7 +109,7 @@ Tine.Crm.LeadEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
      * @return  Object relation with record data
      */
     getRelationData: function(record) {
-        var relation = null; 
+        var relation = null;
         
         if (record.data.relation) {
             relation = record.data.relation;
@@ -161,9 +125,8 @@ Tine.Crm.LeadEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
         
         // do not do recursion!
         delete record.data.relation;
-        //delete record.data.relation_type;
         
-        // save record data        
+        // save record data
         relation.related_record = record.data;
         
         // add remark values
@@ -178,31 +141,27 @@ Tine.Crm.LeadEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
             relation.remark.quantity = record.data.remark_quantity;
         }
         
+        Tine.log.debug('Tine.Crm.LeadEditDialog::getRelationData() -> relation:');
+        Tine.log.debug(relation);
+        
         return relation;
     },
 
     /**
      * getAdditionalData
      * collects additional data (start/end dates, linked contacts, ...)
-     * 
      */
     getAdditionalData: function() {
-        
-        // collect data of relations
-        var relations = [];
-        this.contactGrid.store.each(function(record) {                     
-            relations.push(this.getRelationData(record));
+        var relations = this.record.get('relations'),
+            grids = [this.contactGrid, this.tasksGrid, this.productsGrid];
+            
+        Ext.each(grids, function(grid) {
+            if (grid.store) {
+                grid.store.each(function(record) {
+                    relations.push(this.getRelationData(record.copy()));
+                }, this);
+            }
         }, this);
-        if (this.tasksGrid.store) {
-            this.tasksGrid.store.each(function(record) {
-                relations.push(this.getRelationData(record));
-            }, this);
-        }
-        if (this.productsGrid.store) {
-            this.productsGrid.store.each(function(record) {
-                relations.push(this.getRelationData(record));
-            }, this);
-        }
         
         this.record.data.relations = relations;
     },
@@ -226,12 +185,11 @@ Tine.Crm.LeadEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
             newLinkObject.relation = relations[i];
             newLinkObject.relation_type = relations[i]['type'].toLowerCase();
     
-            //console.log(newLinkObject);
             if ((newLinkObject.relation_type === 'responsible' 
               || newLinkObject.relation_type === 'customer' 
               || newLinkObject.relation_type === 'partner')) {
                 contacts.push(newLinkObject);
-            } else if (newLinkObject.relation_type === 'task') {                
+            } else if (newLinkObject.relation_type === 'task') {
                 tasks.push(newLinkObject);
             } else if (newLinkObject.relation_type === 'product') {
                 newLinkObject.remark_description = relations[i].remark.description;
@@ -316,7 +274,7 @@ Tine.Crm.LeadEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                 id: 'editCenterPanel',
                 defaults: {
                     border: true,
-                    frame: true            
+                    frame: true
                 },
                 items: [{
                     region: 'center',
@@ -437,7 +395,7 @@ Tine.Crm.LeadEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                                         new Ext.form.DateField({
                                             fieldLabel: this.app.i18n._('Start'), 
                                             allowBlank: false,
-                                            id: 'start',             
+                                            id: 'start',
                                             anchor: '95%'
                                         }),
                                         new Ext.ux.form.ClearableDateField({
@@ -487,7 +445,7 @@ Tine.Crm.LeadEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                                     grow: false,
                                     preventScrollbars:false,
                                     anchor:'100% 100%',
-                                    emptyText: this.app.i18n._('Enter description')                        
+                                    emptyText: this.app.i18n._('Enter description')
                                 }]
                             }),
                             new Tine.widgets.activities.ActivitiesPanel({

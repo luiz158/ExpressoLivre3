@@ -172,7 +172,7 @@ Tine.Crm.Product.GridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
      */
     initActions: function() {
         
-        var app = Tine.Tinebase.appMgr.get(this.recordClass.getMeta('appName')); 
+        var app = Tine.Tinebase.appMgr.get(this.recordClass.getMeta('appName'));
         if (! app) {
             return;
         }        
@@ -188,11 +188,11 @@ Tine.Crm.Product.GridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
             iconCls: 'action_remove',
             onlySingle: true,
             scope: this,
-            handler: function(_button, _event) {                       
+            handler: function(_button, _event) {
                 var selectedRows = this.getSelectionModel().getSelections();
                 for (var i = 0; i < selectedRows.length; ++i) {
                     this.store.remove(selectedRows[i]);
-                }           
+                }
             }
         });
         
@@ -234,7 +234,7 @@ Tine.Crm.Product.GridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
                             }, record.id);
                             this.productsStore.insert(0, newRecord);
                         }
-                            
+                        
                         this.collapse();
                         this.clearValue();
                     }

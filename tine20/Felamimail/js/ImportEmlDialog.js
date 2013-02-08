@@ -21,7 +21,7 @@ Ext.namespace('Tine.Felamimail');
  * TODO         make email note editable
  * </p>
  * 
- * @author      Antonio Carlos da Silva  <antonio-carlos.silva@serpro.gov.br>
+ * @author      Philipp Schüle <p.schuele@metaways.de>
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * 
  * @param       {Object} config
@@ -171,7 +171,7 @@ Ext.namespace('Tine.Felamimail');
                 dropElSelector: null
             }],
             handler: function (fileSelector, e) {
-        var uploader = new Ext.ux.file.Upload({
+        var uploader = new Ext.ux.file.Uploader({
             maxFileSize: 67108864, // 64MB
             fileSelector: fileSelector
         });
@@ -705,7 +705,7 @@ Ext.namespace('Tine.Felamimail');
         var attachmentData = null;
         
         this.attachmentGrid.store.each(function(attachment) {
-            this.record.data.attachments.push(Ext.ux.file.Upload.file.getFileData(attachment));
+            this.record.data.attachments.push(Ext.ux.file.Uploader.file.getFileData(attachment));
         }, this);
         
         var accountId = this.accountCombo.getValue();

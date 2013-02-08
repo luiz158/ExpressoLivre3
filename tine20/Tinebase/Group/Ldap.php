@@ -147,7 +147,7 @@ class Tinebase_Group_Ldap extends Tinebase_Group_Sql implements Tinebase_Group_I
      */
     public function getGroupByIdFromSyncBackend($_groupId)
     {
-        $groupId = Tinebase_Model_Group::convertGroupIdToInt($_groupId);     
+        $groupId = Tinebase_Model_Group::convertGroupIdToInt($_groupId);
         
         $filter = Zend_Ldap_Filter::andFilter(
             Zend_Ldap_Filter::string($this->_groupBaseFilter),
@@ -202,10 +202,6 @@ class Tinebase_Group_Ldap extends Tinebase_Group_Sql implements Tinebase_Group_I
             array('cn', 'description', $this->_groupUUIDAttribute)
         );
         
-        Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . 'recovered groups from ldap: ' . print_r($groups,true));
-        
-        Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . 'getting groups from syncbackend... filter: ' . print_r($filter,true) . ' groupsDn: ' . $this->_options['groupsDn'] . ' groupSearchScope: ' . $this->_groupSearchScope . ' groupUUIDAttribute: ' . $this->_groupUUIDAttribute);        
-                
         $result = new Tinebase_Record_RecordSet('Tinebase_Model_Group');
         
         foreach ($groups as $group) {
@@ -213,7 +209,7 @@ class Tinebase_Group_Ldap extends Tinebase_Group_Sql implements Tinebase_Group_I
                 'id'            => $group[$this->_groupUUIDAttribute][0],
                 'name'          => $group['cn'][0],
                 'description'   => isset($group['description'][0]) ? $group['description'][0] : null
-            ), TRUE); 
+            ), TRUE);
 
             $result->addRecord($groupObject);
         }
@@ -243,7 +239,7 @@ class Tinebase_Group_Ldap extends Tinebase_Group_Sql implements Tinebase_Group_I
         
         $groupDn = $this->_getDn($_groupId);
         
-        $memberDn = array(); 
+        $memberDn = array();
         $memberUid = array();
         
         foreach ($membersMetaDatas as $memberMetadata) {
@@ -459,7 +455,7 @@ class Tinebase_Group_Ldap extends Tinebase_Group_Sql implements Tinebase_Group_I
                 // we need to add the group dn, as the member attribute is not allowed to be empty
                 $dataAdd = array(
                     'member' => $groupDn
-                ); 
+                );
                 $this->_ldap->insertProperty($groupDn, $dataAdd);
             } else {
                 $ldapData['member'] = $accountMetaData['dn'];
@@ -485,12 +481,12 @@ class Tinebase_Group_Ldap extends Tinebase_Group_Sql implements Tinebase_Group_I
      *
      * @param  Tinebase_Model_Group  $_group
      * 
-     * @return Tinebase_Model_Group
+     * @return Tinebase_Model_Group|NULL
      */
     public function addGroupInSyncBackend(Tinebase_Model_Group $_group) 
     {
         if ($this->_isReadOnlyBackend) {
-            return;
+            return NULL;
         }
         
         $dn = $this->_generateDn($_group);
@@ -634,7 +630,7 @@ class Tinebase_Group_Ldap extends Tinebase_Group_Sql implements Tinebase_Group_I
             throw new Tinebase_Exception_NotFound("Group with id $_groupId not found.");
         }
         
-        return $result->getFirst();        
+        return $result->getFirst();
     }
     
     /**
@@ -899,4 +895,15 @@ class Tinebase_Group_Ldap extends Tinebase_Group_Sql implements Tinebase_Group_I
         return $memberships;
     }
     
+    /**
+     * (non-PHPdoc)
+     * @see tine20/Tinebase/Group/Interface/Syncable::mergeMissingProperties
+     */
+    public static function mergeMissingProperties($syncGroup, $sqlGroup)
+    {
+        // @TODO see ldap schema, email might be an attribute
+        foreach (array('list_id', 'email', 'visibility') as $property) {
+            $syncGroup->{$property} = $sqlGroup->{$property};
+        }
+    }
 }

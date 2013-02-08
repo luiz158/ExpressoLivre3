@@ -48,7 +48,7 @@ class Tinebase_Scheduler_Task extends Zend_Scheduler_Task
      */
     public static function getPreparedTask($_type, array $_requestOptions, array $_taskOptions = array())
     {
-        $request = new Zend_Controller_Request_Simple(); 
+        $request = new Zend_Controller_Request_Simple();
         $request->setControllerName($_requestOptions['controller']);
         $request->setActionName($_requestOptions['action']);
         if (array_key_exists('params', $_requestOptions)) {
@@ -139,6 +139,25 @@ class Tinebase_Scheduler_Task extends Zend_Scheduler_Task
     }
     
     /**
+     * add sessions cleanup task to scheduler
+     * 
+     * @param Zend_Scheduler $_scheduler
+     */
+    public static function addSessionsCleanupTask(Zend_Scheduler $_scheduler)
+    {
+        $task = self::getPreparedTask(self::TASK_TYPE_HOURLY, array(
+            'controller'    => 'Tinebase_Controller',
+            'action'        => 'cleanupSessions',
+        ));
+        
+        $_scheduler->addTask('Tinebase_cleanupSessions', $task);
+        $_scheduler->saveTask();
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
+            . ' Saved task Tinebase_Controller::cleanupSessions in scheduler.');
+    }
+    
+    /**
      * add credential cache cleanup task to scheduler
      * 
      * @param Zend_Scheduler $_scheduler
@@ -201,17 +220,25 @@ class Tinebase_Scheduler_Task extends Zend_Scheduler_Task
      * @see tine20/Zend/Scheduler/Zend_Scheduler_Task::run()
      * 
      * @todo remove the loop? can there be multiple requests?)
+     * 
+     * @return mixed (FALSE on error)
      */
     public function run()
     {
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
-                . ' Fetching requests .... ');
+            . ' Fetching requests .... ');
         
         foreach ($this->getRequests() as $request) {
             if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
                 . ' Running request: ' . $request->getControllerName() . '::' . $request->getActionName());
             
-            $controller = Tinebase_Controller_Abstract::getController($request->getControllerName());
+            try {
+                $controller = Tinebase_Controller_Abstract::getController($request->getControllerName());
+            } catch (Exception $e) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ 
+                    . ' Could not get controller for scheduler job: ' . $e->getMessage());
+                return false;
+            }
             
             // only the first request is processed because of this return 
             return call_user_func_array(array($controller, $request->getActionName()), $request->getUserParams());

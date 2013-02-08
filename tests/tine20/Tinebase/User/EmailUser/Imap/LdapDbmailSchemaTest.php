@@ -67,7 +67,7 @@ class Tinebase_User_EmailUser_Imap_LdapDbmailSchemaTest extends PHPUnit_Framewor
             $this->markTestSkipped('Dbmail LDAP plugin not enabled');
         }
         
-        $this->_config = Tinebase_Config::getInstance()->getConfigAsArray(Tinebase_Config::IMAP);
+        $this->_config = Tinebase_Config::getInstance()->get(Tinebase_Config::IMAP, new Tinebase_Config_Struct())->toArray();
         
         $this->objects['users'] = array();
     }
@@ -93,10 +93,10 @@ class Tinebase_User_EmailUser_Imap_LdapDbmailSchemaTest extends PHPUnit_Framewor
     public function testAddUser()
     {
         $user = Tinebase_User_LdapTest::getTestRecord();
-		$user->imapUser = new Tinebase_Model_EmailUser(array(
-		    'emailMailQuota' => 1000
+        $user->imapUser = new Tinebase_Model_EmailUser(array(
+            'emailMailQuota' => 1000
         ));
-		
+        
         $testUser = $this->_backend->addUser($user);
         $this->objects['users']['testUser'] = $testUser;
 
@@ -153,8 +153,8 @@ class Tinebase_User_EmailUser_Imap_LdapDbmailSchemaTest extends PHPUnit_Framewor
         $this->assertEquals(Tinebase_User::STATUS_ENABLED, $testUser->accountStatus);
     }
     
-}		
-	
+}        
+    
 
 if (PHPUnit_MAIN_METHOD == 'Tinebase_User_EmailUser_Imap_LdapDbmailSchemaTest::main') {
     Tinebase_Group_SqlTest::main();

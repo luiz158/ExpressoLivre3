@@ -12,19 +12,15 @@
       "isDebug": true,
       "fileIncludes": [
         {
-          "text": "Model.js",
+          "text": "ExampleRecordEditDialog.js",
           "path": "js/"
         },
         {
-          "text": "ExampleApplication.js",
+          "text": "ExampleRecordDetailsPanel.js",
           "path": "js/"
         },
         {
           "text": "ExampleRecordGridPanel.js",
-          "path": "js/"
-        },
-        {
-          "text": "ExampleRecordEditDialog.js",
           "path": "js/"
         }
       ]

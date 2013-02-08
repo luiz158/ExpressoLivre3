@@ -4,7 +4,7 @@
  * @package     Felamimail
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2009-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  */
  
@@ -134,7 +134,16 @@ Tine.Felamimail.Application = Ext.extend(Tine.Tinebase.Application, {
             }
             
             this.showActiveVacation();
-            var hook = new Tine.Felamimail.AddressbookGridPanelHook({app: this});
+            var adbHook = new Tine.Felamimail.GridPanelHook({
+                app: this,
+                foreignAppName: 'Addressbook'
+            });
+            var crmHook = new Tine.Felamimail.GridPanelHook({
+                app: this,
+                foreignAppName: 'Crm',
+                contactInRelation: true,
+                relationType: 'CUSTOMER'
+            });
         }
     },
     
@@ -450,7 +459,10 @@ Tine.Felamimail.Application = Ext.extend(Tine.Tinebase.Application, {
                 node.remove();
             }
             this.getFolderStore().remove(currentRequestFolder);
-        } else if (account) {
+        } else if (account && (manualRefresh ||
+            //  do not show exclamation mark for timeouts and connection losses
+            (exception.code !== 520 && exception.code !== 510))
+        ) {
             account.setLastIMAPException(exception);
             
             this.getFolderStore().each(function(folder) {
@@ -465,7 +477,8 @@ Tine.Felamimail.Application = Ext.extend(Tine.Tinebase.Application, {
             }
         }
         
-        Tine.log.info('Background update failed (' + exception.message + ') for folder ' + currentRequestFolder.get('globalname') 
+        Tine.log.info((manualRefresh ? 'Manual' : 'Background') + ' update failed (' + exception.message
+            + ') for folder ' + currentRequestFolder.get('globalname') 
             + ' -> will check mails again in "' + this.updateInterval/1000 + '" seconds');
         Tine.log.debug(exception);
         this.checkMailsDelayedTask.delay(this.updateInterval);
@@ -538,7 +551,7 @@ Tine.Felamimail.Application = Ext.extend(Tine.Tinebase.Application, {
         if (recents > 0 ) {
             Tine.log.info('Show notification: ' + recents + ' new mails.');
             var title = this.i18n._('New mails'),
-                message = String.format(this.i18n._('You got {0} new mail(s) in folder {1} ({2}).'), recents, record.get('localname'), account.get('name')); 
+                message = String.format(this.i18n._('You got {0} new mail(s) in folder {1} ({2}).'), recents, record.get('localname'), account.get('name'));
             
             if (record.isCurrentSelection()) {
                 // need to defer the notification because the new messages are not shown yet 
@@ -566,7 +579,6 @@ Tine.Felamimail.Application = Ext.extend(Tine.Tinebase.Application, {
         }
         
         Tine.log.info('Updating title with new unreadcount: ' + this.unreadcountInDefaultInbox);
-        
         var currentTitle = document.title,
             unreadString = (this.unreadcountInDefaultInbox != 0) ? '(' + this.unreadcountInDefaultInbox + ') ' : '';
             
@@ -635,15 +647,15 @@ Tine.Felamimail.Application = Ext.extend(Tine.Tinebase.Application, {
                 proxy: Tine.Felamimail.accountBackend,
                 reader: Tine.Felamimail.accountBackend.getReader(),
                 listeners: {
-                	scope: this,
-                	'add': function (store, records) {
-                		Tine.log.info('Account added: ' + records[0].get(Tine.Felamimail.Model.Account.getMeta('titleProperty')));
-                		this.getMainScreen().getCenterPanel().action_write.setDisabled(! this.getActiveAccount());
-                	},
-                	'remove': function (store, record) {
-                		Tine.log.info('Account removed: ' + record.get(Tine.Felamimail.Model.Account.getMeta('titleProperty')));
-                		this.getMainScreen().getCenterPanel().action_write.setDisabled(! this.getActiveAccount());
-                	}
+                    scope: this,
+                    'add': function (store, records) {
+                        Tine.log.info('Account added: ' + records[0].get(Tine.Felamimail.Model.Account.getMeta('titleProperty')));
+                        this.getMainScreen().getCenterPanel().action_write.setDisabled(! this.getActiveAccount());
+                    },
+                    'remove': function (store, record) {
+                        Tine.log.info('Account removed: ' + record.get(Tine.Felamimail.Model.Account.getMeta('titleProperty')));
+                        this.getMainScreen().getCenterPanel().action_write.setDisabled(! this.getActiveAccount());
+                    }
                 }
             });
         } 
@@ -751,7 +763,7 @@ Tine.Felamimail.loadFlagsStore = function(reload) {
  * @return {String}
  */
 Tine.Felamimail.getSignature = function(id) {
-        
+    
     var result = '',
         app = Tine.Tinebase.appMgr.get('Felamimail'),
         activeAccount = app.getMainScreen().getTreePanel().getActiveAccount();
@@ -766,7 +778,7 @@ Tine.Felamimail.getSignature = function(id) {
     var signature = (defaultAccount) ? defaultAccount.get('signature') : '';
     if (signature && signature != '') {
         // NOTE: signature is always in html, nl2br here would cause duplicate linebreaks!
-        result = '<br><br><span id="felamimail-body-signature">--<br>' + signature + '</span>';
+        result = '<br><br><span id="felamimail-body-signature">-- <br>' + signature + '</span>';
     }
     
     return result;

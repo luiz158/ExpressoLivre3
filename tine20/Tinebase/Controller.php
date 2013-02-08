@@ -16,7 +16,7 @@
  * @package     Tinebase
  * @subpackage  Server
  */
-class Tinebase_Controller extends Tinebase_Controller_Abstract
+class Tinebase_Controller extends Tinebase_Controller_Event
 {
     /**
      * holds the instance of the singleton
@@ -37,7 +37,7 @@ class Tinebase_Controller extends Tinebase_Controller_Abstract
      *
      */
     private function __construct() 
-    {    
+    {
     }
 
     /**
@@ -78,18 +78,22 @@ class Tinebase_Controller extends Tinebase_Controller_Abstract
                    }
         }
         $authResult = Tinebase_Auth::getInstance()->authenticate($_loginname, $_password);
+        $authResultCode = $authResult->getCode();
+        $authResultIdentity = $authResult->getIdentity();
+        
+        Tinebase_Core::set(Tinebase_Core::SESSIONID, Zend_Session::isStarted() ? session_id() : Tinebase_Record_Abstract::generateUID());
         
         $accessLog = new Tinebase_Model_AccessLog(array(
-            'sessionid'     => session_id(),
+            'sessionid'     => Tinebase_Core::get(Tinebase_Core::SESSIONID),
             'ip'            => $_ipAddress,
             'li'            => Tinebase_DateTime::now()->get(Tinebase_Record_Abstract::ISO8601LONG),
-            'result'        => $authResult->getCode(),
-            'clienttype'    => $_clientIdString,   
+            'result'        => $authResultCode,
+            'clienttype'    => $_clientIdString,
         ), TRUE);
-
+        
         $user = NULL;
         if ($accessLog->result == Tinebase_Auth::SUCCESS) {
-            $user = $this->_getLoginUser($authResult->getIdentity(), $accessLog);
+            $user = $this->_getLoginUser($authResultIdentity, $accessLog);
             if ($user !== NULL) {
                 $this->_checkUserStatus($user, $accessLog);
             }
@@ -138,7 +142,7 @@ class Tinebase_Controller extends Tinebase_Controller_Abstract
     {
         $accountsController = Tinebase_User::getInstance();
         $user = NULL;
-                
+        
         try {
             // does the user exist in the user database?
             if ($accountsController instanceof Tinebase_User_Interface_SyncAble) {
@@ -224,7 +228,7 @@ class Tinebase_Controller extends Tinebase_Controller_Abstract
             
             $_user->setLoginTime($_accessLog->ip);
             
-            $_accessLog->sessionid = session_id();
+            $_accessLog->sessionid = Tinebase_Core::get(Tinebase_Core::SESSIONID);
             $_accessLog->login_name = $_user->accountLoginName;
             $_accessLog->account_id = $_user->getId();
         }
@@ -237,34 +241,38 @@ class Tinebase_Controller extends Tinebase_Controller_Abstract
      */
     protected function _initUserSession(Tinebase_Model_FullUser $_user)
     {
-        if (Tinebase_Config::getInstance()->getConfig(Tinebase_Config::SESSIONUSERAGENTVALIDATION, NULL, TRUE)->value) {
+        if (Tinebase_Config::getInstance()->get(Tinebase_Config::SESSIONUSERAGENTVALIDATION, TRUE)) {
             Zend_Session::registerValidator(new Zend_Session_Validator_HttpUserAgent());
         } else {
             Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' User agent validation disabled.');
         }
         
-        if (Tinebase_Config::getInstance()->getConfig(Tinebase_Config::SESSIONIPVALIDATION, NULL, TRUE)->value) {
+        if (Tinebase_Config::getInstance()->get(Tinebase_Config::SESSIONIPVALIDATION, TRUE)) {
             Zend_Session::registerValidator(new Zend_Session_Validator_IpAddress());
         } else {
             Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Session ip validation disabled.');
         }
         
-        Zend_Session::regenerateId();
-        
-        /** 
-         * fix php session header handling http://forge.tine20.org/mantisbt/view.php?id=4918 
-         * -> search all Set-Cookie: headers and replace them with the last one!
-         **/
-        $cookieHeaders = array();
-        foreach(headers_list() as $headerString) {
-            if (strpos($headerString, 'Set-Cookie: TINE20SESSID=') === 0) {
-                array_push($cookieHeaders, $headerString);
-            }   
-        }   
-        header(array_pop($cookieHeaders), true);
-        /** end of fix **/
-        
-        Tinebase_Core::getSession()->currentAccount = $_user;
+        if (Zend_Session::isStarted()) {
+            Zend_Session::regenerateId();
+            Tinebase_Core::set(Tinebase_Core::SESSIONID, session_id());
+            
+            /** 
+             * fix php session header handling http://forge.tine20.org/mantisbt/view.php?id=4918 
+             * -> search all Set-Cookie: headers and replace them with the last one!
+             **/
+            $cookieHeaders = array();
+            foreach (headers_list() as $headerString) {
+                if (strpos($headerString, 'Set-Cookie: TINE20SESSID=') === 0) {
+                    array_push($cookieHeaders, $headerString);
+                }
+            }
+            header(array_pop($cookieHeaders), true);
+            /** end of fix **/
+            
+            Tinebase_Core::getSession()->currentAccount = $_user;
+        }
+    
     }
     
     /**
@@ -279,8 +287,6 @@ class Tinebase_Controller extends Tinebase_Controller_Abstract
         
         $_accessLog->login_name = $_loginname;
         $_accessLog->lo = Tinebase_DateTime::now()->get(Tinebase_Record_Abstract::ISO8601LONG);
-        
-        Zend_Session::destroy();
         
         sleep(mt_rand(2,5));
     }
@@ -355,7 +361,7 @@ class Tinebase_Controller extends Tinebase_Controller_Abstract
          * but the user is not logged into Tine 2.0
          * we use this to validate passwords for OpenId for example
          */ 
-        unset($_SESSION['Zend_Auth']);
+        unset(Tinebase_Core::getSession()->Zend_Auth);
         unset(Tinebase_Core::getSession()->currentAccount);
         
         return $result;
@@ -370,11 +376,8 @@ class Tinebase_Controller extends Tinebase_Controller_Abstract
      */
     public function changePassword($_oldPassword, $_newPassword)
     {
-        //error_log(print_r(Tinebase_Core::getUser()->toArray(), true));
-        
-        // check config setting 
-        if (!Tinebase_User::getBackendConfiguration('changepw', true)) {
-            throw new Tinebase_Exception_AccessDenied('Password change not allowed.');                
+        if (! Tinebase_Config::getInstance()->get(Tinebase_Config::PASSWORD_CHANGE, TRUE)) {
+            throw new Tinebase_Exception_AccessDenied('Password change not allowed.');
         }
         
         $loginName = Tinebase_Core::getUser()->accountLoginName;
@@ -388,22 +391,16 @@ class Tinebase_Controller extends Tinebase_Controller_Abstract
     }
     
     /**
-     * destroy session
+     * logout user
      *
      * @return void
      */
     public function logout($_ipAddress)
     {
-        if (Tinebase_Core::isRegistered(Tinebase_Core::USER)) {
-            $currentAccount = Tinebase_Core::getUser();
-    
-            if (is_object($currentAccount)) {
-                Tinebase_AccessLog::getInstance()->setLogout(session_id(), $_ipAddress);                
-            }
+        if (Tinebase_Core::isRegistered(Tinebase_Core::USER) && is_object(Tinebase_Core::getUser())) {
+            Tinebase_AccessLog::getInstance()->setLogout(Tinebase_Core::get(Tinebase_Core::SESSIONID), $_ipAddress);
         }
-        
-        Zend_Session::destroy();
-    }   
+    }
     
     /**
      * gets image info and data
@@ -438,8 +435,100 @@ class Tinebase_Controller extends Tinebase_Controller_Abstract
      */
     public function cleanupCache($_mode = Zend_Cache::CLEANING_MODE_OLD)
     {
-        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Cleaning up the cache (mode: ' . $_mode . ')');
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(
+            __METHOD__ . '::' . __LINE__ . ' Cleaning up the cache (mode: ' . $_mode . ')');
         
         Tinebase_Core::getCache()->clean($_mode);
+    }
+    
+    /**
+     * cleanup old sessions files => needed only for filesystems based sessions
+     */
+    public function cleanupSessions()
+    {
+        $config = Tinebase_Core::getConfig();
+        
+        $backendType = ($config->session && $config->session->backend) ? ucfirst($config->session->backend) : 'File';
+        
+        if (strtolower($backendType) == 'file') {
+            $maxLifeTime = ($config->session && $config->session->lifetime) ? $config->session->lifetime : 86400;
+            $path = ini_get('session.save_path');
+            
+            $unlinked = 0;
+            try {
+                $dir = new DirectoryIterator($path);
+            } catch (UnexpectedValueException $uve) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(
+                    __METHOD__ . '::' . __LINE__ . " Could not cleanup sessions: " . $e->getMessage());
+                return;
+            }
+            
+            foreach ($dir as $fileinfo) {
+                if (!$fileinfo->isDot() && !$fileinfo->isLink() && $fileinfo->isFile()) {
+                    if ($fileinfo->getMTime() < Tinebase_DateTime::now()->getTimestamp() - $maxLifeTime) {
+                        unlink($fileinfo->getPathname());
+                        $unlinked++;
+                    }
+                }
+            }
+            
+            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(
+                __METHOD__ . '::' . __LINE__ . " Deleted $unlinked expired session files");
+            
+            Tinebase_Config::getInstance()->set(Tinebase_Config::LAST_SESSIONS_CLEANUP_RUN, Tinebase_DateTime::now()->toString());
+        }
+    }
+    
+    /**
+     * spy function for unittesting of queue workers
+     * 
+     * this function writes the number of executions of itself in the given 
+     * file and optionally sleeps a given time
+     * 
+     * @param string  $filename
+     * @param int     $sleep
+     * @param int     $fail
+     */
+    public function testSpy($filename=NULL, $sleep=0, $fail=NULL)
+    {
+        $filename = $filename ? $filename : ('/tmp/'.__METHOD__);
+        $counter = file_exists($filename) ? (int) file_get_contents($filename) : 0;
+        
+        file_put_contents($filename, ++$counter);
+        
+        if ($sleep) {
+            sleep($sleep);
+        }
+        
+        if ($fail && (int) $counter <= $fail) {
+            throw new Exception('spy failed on request');
+        }
+        
+        return;
+    }
+
+    /**
+     * handle events for Tinebase
+     * 
+     * @param Tinebase_Event_Abstract $_eventObject
+     */
+    protected function _handleEvent(Tinebase_Event_Abstract $_eventObject)
+    {
+        switch (get_class($_eventObject)) {
+            case 'Admin_Event_DeleteGroup':
+                foreach ($_eventObject->groupIds as $groupId) {
+                    if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                        . ' Removing role memberships of group ' .$groupId );
+                    
+                    $roleIds = Tinebase_Acl_Roles::getInstance()->getRoleMemberships($groupId, Tinebase_Acl_Rights::ACCOUNT_TYPE_GROUP);
+                    foreach ($roleIds as $roleId) {
+                        Tinebase_Acl_Roles::getInstance()->removeRoleMember($roleId, array(
+                            'id'   => $groupId,
+                            'type' => Tinebase_Acl_Rights::ACCOUNT_TYPE_GROUP,
+                        ));
+                    }
+                }
+                break;
+        }
     }
 }

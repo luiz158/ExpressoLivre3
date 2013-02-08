@@ -36,7 +36,7 @@ class Addressbook_Setup_Initialize extends Setup_Initialize
         $initialAdminUserOptions = $this->_parseInitialAdminUserOptions($_options);
         
         if(Tinebase_User::getInstance() instanceof Tinebase_User_Interface_SyncAble) {
-            Tinebase_User::syncUsers(true);
+            Tinebase_User::syncUsers(array('syncContactData' => TRUE));
         } else {
             Tinebase_User::createInitialAccounts($initialAdminUserOptions);
         }
@@ -59,7 +59,7 @@ class Addressbook_Setup_Initialize extends Setup_Initialize
         $keyfieldConfig = array(
             'name'    => Addressbook_Config::CONTACT_SALUTATION,
             'records' => array(
-                array('id' => 'MR',      'value' => 'Mr', 	   'gender' => Addressbook_Model_Salutation::GENDER_MALE,   'image' => 'images/empty_photo_male.png',    'system' => true), //_('Mr')
+                array('id' => 'MR',      'value' => 'Mr',        'gender' => Addressbook_Model_Salutation::GENDER_MALE,   'image' => 'images/empty_photo_male.png',    'system' => true), //_('Mr')
                 array('id' => 'MS',      'value' => 'Ms',      'gender' => Addressbook_Model_Salutation::GENDER_FEMALE, 'image' => 'images/empty_photo_female.png',  'system' => true), //_('Ms')
                 array('id' => 'COMPANY', 'value' => 'Company', 'gender' => Addressbook_Model_Salutation::GENDER_OTHER,  'image' => 'images/empty_photo_company.png', 'system' => true), //_('Company')
             ),
@@ -108,6 +108,7 @@ class Addressbook_Setup_Initialize extends Setup_Initialize
         foreach (Tinebase_Group::getInstance()->getGroups() as $group) {
             $group->members = Tinebase_Group::getInstance()->getGroupMembers($group);
             $group->container_id = $this->_getInternalAddressbook()->getId();
+            $group->visibility = Tinebase_Model_Group::VISIBILITY_DISPLAYED;
             $list = Admin_Controller_Group::getInstance()->createOrUpdateList($group);
             
             $group->list_id = $list->getId();
@@ -193,7 +194,7 @@ class Addressbook_Setup_Initialize extends Setup_Initialize
             Tinebase_Model_Grants::GRANT_READ,
             Tinebase_Model_Grants::GRANT_EDIT,
             Tinebase_Model_Grants::GRANT_ADMIN
-        ), TRUE);               
+        ), TRUE);
     }
     
     /**
@@ -241,12 +242,11 @@ class Addressbook_Setup_Initialize extends Setup_Initialize
             $internalAddressbook = Tinebase_Container::getInstance()->getContainerByName('Addressbook', 'Internal Contacts', Tinebase_Model_Container::TYPE_SHARED);
         }
         
-        Tinebase_Config::getInstance()->setConfigForApplication(
+        Admin_Config::getInstance()->set(
             Tinebase_Config::APPDEFAULTS,
-            Zend_Json::encode(array(
+            array(
                 Admin_Model_Config::DEFAULTINTERNALADDRESSBOOK => $internalAddressbook->getId()
-            )),
-            'Admin'
+            )
         );
         
         return $internalAddressbook;

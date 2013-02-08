@@ -67,9 +67,9 @@ class Tinebase_Model_Filter_Date extends Tinebase_Model_Filter_Abstract implemen
         
         // quote field identifier
         $field = $this->_getQuotedFieldName($_backend);
-        
-        // db
-        $this->_db = Tinebase_Core::getDb();
+
+        $db = Tinebase_Core::getDb();
+        $dbCommand = Tinebase_Backend_Sql_Command::factory($db);
          
         // append query to select object
         foreach ((array)$this->_opSqlMap[$this->_operator]['sqlop'] as $num => $operator) {
@@ -77,8 +77,7 @@ class Tinebase_Model_Filter_Date extends Tinebase_Model_Filter_Abstract implemen
                 if (get_parent_class($this) === 'Tinebase_Model_Filter_Date' || in_array($this->_operator, array('isnull', 'notnull'))) {
                     $_select->where($field . $operator, $value[$num]);
                 } else {
-                    $value = Tinebase_Backend_Sql_Command::setDateValue($this->_db, $value[$num]);
-                    $_select->where( Tinebase_Backend_Sql_Command::setDate($this->_db, $field). $operator, $value);
+                    $_select->where($dbCommand->setDate($field). $operator, new Zend_Db_Expr($dbCommand->setDateValue($value[$num])));
                 }
             } else {
                 if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' No filter value found, skipping operator: ' . $operator);
@@ -184,7 +183,7 @@ class Tinebase_Model_Filter_Date extends Tinebase_Model_Filter_Abstract implemen
                     $value = array(
                         $date->toString('Y') . '-01-01', 
                         $date->toString('Y') . '-12-31',
-                    );                
+                    );
                     break;
                 /******* quarter *********/
                 case 'quarterNext':
@@ -209,7 +208,7 @@ class Tinebase_Model_Filter_Date extends Tinebase_Model_Filter_Abstract implemen
                     $value = array(
                         $first, 
                         $last
-                    );                
+                    );
                     break;
                 /******* day *********/
                 case 'dayNext':
@@ -223,11 +222,20 @@ class Tinebase_Model_Filter_Date extends Tinebase_Model_Filter_Abstract implemen
                     );
                     
                     break;
-                /******* error *********/
+                /******* try to create datetime from value string *********/
                 default:
-                    Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__ . ' value unknown: ' . $_value);
-                    $value = '';
-            }        
+                    try {
+                        $date = new Tinebase_DateTime($_value);
+                        $value = array(
+                            $date->toString($this->_dateFormat),
+                            $date->toString($this->_dateFormat),
+                        );
+                    } catch (Exception $e) {
+                        Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__ . ' Bad value: ' . $_value);
+                        Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $e);
+                        $value = '';
+                    }
+            }
         } elseif ($_operator === 'inweek') {
             $date = new Tinebase_DateTime();
             

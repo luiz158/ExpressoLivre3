@@ -3,12 +3,10 @@
  * Tine 2.0
  * 
  * @package     ActiveSync
- * @license     http://www.tine20.org/licenses/agpl-nonus.txt AGPL Version 1 (Non-US)
- *              NOTE: According to sec. 8 of the AFFERO GENERAL PUBLIC LICENSE (AGPL), 
- *              Version 1, the distribution of the Tine 2.0 ActiveSync module in or to the 
- *              United States of America is excluded from the scope of this license.
+ * @subpackage  Model
+ * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Lars Kneschke <l.kneschke@metaways.de>
- * @copyright   Copyright (c) 2008-2009 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2008-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * 
  */
 
@@ -16,6 +14,7 @@
  * class to hold device data
  * 
  * @package     ActiveSync
+ * @subpackage  Model
  * @property  string  $acsversion         activesync protocoll version
  * @property  string  $calendarfilter_id  the calendar filter id
  * @property  string  $contactsfilter_id  the contacts filter id
@@ -25,15 +24,15 @@
  * @property  string  $policykey          the current policykey
  * @property  string  $tasksfilter_id     the tasks filter id
  */
-class ActiveSync_Model_Device extends Tinebase_Record_Abstract implements Syncope_Model_IDevice
-{  
+class ActiveSync_Model_Device extends Tinebase_Record_Abstract implements Syncroton_Model_IDevice
+{
     /**
      * key in $_validators/$_properties array for the filed which 
      * represents the identifier
      * 
      * @var string
      */    
-    protected $_identifier = 'id';    
+    protected $_identifier = 'id';
     
     /**
      * application the record belongs to
@@ -65,7 +64,7 @@ class ActiveSync_Model_Device extends Tinebase_Record_Abstract implements Syncop
         'deviceid'              => array(Zend_Filter_Input::ALLOW_EMPTY => false, 'presence'=>'required'),
         'devicetype'            => array(Zend_Filter_Input::ALLOW_EMPTY => false, 'presence'=>'required'),
         'owner_id'              => array(Zend_Filter_Input::ALLOW_EMPTY => false, 'presence'=>'required'),
-        'policy_id'             => array(Zend_Filter_Input::ALLOW_EMPTY => false, 'presence'=>'required'),
+        'policy_id'             => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'policykey'             => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'acsversion'            => array(Zend_Filter_Input::ALLOW_EMPTY => false, 'presence'=>'required'),
         'useragent'             => array(Zend_Filter_Input::ALLOW_EMPTY => false, 'presence'=>'required'),
@@ -92,7 +91,7 @@ class ActiveSync_Model_Device extends Tinebase_Record_Abstract implements Syncop
     public function getMajorVersion()
     {
         switch ($this->devicetype) {
-            case Syncope_Model_Device::TYPE_IPHONE:
+            case Syncroton_Model_Device::TYPE_IPHONE:
                 if (preg_match('/(.+)\/(\d+)\.(\d+)/', $this->useragent, $matches)) {
                     list(, $name, $majorVersion, $minorVersion) = $matches;
                     return $majorVersion;

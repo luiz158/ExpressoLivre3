@@ -5,7 +5,7 @@
  * @package     Timetracker
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 
 /**
@@ -48,7 +48,18 @@ class Timetracker_Model_TimeaccountFilter extends Tinebase_Model_Filter_FilterGr
             'applicationName' => 'Timetracker',
         )),
         'created_by'     => array('filter' => 'Tinebase_Model_Filter_User'),
-        'showClosed'     => array('filter' => 'Timetracker_Model_TimeaccountClosedFilter'),
+        'last_modified_time'   => array('filter' => 'Tinebase_Model_Filter_Date'),
+        'deleted_time'         => array('filter' => 'Tinebase_Model_Filter_DateTime'),
+        'creation_time'        => array('filter' => 'Tinebase_Model_Filter_Date'),
+        'last_modified_by'     => array('filter' => 'Tinebase_Model_Filter_User'),
+        'is_open'              => array('filter' => 'Tinebase_Model_Filter_Bool'),
+        'contract'    => array('filter' => 'Tinebase_Model_Filter_ExplicitRelatedRecord', 'options' => array(
+            'controller' => 'Sales_Controller_Contract',
+            'filtergroup' => 'Sales_Model_ContractFilter',
+            'own_filtergroup' => 'Timetracker_Model_TimeaccountFilter',
+            'own_controller' => 'Timetracker_Controller_Timeaccount',
+            'related_model' => 'Sales_Model_Contract',
+        ))
     );
     
     /**
@@ -73,7 +84,6 @@ class Timetracker_Model_TimeaccountFilter extends Tinebase_Model_Filter_FilterGr
     protected function _setOptions(array $_options)
     {
         $_options['useTimesheetAcl']    = array_key_exists('useTimesheetAcl', $_options) ? $_options['useTimesheetAcl'] : FALSE;
-        $_options['showClosed']         = array_key_exists('showClosed', $_options)      ? $_options['showClosed']      : 0;
         parent::_setOptions($_options);
     }
     
@@ -97,35 +107,20 @@ class Timetracker_Model_TimeaccountFilter extends Tinebase_Model_Filter_FilterGr
      */
     public function appendFilterSql($_select, $_backend)
     {
-        if (! $this->isFilterSet('showClosed')) {
-            // add show closed filter if not already set
-            $showClosedFilter = $this->createFilter('showClosed', 'equals', $this->_options['showClosed']);
-            $showClosedFilter->setIsImplicit(TRUE);
-            $this->addFilter($showClosedFilter);
-        }
-        
-        $this->_appendAclSqlFilter($_select);
-    }
-    
-    /**
-     * append acl filter
-     *
-     * @param Zend_Db_Select $_select
-     */
-    protected function _appendAclSqlFilter($_select)
-    {
         if (Timetracker_Controller_Timesheet::getInstance()->checkRight(Timetracker_Acl_Rights::MANAGE_TIMEACCOUNTS, FALSE, FALSE)) {
             return;
         }
         
         if (! $this->_isResolved) {
-            // get all timeaccounts user has required grants for
-            $result = array();
-            foreach ($this->_requiredGrants as $grant) {
-                $result = array_merge($result, Timetracker_Model_TimeaccountGrants::getTimeaccountsByAcl($grant, TRUE));
-            }
-            $this->_validTimeaccounts = array_unique($result);
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                . " Get all timeaccounts for user with required grants: " . print_r($this->_requiredGrants, TRUE));
+            
+            $result = Timetracker_Model_TimeaccountGrants::getTimeaccountsByAcl($this->_requiredGrants, TRUE);
+            $this->_validTimeaccounts = $result;
             $this->_isResolved = TRUE;
+            
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                . " Got " . count($this->_validTimeaccounts) . ' valid timeaccounts');
         }
         
         $db = Tinebase_Core::getDb();

@@ -11,7 +11,7 @@
 /**
  * Rest backend for RequestTracker
  * 
- * NOTE: the foreing "REST" server isn't a real rest server, so we use a bare http client
+ * NOTE: the foreign "REST" server isn't a real rest server, so we use a bare http client
  *       @see {http://www.gossamer-threads.com/lists/rt/devel/71088}
  * 
  * @see         {http://wiki.bestpractical.com/view/REST}
@@ -42,7 +42,7 @@ class RequestTracker_Backend_Rest //implements Tinebase_Backend_Interface
     
     public function __construct()
     {
-        $this->_config = isset(Tinebase_Core::getConfig()->requesttracker) ? Tinebase_Core::getConfig()->requesttracker : new Zend_Config(array());
+        $this->_config = RequestTracker_Config::getInstance();
         $this->_connect();
     }
     
@@ -156,7 +156,7 @@ class RequestTracker_Backend_Rest //implements Tinebase_Backend_Interface
         
         $ticket->History = $this->_rawDataToHistory($response->getBody());
         
-        return $ticket;        
+        return $ticket;
     }
     
     /**
@@ -278,11 +278,11 @@ class RequestTracker_Backend_Rest //implements Tinebase_Backend_Interface
         }
         
         foreach ($dataArray as $property => $value) {
-        	switch ($property) {
-        	    case 'id':
-        	        $dataArray[$property] = substr($value, 7);
-        	        break;
-        	    case 'Created':
+            switch ($property) {
+                case 'id':
+                    $dataArray[$property] = substr($value, 7);
+                    break;
+                case 'Created':
                 case 'Starts':
                 case 'Started':
                 case 'Due':
@@ -291,7 +291,7 @@ class RequestTracker_Backend_Rest //implements Tinebase_Backend_Interface
                 case 'LastUpdated':
                     $dataArray[$property] = $value == 'Not set' ? NULL : new Tinebase_DateTime($value);
                     break;
-        	}
+            }
         }
         
         return new RequestTracker_Model_Ticket($dataArray);

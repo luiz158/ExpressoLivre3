@@ -4,7 +4,7 @@
  * 
  * @package     Projects
  * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2011-2013 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  * 
  * @todo        add relations tests
@@ -26,13 +26,6 @@ class Projects_JsonTest extends PHPUnit_Framework_TestCase
     protected $_json = array();
     
     /**
-     * projects to delete in tearDown
-     * 
-     * @var array
-     */
-    protected $_projectsToDelete = array(); 
-    
-    /**
      * test department
      * 
      * @var Tinebase_Model_Department
@@ -47,9 +40,9 @@ class Projects_JsonTest extends PHPUnit_Framework_TestCase
      */
     public static function main()
     {
-		$suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Projects Json Tests');
+        $suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Projects Json Tests');
         PHPUnit_TextUI_TestRunner::run($suite);
-	}
+    }
 
     /**
      * Sets up the fixture.
@@ -59,6 +52,7 @@ class Projects_JsonTest extends PHPUnit_Framework_TestCase
      */
     protected function setUp()
     {
+        Tinebase_TransactionManager::getInstance()->startTransaction(Tinebase_Core::getDb());
         $this->_json = new Projects_Frontend_Json();
     }
 
@@ -70,14 +64,11 @@ class Projects_JsonTest extends PHPUnit_Framework_TestCase
      */
     protected function tearDown()
     {
-        if (! empty($this->_projectsToDelete)) {
-            $this->_json->deleteProjects($this->_projectsToDelete);
-        }
+        Tinebase_TransactionManager::getInstance()->rollBack();
     }
     
     /**
      * try to add a Project
-     *
      */
     public function testAddProject()
     {
@@ -86,7 +77,10 @@ class Projects_JsonTest extends PHPUnit_Framework_TestCase
         
         // checks
         $this->assertEquals($project['description'], $projectData['description']);
-        $this->assertEquals(Tinebase_Core::getUser()->getId(), $projectData['created_by'], 'Created by has not been set.');
+        
+        // created by should be resolved
+        $this->assertTrue(is_array($projectData['created_by']), 'Created by has not been resolved.');
+        $this->assertEquals(Tinebase_Core::getUser()->getId(), $projectData['created_by']['accountId']);
         
         // cleanup
         $this->_json->deleteProjects($projectData['id']);
@@ -98,29 +92,28 @@ class Projects_JsonTest extends PHPUnit_Framework_TestCase
     
     /**
      * try to get a Project
-     *
      */
     public function testGetProject()
     {
         $project = $this->_getProjectData();
         $projectData = $this->_json->saveProject($project);
         $projectData = $this->_json->getProject($projectData['id']);
-        $this->_projectsToDelete[] = $projectData['id'];
         
         // checks
         $this->assertEquals($project['description'], $projectData['description']);
-        $this->assertEquals(Tinebase_Core::getUser()->getId(), $projectData['created_by']);
+        
+        // created by should be resolved
+        $this->assertTrue(is_array($projectData['created_by']), 'Created by has not been resolved.');
+        $this->assertEquals(Tinebase_Core::getUser()->getId(), $projectData['created_by']['accountId']);
     }
 
     /**
      * try to update a Project
-     *
      */
     public function testUpdateProject()
     {
         $project = $this->_getProjectData();
         $projectData = $this->_json->saveProject($project);
-        $this->_projectsToDelete[] = $projectData['id'];
         
         // update Project
         $projectData['description'] = "blubbblubb";
@@ -129,24 +122,81 @@ class Projects_JsonTest extends PHPUnit_Framework_TestCase
         // check
         $this->assertEquals($projectData['id'], $projectUpdated['id']);
         $this->assertEquals($projectData['description'], $projectUpdated['description']);
-        $this->assertEquals(Tinebase_Core::getUser()->getId(), $projectUpdated['last_modified_by']);
+        
+        // last modified by should be resolved
+        $this->assertTrue(is_array($projectUpdated['last_modified_by']), 'Last modified by has not been resolved.');
+        $this->assertEquals(Tinebase_Core::getUser()->getId(), $projectUpdated['last_modified_by']['accountId']);
     }
     
     /**
      * try to search a Project
-     *
      */
     public function testSearchProjects()
     {
         // create
         $project = $this->_getProjectData();
         $projectData = $this->_json->saveProject($project);
-        $this->_projectsToDelete[] = $projectData['id'];
         
         // search & check
         $search = $this->_json->searchProjects($this->_getProjectFilter($projectData['title']), $this->_getPaging());
         $this->assertEquals($project['description'], $search['results'][0]['description']);
         $this->assertEquals(1, $search['totalcount']);
+    }
+    
+    /**
+     * testSearchProjectsWithMultipleFilters / taken from a bugreport
+     */
+    public function testSearchProjectsWithMultipleFilters()
+    {
+        $filter = '[
+            {
+                "condition": "OR",
+                "filters": [
+                    {
+                        "condition": "AND",
+                        "filters": [
+                            {
+                                "field": "status",
+                                "operator": "notin",
+                                "value": [
+                                    "COMPLETED",
+                                    "CANCELLED"
+                                ],
+                                "id": "ext-record-347"
+                            },
+                            {
+                                "field": "contact",
+                                "operator": "AND",
+                                "value": [
+                                    {
+                                        "field": "list",
+                                        "operator": "equals",
+                                        "value": null,
+                                        "id": "ext-record-1073"
+                                    },
+                                    {
+                                        "field": ":id",
+                                        "operator": "AND"
+                                    },
+                                    {
+                                        "field": ":relation_type",
+                                        "operator": "in",
+                                        "value": [
+                                            "COWORKER",
+                                            "RESPONSIBLE"
+                                        ],
+                                        "id": "ext-record-395"
+                                    }
+                                ],
+                                "id": "ext-record-379"
+                            }
+                        ],
+                        "id": "ext-comp-1330",
+                        "label": "Projekte"
+                    }
+                ]';
+        $search = $this->_json->searchProjects(Zend_Json::decode($filter), $this->_getPaging());
+        $this->assertGreaterThanOrEqual(0, $search['totalcount']);
     }
 
     /**
@@ -245,8 +295,6 @@ class Projects_JsonTest extends PHPUnit_Framework_TestCase
         $this->assertEquals("statusfilter", $result['filter'][0]['filters'][0]['filters'][1]['label']);
     }
     
-    /************ protected helper funcs *************/
-    
     /**
      * get Project
      *
@@ -260,7 +308,7 @@ class Projects_JsonTest extends PHPUnit_Framework_TestCase
             'status'        => 'IN-PROCESS',
         );
     }
-        
+    
     /**
      * get paging
      *
@@ -330,8 +378,19 @@ class Projects_JsonTest extends PHPUnit_Framework_TestCase
             )
         );
         $projectData = $this->_json->saveProject($project);
-        $this->_projectsToDelete[] = $projectData['id'];
         
         return $projectData;
+    }
+    
+    /**
+     * testPersonalContainers
+     * 
+     * @see 0007098: personal containers of other users are shown below personal container node
+     */
+    public function testPersonalContainers()
+    {
+        $containerJson = new Tinebase_Frontend_Json_Container();
+        $personalContainers = $containerJson->getContainer('Projects', 'personal', Tinebase_Core::getUser()->getId());
+        $this->assertEquals(1, count($personalContainers), 'this should only return 1 personal container: ' . print_r($personalContainers, TRUE));
     }
 }

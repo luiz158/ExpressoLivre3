@@ -15,6 +15,8 @@
  * Events consists of the properties of Calendar_Model_Event except Tags and Notes 
  * which are as always handles by their controllers/backends
  * 
+ * @TODO rework fetch handling. all fetch operations should be based on search.
+ *       remove old grant sql when done
  * 
  * @package     Calendar 
  * @subpackage  Backend
@@ -82,8 +84,6 @@ class Calendar_Backend_Sql extends Tinebase_Backend_Sql_Abstract
      * @return  Tinebase_Record_Interface
      * @throws  Tinebase_Exception_InvalidArgument
      * @throws  Tinebase_Exception_UnexpectedValue
-     * 
-     * @todo    remove autoincremental ids later
      */
     public function create(Tinebase_Record_Interface $_record) 
     {
@@ -139,6 +139,13 @@ class Calendar_Backend_Sql extends Tinebase_Backend_Sql_Abstract
     
     /**
      * Calendar optimized search function
+     * 
+     * 1. get all events neglecting grants filter
+     * 2. get all related container grants (via resolveing)
+     * 3. compute effective grants in PHP and only keep events 
+     *    user has required grant for
+     * 
+     * @TODO rethink if an outer container filter could help
      *
      * @param  Tinebase_Model_Filter_FilterGroup    $_filter
      * @param  Tinebase_Model_Pagination            $_pagination
@@ -152,94 +159,115 @@ class Calendar_Backend_Sql extends Tinebase_Backend_Sql_Abstract
             $_pagination = new Tinebase_Model_Pagination();
         }
         
-        // we use a an extra select to reduce data amount where grants etc. have to be computed for.
-        // the exdate is already appended here, to reduce virtual row numbers later
-        $subselect = $this->_getSelectSimple('id', $_getDeleted);
+        $select = parent::_getSelect('*', $_getDeleted);
         
-        $subselect->joinLeft(
+        $select->joinLeft(
             /* table  */ array('exdate' => $this->_tablePrefix . 'cal_exdate'),
             /* on     */ $this->_db->quoteIdentifier('exdate.cal_event_id') . ' = ' . $this->_db->quoteIdentifier($this->_tableName . '.id'),
-            /* select */ array('exdate' => Tinebase_Backend_Sql_Command::getAggregateFunction($this->_db, $this->_db->quoteIdentifier('exdate.exdate'))));
+            /* select */ array('exdate' => $this->_dbCommand->getAggregate('exdate.exdate')));
         
-        // this attendee join has nothing to do with grants but is here for attendee/status/... filters
-        $subselect->joinLeft(
+        $select->joinLeft(
             /* table  */ array('attendee' => $this->_tablePrefix . 'cal_attendee'),
             /* on     */ $this->_db->quoteIdentifier('attendee.cal_event_id') . ' = ' . $this->_db->quoteIdentifier('cal_events.id'),
             /* select */ array());
         
         if (! $_getDeleted) {
-            $subselect->joinLeft(
+            $select->joinLeft(
                 /* table  */ array('dispcontainer' => $this->_tablePrefix . 'container'), 
                 /* on     */ $this->_db->quoteIdentifier('dispcontainer.id') . ' = ' . $this->_db->quoteIdentifier('attendee.displaycontainer_id'),
                 /* select */ array());
             
-            $subselect->where($this->_db->quoteIdentifier('dispcontainer.is_deleted') . ' = 0 OR ' . $this->_db->quoteIdentifier('dispcontainer.is_deleted') . 'IS NULL');
+            $select->where($this->_db->quoteIdentifier('dispcontainer.is_deleted') . ' = 0 OR ' . $this->_db->quoteIdentifier('dispcontainer.is_deleted') . 'IS NULL');
         }
         
-        // remove grantsfilter here as we need it in the main select
+        // remove grantsfilter here as we do grants computation in PHP
         $grantsFilter = $_filter->getFilter('grants');
         if ($grantsFilter) {
             $_filter->removeFilter('grants');
         }
         
-        $this->_addFilter($subselect, $_filter);
-        $_pagination->appendPaginationSql($subselect);
-        $subselect->group($this->_tableName . '.' . 'id');
-
-        $stmt = $this->_db->query($subselect);
-        $rows = (array)$stmt->fetchAll(Zend_Db::FETCH_ASSOC);
-        $ids = array();
-        $exdates = array();
-        foreach($rows as $row) {
-            $ids[] = $row['id'];
-            $exdates[$row['id']] = $row['exdate'];
-        }
-
-        $select = $this->_getSelectSimple('*', $_getDeleted);
-        $select->where($this->_db->quoteInto("{$this->_db->quoteIdentifier('cal_events.id')} IN (?)", !empty($ids) ? $ids : ' ' ));
+        $this->_addFilter($select, $_filter);
         $_pagination->appendPaginationSql($select);
         
-        // append grants filters : only take limited set of attendee into account for grants computation
-        $attenderFilter = $_filter->getFilter('attender');
-        if (! $attenderFilter) {
-            // if a container filter is set, take owners of personal containers (solve secretary scenario)
-            $containerFilter = $_filter->getFilter('container_id');
-            if ($containerFilter && $containerFilter instanceof Calendar_Model_CalendarFilter) {
-                $attenderFilter = $containerFilter->getRelatedAttendeeFilter();
-            } else {
-                $attenderFilter = new Calendar_Model_AttenderFilter('attender', 'equals', array(
-                   'user_type' => Calendar_Model_Attender::USERTYPE_USER,
-                   'user_id'   =>  Tinebase_Core::getUser()->contact_id
-                ));
-            }
-            
-        }
-        $this->_appendEffectiveGrantCalculationSql($select, $attenderFilter);
-        if ($grantsFilter) {
-            $grantsFilter->appendFilterSql($select, $this);
-        }
         $select->group($this->_tableName . '.' . 'id');
-        $this->_traitGroup($select);
-	
-        $stmt = null; // solve PHP bug @see {http://bugs.php.net/bug.php?id=35793}
+        Tinebase_Backend_Sql_Abstract::traitGroup($select);
+        
         $stmt = $this->_db->query($select);
         $rows = (array)$stmt->fetchAll(Zend_Db::FETCH_ASSOC);
+        $result = $this->_rawDataToRecordSet($rows);
+        $clones = clone $result;
         
-        if ($_onlyIds) {
-            $identifier = is_bool($_onlyIds) ? $this->_getRecordIdentifier() : $_onlyIds;
-            $result = array();
-            foreach ($rows as $row) {
-                $result[] = $row[$identifier];
+        Tinebase_Container::getInstance()->getGrantsOfRecords($clones, Tinebase_Core::getUser());
+        Calendar_Model_Attender::resolveAttendee($clones->attendee, TRUE, $clones);
+        
+        $me = Tinebase_Core::getUser()->contact_id;
+        $inheritableGrants = array(
+            Tinebase_Model_Grants::GRANT_FREEBUSY,
+            Tinebase_Model_Grants::GRANT_READ, 
+            Tinebase_Model_Grants::GRANT_SYNC, 
+            Tinebase_Model_Grants::GRANT_EXPORT, 
+            Tinebase_Model_Grants::GRANT_PRIVATE,
+        );
+        $toRemove = array();
+        
+        foreach($result as $event) {
+            $clone = $clones->getById($event->getId());
+            if ($event->organizer == $me) {
+                foreach($this->_recordBasedGrants as $grant) {
+                    $event->{$grant}     = TRUE;
+                }
+            } else {
+                // grants to original container
+                if ($clone->container_id instanceof Tinebase_Model_Container && $clone->container_id->account_grants) {
+                    foreach($this->_recordBasedGrants as $grant) {
+                        $event->{$grant} =     $clone->container_id->account_grants[$grant] 
+                                            || $clone->container_id->account_grants[Tinebase_Model_Grants::GRANT_ADMIN];
+                    }
+                }
+                
+                // check grant inheritance
+                foreach($inheritableGrants as $grant) {
+                    if (! $event->{$grant} && $clone->attendee instanceof Tinebase_Record_RecordSet) {
+                        foreach($clone->attendee as $attendee) {
+                            if (   $attendee->displaycontainer_id instanceof Tinebase_Model_Container
+                                && $attendee->displaycontainer_id->account_grants 
+                                && (    $attendee->displaycontainer_id->account_grants[$grant]
+                                     || $attendee->displaycontainer_id->account_grants[Tinebase_Model_Grants::GRANT_ADMIN]
+                                   )
+                            ){
+                                $event->{$grant} = TRUE;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                $requiredGrants = $grantsFilter ? $grantsFilter->getRequiredGrants() : array(
+                    Tinebase_Model_Grants::GRANT_FREEBUSY,
+                    Tinebase_Model_Grants::GRANT_READ,
+                    Tinebase_Model_Grants::GRANT_ADMIN,
+                );
+                
+                $requiredGrants = array_intersect($requiredGrants, $this->_recordBasedGrants);
+                
+                $hasGrant = FALSE;
+                foreach($requiredGrants as $requiredGrant) {
+                    if ($event->{$requiredGrant}) {
+                        $hasGrant |= $event->{$requiredGrant};
+                    }
+                }
+                
+                if (! $hasGrant) {
+                    $toRemove[] = $event;
+                }
             }
-        } else {
-            foreach ($rows as &$row) {
-                $row['exdate'] = $exdates[$row[$this->_getRecordIdentifier()]];
-            }
-
-            $result = $this->_rawDataToRecordSet($rows);
         }
         
-        return $result;
+        foreach($toRemove as $event) {
+            $result->removeRecord($event);
+        }
+        
+        return $_onlyIds ? $result->{is_bool($_onlyIds) ? $this->_getRecordIdentifier() : $_onlyIds} : $result;
     }
     
     /**
@@ -250,14 +278,14 @@ class Calendar_Backend_Sql extends Tinebase_Backend_Sql_Abstract
      * @return Zend_Db_Select
      */
     protected function _getSelectSimple($_cols = '*', $_getDeleted = FALSE)
-    {        
+    {
         $select = $this->_db->select();
 
         $select->from(array($this->_tableName => $this->_tablePrefix . $this->_tableName), $_cols);
         
         if (!$_getDeleted && $this->_modlogActive) {
             // don't fetch deleted objects
-            $select->where($this->_db->quoteIdentifier($this->_tableName . '.is_deleted') . ' = 0');                        
+            $select->where($this->_db->quoteIdentifier($this->_tableName . '.is_deleted') . ' = 0');
         }
         
         return $select;
@@ -270,13 +298,13 @@ class Calendar_Backend_Sql extends Tinebase_Backend_Sql_Abstract
      * @return int
      */
     public function searchCount(Tinebase_Model_Filter_FilterGroup $_filter)
-    {   
+    {
         $select = $this->_getSelect(array('count' => 'COUNT(*)'));
         $this->_addFilter($select, $_filter);
 
         $result = $this->_db->fetchOne($select);
         
-        return $result;        
+        return $result;
     }    
     
     /**
@@ -291,6 +319,11 @@ class Calendar_Backend_Sql extends Tinebase_Backend_Sql_Abstract
         if ($_record->rrule) {
             $_record->rrule = (string) $_record->rrule;
         }
+        
+        if ($_record->container_id instanceof Tinebase_Model_Container) {
+            $_record->container_id = $_record->container_id->getId();
+        }
+        
         $_record->rrule   = !empty($_record->rrule)   ? $_record->rrule   : NULL;
         $_record->recurid = !empty($_record->recurid) ? $_record->recurid : NULL;
         
@@ -317,11 +350,10 @@ class Calendar_Backend_Sql extends Tinebase_Backend_Sql_Abstract
         $select->joinLeft(
             /* table  */ array('exdate' => $this->_tablePrefix . 'cal_exdate'), 
             /* on     */ $this->_db->quoteIdentifier('exdate.cal_event_id') . ' = ' . $this->_db->quoteIdentifier($this->_tableName . '.id'),
-            /* select */ array('exdate' => Tinebase_Backend_Sql_Command::getAggregateFunction($this->_db, $this->_db->quoteIdentifier('exdate.exdate'))));
+            /* select */ array('exdate' => $this->_dbCommand->getAggregate('exdate.exdate')));
         
         $select->group($this->_tableName . '.' . 'id');
-        $this->_traitGroup($select);
-	
+        
         return $select;
     }
     
@@ -330,7 +362,7 @@ class Calendar_Backend_Sql extends Tinebase_Backend_Sql_Abstract
      *
      * @param Zend_Db_Select $_select
      */
-    protected function _appendEffectiveGrantCalculationSql($_select, $_attenderFilter = NULL)
+    protected function _appendEffectiveGrantCalculationSql($_select, $_attendeeFilters = NULL)
     {
         // groupmemberships of current user, needed to compute phys and inherited grants
         $_select->joinLeft(
@@ -342,9 +374,14 @@ class Calendar_Backend_Sql extends Tinebase_Backend_Sql_Abstract
         // NOTE: 2010-04 the behaviour changed. Now, only the attendee the client filters for are 
         //       taken into account for grants calculation 
         $attendeeWhere = FALSE;
-        if ($_attenderFilter instanceof Calendar_Model_AttenderFilter) {
+        if (is_array($_attendeeFilters) && !empty($_attendeeFilters)) {
             $attendeeSelect = $this->_db->select();
-            $_attenderFilter->appendFilterSql($attendeeSelect, $this);
+            foreach ((array) $_attendeeFilters as $attendeeFilter) {
+                if ($attendeeFilter instanceof Calendar_Model_AttenderFilter) {
+                    $attendeeFilter->appendFilterSql($attendeeSelect, $this);
+                }
+            }
+            
             $whereArray = $attendeeSelect->getPart(Zend_Db_Select::SQL_WHERE);
             if (! empty($whereArray)) {
                 $attendeeWhere = ' AND ' . array_value(0, $whereArray);
@@ -389,15 +426,15 @@ class Calendar_Backend_Sql extends Tinebase_Backend_Sql_Abstract
         
         foreach ($allGrants as $grant) {
             if (in_array($grant, $this->_recordBasedGrants)) {
-                $_select->columns(array($grant => "\n MAX( case when ( \n" .
+                $_select->columns(array($grant => "\n MAX( CASE WHEN ( \n" .
                     '  /* physgrant */' . $this->_getContainGrantCondition('physgrants', 'groupmemberships', $grant) . " OR \n" . 
                     '  /* implicit  */' . $this->_getImplicitGrantCondition($grant) . " OR \n" .
                     '  /* inherited */' . $this->_getInheritedGrantCondition($grant) . " \n" .
-                 ")then 1 else 0 end ) "));
+                 ") THEN 1 ELSE 0 END ) "));
             } else {
-                $_select->columns(array($grant => "\n MAX( case when ( \n" .
+                $_select->columns(array($grant => "\n MAX( CASE WHEN ( \n" .
                     '  /* physgrant */' . $this->_getContainGrantCondition('physgrants', 'groupmemberships', $grant) . "\n" .
-                ")then 1 else 0 end ) "));
+                ") THEN 1 ELSE 0 END ) "));
             }
         }
     }

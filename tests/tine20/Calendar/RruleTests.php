@@ -134,11 +134,12 @@ class Calendar_RruleTests extends PHPUnit_Framework_TestCase
     public function testCalcWeekly()
     {
         // note: 1979-06-05 was a tuesday
+        // note: 1979 had no DST in Europe/Berlin
         $event = new Calendar_Model_Event(array(
             'uid'           => Tinebase_Record_Abstract::generateUID(),
             'summary'       => 'take a bath',
-            'dtstart'       => '1979-06-05 17:00:00',
-            'dtend'         => '1979-06-05 18:00:00',
+            'dtstart'       => '1979-06-05 18:00:00',
+            'dtend'         => '1979-06-05 19:00:00',
             'rrule'         => 'FREQ=WEEKLY;INTERVAL=1;BYDAY=SU',
             'originator_tz' => 'Europe/Berlin',
             Tinebase_Model_Grants::GRANT_EDIT     => true,
@@ -824,6 +825,28 @@ class Calendar_RruleTests extends PHPUnit_Framework_TestCase
         $nextOccurrence = Calendar_Model_Rrule::computeNextOccurrence($event, $exceptions, $nextOccurrence->dtstart);
         $this->assertEquals('2009-09-16 08:00:00', $nextOccurrence->dtstart->toString(Tinebase_Record_Abstract::ISO8601LONG));
         
+    }
+    
+    public function testComputeNextOccurrenceWithWhich()
+    {
+        $event = new Calendar_Model_Event(array(
+            'uid'           => Tinebase_Record_Abstract::generateUID(),
+            'summary'       => 'weekly',
+            'dtstart'       => '2009-09-09 08:00:00',
+            'dtend'         => '2009-09-09 10:00:00',
+            'rrule'         => 'FREQ=WEEKLY;BYDAY=WE,FR;INTERVAL=1',
+            'originator_tz' => 'Europe/Berlin',
+        ));
+        
+        $exceptions = new Tinebase_Record_RecordSet('Calendar_Model_Event');
+        
+        $from = new Tinebase_DateTime('now');
+        $nextOccurrence = Calendar_Model_Rrule::computeNextOccurrence($event, $exceptions, $from, 0);
+        $this->assertEquals($event, $nextOccurrence, 'which = 0 means same event');
+        
+        $nextOccurrence = Calendar_Model_Rrule::computeNextOccurrence($event, $exceptions, $from, 4);
+        $this->assertLessThan($nextOccurrence->dtstart, $from);
+        $this->assertGreaterThan($nextOccurrence->dtstart, $from->modify('+ 3 weeks'));
     }
     
     public function testWeeklyWithCount()

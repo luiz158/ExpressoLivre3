@@ -3,24 +3,34 @@
  * 
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 Ext.ns('Tine.Tinebase.Model');
 
 /**
  * @type {Array}
- * generic Record fields
+ * 
+ * modlog Fields
  */
-Tine.Tinebase.Model.genericFields = [
-    { name: 'container_id', header: 'Container',                                       isMetaField: false},
+
+Tine.Tinebase.Model.modlogFields = [
     { name: 'creation_time',      type: 'date', dateFormat: Date.patterns.ISO8601Long, isMetaField: true },
     { name: 'created_by',                                                              isMetaField: true },
     { name: 'last_modified_time', type: 'date', dateFormat: Date.patterns.ISO8601Long, isMetaField: true },
     { name: 'last_modified_by',                                                        isMetaField: true },
     { name: 'is_deleted',         type: 'boolean',                                     isMetaField: true },
     { name: 'deleted_time',       type: 'date', dateFormat: Date.patterns.ISO8601Long, isMetaField: true },
-    { name: 'deleted_by',                                                              isMetaField: true }
+    { name: 'deleted_by',                                                              isMetaField: true },
+    { name: 'seq',                                                                     isMetaField: true }
 ];
+
+/**
+ * @type {Array}
+ * generic Record fields
+ */
+Tine.Tinebase.Model.genericFields = Tine.Tinebase.Model.modlogFields.concat([
+    { name: 'container_id', header: 'Container',                                       isMetaField: false}
+]);
     
 /**
  * Model of a language
@@ -52,8 +62,7 @@ Tine.Tinebase.Model.Role = Tine.Tinebase.data.Record.create([
     idProperty: 'id',
     titleProperty: 'name',
     recordName: 'Role',
-    recordsName: 'Roles',
-    containerProperty: null
+    recordsName: 'Roles'
 });
 
 /**
@@ -69,7 +78,7 @@ Tine.Tinebase.Model.Account = Ext.data.Record.create([
 /**
  * Model of a container
  */
-Tine.Tinebase.Model.Container = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.genericFields.concat([
+Tine.Tinebase.Model.Container = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.modlogFields.concat([
     {name: 'id'},
     {name: 'name'},
     {name: 'type'},
@@ -78,7 +87,8 @@ Tine.Tinebase.Model.Container = Tine.Tinebase.data.Record.create(Tine.Tinebase.M
     {name: 'is_container_node', type: 'boolean'},
     {name: 'dtselect', type: 'number'},
     {name: 'application_id'},
-    {name: 'account_grants'}
+    {name: 'account_grants'},
+    {name: 'model'}
 ]), {
     appName: 'Tinebase',
     modelName: 'Container',
@@ -110,7 +120,7 @@ Tine.Tinebase.Model.Grant = Ext.data.Record.create([
  * 
  * @constructor {Tine.Tinebase.data.Record}
  */
-Tine.Tinebase.Model.Tag = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.genericFields.concat([
+Tine.Tinebase.Model.Tag = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.modlogFields.concat([
     {name: 'id'         },
     {name: 'app'        },
     {name: 'owner'      },
@@ -243,17 +253,38 @@ Tine.Tinebase.Model.Preference = Ext.data.Record.create([
  * 
  * @constructor {Ext.data.Record}
  */
-Tine.Tinebase.Model.Alarm = Ext.data.Record.create([
+Tine.Tinebase.Model.Alarm = Tine.Tinebase.data.Record.create([
     {name: 'id'             },
     {name: 'record_id'      },
     {name: 'model'          },
-    {name: 'alarm_time',      type: 'date', dateFormat: Date.patterns.ISO8601Long     },
-    {name: 'minutes_before' },
-    {name: 'sent_time'      },
+    {name: 'alarm_time',      type: 'date', dateFormat: Date.patterns.ISO8601Long },
+    {name: 'minutes_before',  sortType: Ext.data.SortTypes.asInt},
+    {name: 'sent_time',       type: 'date', dateFormat: Date.patterns.ISO8601Long },
     {name: 'sent_status'    },
     {name: 'sent_message'   },
     {name: 'options'        }
-]);
+], {
+    appName: 'Tinebase',
+    modelName: 'Alarm',
+    idProperty: 'id',
+    titleProperty: 'minutes_before',
+    // ngettext('Alarm', 'Alarms', n); gettext('Alarm');
+    recordName: 'Alarm',
+    recordsName: 'Alarms',
+    getOption: function(name) {
+        var encodedOptions = this.get('options'),
+            options = encodedOptions ? Ext.decode(encodedOptions) : {}
+        
+        return options[name];
+    },
+    setOption: function(name, value) {
+        var encodedOptions = this.get('options'),
+            options = encodedOptions ? Ext.decode(encodedOptions) : {}
+        
+        options[name] = value;
+        this.set('options', Ext.encode(options));
+    }
+});
 
 /**
  * @namespace Tine.Tinebase.Model
@@ -277,8 +308,7 @@ Tine.Tinebase.Model.ImportJob = Tine.Tinebase.data.Record.create([
     titleProperty: 'model',
     // ngettext('Import', 'Imports', n); gettext('Import');
     recordName: 'Import',
-    recordsName: 'Imports',
-    containerProperty: null
+    recordsName: 'Imports'
 });
 
 /**
@@ -304,8 +334,7 @@ Tine.Tinebase.Model.ExportJob = Tine.Tinebase.data.Record.create([
     titleProperty: 'model',
     // ngettext('Export', 'Export', n); gettext('Export');
     recordName: 'Export',
-    recordsName: 'Exports',
-    containerProperty: null
+    recordsName: 'Exports'
 });
 
 /**
@@ -316,7 +345,7 @@ Tine.Tinebase.Model.ExportJob = Tine.Tinebase.data.Record.create([
 Tine.Tinebase.Model.ImportExportDefinition = Ext.data.Record.create(Tine.Tinebase.Model.genericFields.concat([
     {name: 'id'             },
     {name: 'name'           },
-    {name: 'label'          },
+    {name: 'label', sortType: Ext.data.SortTypes.asUCText },
     {name: 'filename'       },
     {name: 'plugin'         },
     {name: 'description'    },
@@ -342,8 +371,7 @@ Tine.Tinebase.Model.Credentials = Tine.Tinebase.data.Record.create([
     titleProperty: 'username',
     // ngettext('Credentials', 'Credentials', n); gettext('Credentials');
     recordName: 'Credentials',
-    recordsName: 'Credentials',
-    containerProperty: null
+    recordsName: 'Credentials'
 });
 
 /**
@@ -361,7 +389,8 @@ Tine.Tinebase.Model.Relation = Tine.Tinebase.data.Record.create([
     {name: 'related_id'},
     {name: 'type'},
     {name: 'remark'},
-    {name: 'related_record'}
+    {name: 'related_record', sortType: Tine.Tinebase.common.recordSortType},
+    {name: 'creation_time'}
 ], {
     appName: 'Tinebase',
     modelName: 'Relation',
@@ -369,8 +398,7 @@ Tine.Tinebase.Model.Relation = Tine.Tinebase.data.Record.create([
     titleProperty: 'related_model',
     // ngettext('Relation', 'Relations', n); gettext('Relation');
     recordName: 'Relation',
-    recordsName: 'Relations',
-    containerProperty: null
+    recordsName: 'Relations'
 });
 
 /**
@@ -391,8 +419,7 @@ Tine.Tinebase.Model.Department = Tine.Tinebase.data.Record.create([
     titleProperty: 'name',
     // ngettext('Department', 'Departments', n); gettext('Department');
     recordName: 'Department',
-    recordsName: 'Departments',
-    containerProperty: null
+    recordsName: 'Departments'
 });
 
 Tine.Tinebase.Model.Department.getFilterModel = function() {
@@ -418,6 +445,5 @@ Tine.Tinebase.Model.Config = Tine.Tinebase.data.Record.create([
     titleProperty: 'id',
     // ngettext('Config', 'Configs', n); gettext('Configs');
     recordName: 'Config',
-    recordsName: 'Configs',
-    containerProperty: null
+    recordsName: 'Configs'
 });

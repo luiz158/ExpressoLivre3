@@ -81,7 +81,7 @@ class Tinebase_Alarm extends Tinebase_Controller_Record_Abstract
      * @todo what to do about Tinebase_Model_Alarm::STATUS_FAILURE alarms?
      */
     public function sendPendingAlarms($_eventName)
-    {        
+    {
         $eventName = (is_array($_eventName)) ? $_eventName['eventName'] : $_eventName;
         
         $job = Tinebase_AsyncJob::getInstance()->startJob($eventName);
@@ -92,7 +92,7 @@ class Tinebase_Alarm extends Tinebase_Controller_Record_Abstract
         
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' No ' . $eventName . ' is running. Starting new one.');
         
-        try { 
+        try {
             // get all pending alarms
             $filter = new Tinebase_Model_AlarmFilter(array(
                 array(
@@ -148,11 +148,11 @@ class Tinebase_Alarm extends Tinebase_Controller_Record_Abstract
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $e->getTraceAsString());
         }
         
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Job ' . $eventName . ' finished.');           
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Job ' . $eventName . ' finished.');
     }
     
     /**
-     * get all alarms of given record(s)
+     * get all alarms of given record(s) / adds record_id index to result set
      * 
      * @param  string $_model model to get alarms for
      * @param  string|array|Tinebase_Record_Interface|Tinebase_Record_RecordSet $_recordId record id(s) to get alarms for
@@ -209,9 +209,6 @@ class Tinebase_Alarm extends Tinebase_Controller_Record_Abstract
         $diff = $currentAlarms->getMigration($alarms->getArrayOfIds());
         $this->_backend->delete($diff['toDeleteIds']);
         
-        if (count($alarms) > 1) {
-            Tinebase_Core::getLogger()->NOTICE(__METHOD__ . '::' . __LINE__ . "only the first alarm could is saved: " . print_r($alarms->toArray(), TRUE));
-        }
         // create / update alarms
         foreach ($alarms as $alarm) {
             $id = $alarm->getId();
@@ -226,8 +223,6 @@ class Tinebase_Alarm extends Tinebase_Controller_Record_Abstract
                 }
                 $alarm = $this->_backend->create($alarm);
             }
-            
-            break;
         }
     }
     

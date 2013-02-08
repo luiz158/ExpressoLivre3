@@ -25,19 +25,19 @@ abstract class Tinebase_Controller_Abstract implements Tinebase_Controller_Inter
      */
     protected $_defaultsSettings = array();
     
+    
+    /**
+     * holds the default Model of this application
+     * @var string
+     */
+    protected static $_defaultModel = NULL;
+    
     /**
      * application name (is needed in checkRight())
      *
      * @var string
      */
     protected $_applicationName = '';
-    
-    /**
-     * the current account
-     * 
-     * @var Tinebase_Model_User
-     */
-    protected $_currentAccount = NULL;
     
     /**
      * disable events on demand
@@ -61,18 +61,21 @@ abstract class Tinebase_Controller_Abstract implements Tinebase_Controller_Inter
      * @throws  Tinebase_Exception_AccessDenied
      * 
      * @todo move that to *_Acl_Rights
-     */    
+     * @todo include Tinebase admin? atm only the application admin right is checked
+     */
     public function checkRight($_right, $_throwException = TRUE, $_includeTinebaseAdmin = TRUE) 
     {
         if (empty($this->_applicationName)) {
             throw new Tinebase_Exception_UnexpectedValue('No application name defined!');
         }
-                
+        
         $right = strtoupper($_right);
         
         $cache = Tinebase_Core::get(Tinebase_Core::CACHE);
-        $cacheId = convertCacheId('checkRight' . Tinebase_Core::getUser()->getId() . $_right . $this->_applicationName);
+        $cacheId = convertCacheId('checkRight' . Tinebase_Core::getUser()->getId() . $right . $this->_applicationName);
         $result = $cache->load($cacheId);
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . $cacheId);
         
         if (!$result) {
             $applicationRightsClass = $this->_applicationName . '_Acl_Rights';
@@ -80,29 +83,27 @@ abstract class Tinebase_Controller_Abstract implements Tinebase_Controller_Inter
             // array with the rights that should be checked, ADMIN is in it per default
             $rightsToCheck = ($_includeTinebaseAdmin) ? array(Tinebase_Acl_Rights::ADMIN) : array();
             
-            if (preg_match("/MANAGE_/", $right)) {
-                $rightsToCheck[] = constant($applicationRightsClass. '::' . $right);
-            }
-    
             if (preg_match("/VIEW_([A-Z_]*)/", $right, $matches)) {
-                $rightsToCheck[] = constant($applicationRightsClass. '::' . $right);
                 // manage right includes view right
                 $rightsToCheck[] = constant($applicationRightsClass. '::MANAGE_' . $matches[1]);
-            }
+            } 
+            
+            $rightsToCheck[] = constant($applicationRightsClass. '::' . $right);
             
             $result = FALSE;
             
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Checking rights: ' . print_r($rightsToCheck, TRUE));
+            
             foreach ($rightsToCheck as $rightToCheck) {
-                //echo "check right: " . $rightToCheck;
                 if (Tinebase_Acl_Roles::getInstance()->hasRight($this->_applicationName, Tinebase_Core::getUser()->getId(), $rightToCheck)) {
                     $result = TRUE;
-                    break;    
+                    break;
                 }
             }
 
             $cache->save($result, $cacheId, array('rights'), 120);
         }
-            
+        
         if (!$result && $_throwException) {
             throw new Tinebase_Exception_AccessDenied("You are not allowed to $right in application $this->_applicationName !");
         }
@@ -118,12 +119,15 @@ abstract class Tinebase_Controller_Abstract implements Tinebase_Controller_Inter
      */
     public function getConfigSettings($_resolve = FALSE)
     {
-        $settings = Tinebase_Config::getInstance()->getConfigAsArray(
-            Tinebase_Config::APPDEFAULTS, 
-            $this->_applicationName, 
-            $this->_defaultsSettings
-        );
-        
+        $appConfig = Tinebase_Config::getAppConfig($this->_applicationName);
+        if ($appConfig != NULL) {
+            $settings = $appConfig::getInstance()->get(
+                Tinebase_Config::APPDEFAULTS, 
+                new Tinebase_Config_Struct($this->_defaultsSettings)
+            )->toArray();
+        } else { 
+            $settings = $this->_defaultsSettings;
+        }
         return ($_resolve) ? $this->_resolveConfigSettings($settings) : $settings;
     }
     
@@ -148,11 +152,20 @@ abstract class Tinebase_Controller_Abstract implements Tinebase_Controller_Inter
         // only admins are allowed to do this
         $this->checkRight(Tinebase_Acl_Rights::ADMIN);
         
-        Tinebase_Config::getInstance()->setConfigForApplication(
-            Tinebase_Config::APPDEFAULTS, 
-            Zend_Json::encode($_settings), 
-            $this->_applicationName
-        );
+        $appConfig = Tinebase_Config::getAppConfig($this->_applicationName);
+        
+        if ($appConfig !== NULL) {
+            $appConfig::getInstance()->set(Tinebase_Config::APPDEFAULTS, $_settings);
+        }
+    }
+    
+    /**
+     * returns the default model of this application
+     * @return string
+     */
+    public static function getDefaultModel()
+    {
+        return static::$_defaultModel;
     }
     
     /**
@@ -171,6 +184,6 @@ abstract class Tinebase_Controller_Abstract implements Tinebase_Controller_Inter
             throw new Exception("Controller $_controllerName does not implement Tinebase_Controller_Interface.");
         }
         
-        return call_user_func(array($_controllerName, 'getInstance')); 
+        return call_user_func(array($_controllerName, 'getInstance'));
     }
 }

@@ -3,7 +3,7 @@
  * 
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2007-2010 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  */
  
@@ -114,7 +114,7 @@ Ext.extend(Tine.Tinebase.data.RecordProxy, Ext.data.DataProxy, {
         
         var p = options.params;
         p.method = this.appName + '.get' + this.modelName;
-        p.id = record.get(this.idProperty); 
+        p.id = record.get(this.idProperty);
         
         return this.doXHTTPRequest(options);
     },
@@ -144,7 +144,7 @@ Ext.extend(Tine.Tinebase.data.RecordProxy, Ext.data.DataProxy, {
         
         // increase timeout as this can take a longer (1 minute)
         options.timeout = 60000;
-                
+        
         return this.doXHTTPRequest(options);
     },
     
@@ -153,6 +153,7 @@ Ext.extend(Tine.Tinebase.data.RecordProxy, Ext.data.DataProxy, {
      * 
      * @param   {Ext.data.Record} record
      * @param   {Object} options
+     * @param   {Object} additionalArguments
      * @return  {Number} Ext.Ajax transaction id
      * @success {Ext.data.Record}
      */
@@ -181,15 +182,19 @@ Ext.extend(Tine.Tinebase.data.RecordProxy, Ext.data.DataProxy, {
      * 
      * @param   {Array} records Array of records or ids
      * @param   {Object} options
+     * @param   {Object} additionalArguments
      * @return  {Number} Ext.Ajax transaction id
      * @success 
      */
-    deleteRecords: function(records, options) {
+    deleteRecords: function(records, options, additionalArguments) {
         options = options || {};
         options.params = options.params || {};
         options.params.method = this.appName + '.delete' + this.modelName + 's';
         options.params.ids = this.getRecordIds(records);
-
+        if (additionalArguments) {
+            Ext.apply(options.params, additionalArguments);
+        }
+        
         // increase timeout as this can take a long time (2 mins)
         options.timeout = 120000;
         
@@ -382,7 +387,7 @@ Ext.extend(Tine.Tinebase.data.RecordProxy, Ext.data.DataProxy, {
                     options.success.apply(options.scope, args);
                 }
             },
-            // note incoming options are implicitly jsonprc converted
+            // note incoming options are implicitly json-rpc converted
             failure: function (response, jsonrpcoptions) {
                 var responseData = Ext.decode(response.responseText),
                     exception = responseData.data ? responseData.data : responseData;
@@ -397,10 +402,15 @@ Ext.extend(Tine.Tinebase.data.RecordProxy, Ext.data.DataProxy, {
                     } else {
                         args = [exception];
                     }
-                
+                    Tine.log.debug('Tine.Tinebase.data.RecordProxy::doXHTTPRequest -> call failure fn');
                     options.failure.apply(options.scope, args);
-                } else {
+                }
+                // requests with callback need to define their own exception handling
+                else if (! options.callback) {
+                    Tine.log.debug('Tine.Tinebase.data.RecordProxy::doXHTTPRequest -> handle exception');
                     this.handleRequestException(exception);
+                } else {
+                    Tine.log.debug('Tine.Tinebase.data.RecordProxy::doXHTTPRequest -> call callback fn');
                 }
             }
         };

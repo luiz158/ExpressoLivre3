@@ -3,7 +3,7 @@
  * class to hold message cache data
  * 
  * @package     Felamimail
- * @subpackage	Model
+ * @subpackage    Model
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
@@ -13,7 +13,8 @@
  * class to hold message cache data
  * 
  * @package     Felamimail
- * @subpackage	Model
+ * @subpackage  Model
+ * @property    string  $folder_id      the folder id
  * @property    string  $subject        the subject of the email
  * @property    string  $from_email     the address of the sender (from)
  * @property    string  $from_name      the name of the sender (from)
@@ -26,6 +27,8 @@
  * @property    array   $structure      the message structure
  * @property    array   $attachments    the attachments
  * @property    string  $messageuid     the message uid on the imap server
+ * @property    array   $preparedParts  prepared parts
+ * @property    integer $reading_conf   true if it must send a reading confirmation
  * @property    integer $smime          true if is a digitaly signed message
  * @property    integer $reading_conf   true if it must send a reading confirmation
  * @property    string  $importance     true if must mark importance as high
@@ -89,8 +92,8 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
      * represents the identifier
      * 
      * @var string
-     */    
-    protected $_identifier = 'id';    
+     */
+    protected $_identifier = 'id';
     
     /**
      * application the record belongs to
@@ -144,6 +147,8 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
         'message'               => array(Zend_Filter_Input::ALLOW_EMPTY => true),
     // prepared parts (iMIP invitations, contact vcards, ...)
         'preparedParts'         => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'reading_conf'          => array(Zend_Filter_Input::ALLOW_EMPTY => true,
+                                         Zend_Filter_Input::DEFAULT_VALUE => 0),
         'smime'                 => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'reading_conf'          => array(Zend_Filter_Input::ALLOW_EMPTY => true,
                                          Zend_Filter_Input::DEFAULT_VALUE => 0),
@@ -182,6 +187,79 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
     }
     
     /**
+     * gets record related properties
+     * 
+     * @param string _name of property
+     * @throws Tinebase_Exception_UnexpectedValue
+     * @return mixed value of property
+     */
+    public function __get($_name)
+    {
+        $result = parent::__get($_name);
+        
+        if ($_name === 'structure' && empty($result)) {
+            $result = $this->_fetchStructure();
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * fetch structure from cache or imap server, parse it and store it into cache
+     * 
+     * @return array
+     */
+    protected function _fetchStructure()
+    {
+        $cacheId = $this->_getStructureCacheId();
+        $cache = Tinebase_Core::getCache();
+        if ($cache->test($cacheId)) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Getting message structure from cache: ' . $cacheId);
+            $result = $cache->load($cacheId);
+        } else {
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Getting message structure from IMAP server.');
+            
+            try {
+                $summary = Felamimail_Controller_Cache_Message::getInstance()->getMessageSummary($this->messageuid, $this->account_id, $this->folder_id);
+                $result = $summary['structure'];
+            } catch (Zend_Mail_Protocol_Exception $zmpe) {
+                // imap server might have gone away
+                Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ 
+                    . ' IMAP protocol error during summary fetching: ' . $zmpe->getMessage());
+                $result = array();
+            }
+            $this->_setStructure($result);
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * get cache id for structure
+     * 
+     * @return string
+     */
+    protected function _getStructureCacheId()
+    {
+        return 'messageStructure' . $this->folder_id . $this->messageuid;
+    }
+    
+    /**
+     * set structure and save into cache
+     * 
+     * @param array $structure
+     */
+    protected function _setStructure($structure)
+    {
+        $cacheId = $this->_getStructureCacheId();
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Caching message structure: ' . $cacheId);
+        Tinebase_Core::getCache()->save($structure, $cacheId, array('messageStructure'), 86400); // 24 hours
+        
+        $this->structure = $structure;
+    }
+    
+    /**
      * check if message has \SEEN flag
      * 
      * @return boolean
@@ -198,8 +276,7 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
      */
     public function sendReadingConfirmation()
     {
-        if (($this->headers['disposition-notification-to']) && (!$this->hasSeenFlag()))
-        {
+        if (array_key_exists('disposition-notification-to', $this->headers) && $this->headers['disposition-notification-to'] && !$this->hasSeenFlag()) {
             $translate = Tinebase_Translation::getTranslation($this->_application);
             $from = Felamimail_Controller_Account::getInstance()->get($this->account_id);
 
@@ -251,12 +328,14 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
                         $this->from_email = (isset($value[0]) && array_key_exists('email', $value[0])) ? $value[0]['email'] : '';
                         $this->from_name = (isset($value[0]) && array_key_exists('name', $value[0]) && ! empty($value[0]['name'])) ? $value[0]['name'] : $this->from_email;
                         break;
+                        
                     case 'sender':
                         $this->sender = (isset($value[0]) && array_key_exists('email', $value[0])) ? '<' . $value[0]['email'] . '>' : '';
                         if ((isset($value[0]) && array_key_exists('name', $value[0]) && ! empty($value[0]['name']))) {
                             $this->sender = '"' . $value[0]['name'] . '" ' . $this->sender;
                         }
                         break;
+                        
                     default:
                         $this->$field = $value;
                 }
@@ -273,8 +352,11 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
     public function parseStructure($_structure = NULL)
     {
         if ($_structure !== NULL) {
-            $this->structure = $_structure;
+            $this->_setStructure($_structure);
         }
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Parsing structure: ' . print_r($this->structure, TRUE));
+        
         $this->content_type  = isset($this->structure['contentType']) ? $this->structure['contentType'] : Zend_Mime::TYPE_TEXT;
         $this->_setBodyContentType();
     }
@@ -291,7 +373,7 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
             $this->body_content_type = (in_array($this->content_type, array(self::CONTENT_TYPE_HTML, self::CONTENT_TYPE_PLAIN))) ? $this->content_type : self::CONTENT_TYPE_PLAIN;
         }
         
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Set body content type to ' . $this->body_content_type);
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Set body content type to ' . $this->body_content_type);
     }
     
     /**
@@ -351,7 +433,7 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
         }
         
         if ($result === NULL) {
-            throw new Felamimail_Exception("Structure for partId $_partId not found!");
+            Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ . ' ' . "Structure for partId $_partId not found!");
         }
         
         return $result;
@@ -394,12 +476,12 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
         $result = array();
         
         if (! array_key_exists('type', $_structure) || $_structure['type'] != 'text') {
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Structure has no type key or type != text: ' . print_r($_structure, TRUE));
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Structure has no type key or type != text: ' . print_r($_structure, TRUE));
             return $result;
         }
         
         if ($_onlyGetNonAttachmentParts && $this->_partIsAttachment($_structure)) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Part is attachment: ' . $_structure['disposition']);
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Part is attachment: ' . print_r($_structure['disposition'], TRUE));
             return $result;
         }
 
@@ -469,7 +551,7 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
     }
 
     /**
-     * Parses SMIME types
+     * Verify if message is a signed Message
      *
      * @param array $_structure
      * @return void
@@ -563,7 +645,7 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
         } else {
             // ignore other types for now
             #var_dump($_structure);
-            #throw new Exception('unsupported multipart');    
+            #throw new Exception('unsupported multipart');
         }
         
         return $result;
@@ -778,5 +860,5 @@ class Felamimail_Model_Message extends Tinebase_Record_Abstract
         }
         
         return $result;
-    }
+    } 
 }

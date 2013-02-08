@@ -36,26 +36,24 @@ Ext.ux.PopupWindowGroup = function(config) {
         var doc;
         for(var id in list){
             try {
-            	var newDate = new Date().getTime();
+                var newDate = new Date().getTime();
 
-            	if(list[id].registerTime && (list[id].registerTime/1 + 2000 > newDate/1)) {
-            		
-            		continue;
-            	}
-            	
+                if(list[id].registerTime && (list[id].registerTime/1 + 2000 > newDate/1)) {
+                    
+                    continue;
+                }
+                
                 doc = list[id].popup.document;
-                if ((Ext.isChrome || Ext.isOpera) && ! doc.defaultView) {
+                if(!Ext.isIE && !doc.defaultView) {
                     doc = false;
                 }
             } catch(e)  {
-            	doc = false;
-            	
+                doc = false;
+                
             }
-            
             if (! doc) {
                 accessList.remove(list[id]);
                 delete list[id];
-                
             }
         }
     };
@@ -110,7 +108,7 @@ Ext.ux.PopupWindowGroup = function(config) {
 
         register : function(win){
 
-    		win.registerTime = new Date().getTime();
+            win.registerTime = new Date().getTime();
             cleanupClosedWindows();
             if (! win.popup) {
                 console.error('pure window instead of Ext.ux.PopupWindow got registered');
@@ -157,7 +155,7 @@ Ext.ux.PopupWindowGroup = function(config) {
             if(win != front){
                 win._lastAccess = new Date().getTime();
                 if(win.popup.focus) {
-                	win.popup.focus();
+                    win.popup.focus();
                 }
                 
 //                front = win;

@@ -5,7 +5,7 @@
  * @package     Tinebase
  * @subpackage  Record
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2007-2008 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Cornelius Weiss <c.weiss@metaways.de>
  */
 
@@ -18,13 +18,13 @@ require_once dirname(dirname(__FILE__)) . DIRECTORY_SEPARATOR . 'TestHelper.php'
  * Test class for Tinebase_Relations
  */
 class Tasks_ControllerTest extends PHPUnit_Framework_TestCase //Tinebase_AbstractControllerTest
-{   
-	/**
+{
+    /**
      * @var array test Task 1 data
      */
     protected $_testTask1;
     
-	/**
+    /**
      * @var Tasks_Model_Task persistant (readout from db after persistant creation) test Task 1
      */
     protected $_persistantTestTask1;
@@ -57,6 +57,8 @@ class Tasks_ControllerTest extends PHPUnit_Framework_TestCase //Tinebase_Abstrac
      */
     protected function setUp()
     {
+        Tinebase_TransactionManager::getInstance()->startTransaction(Tinebase_Core::getDb());
+        
         $this->_controller = Tasks_Controller_Task::getInstance();
         $this->_minimalDatas = array('Task' => array(
             'summary'       => 'minimal task by PHPUnit::Tasks_ControllerTest',
@@ -88,8 +90,6 @@ class Tasks_ControllerTest extends PHPUnit_Framework_TestCase //Tinebase_Abstrac
         $this->_testTask1->convertDates = true;
         
         $this->_persistantTestTask1 = $this->_controller->create($this->_testTask1);
-        
-        //parent::setUp();
     }
 
     /**
@@ -100,7 +100,7 @@ class Tasks_ControllerTest extends PHPUnit_Framework_TestCase //Tinebase_Abstrac
      */
     protected function tearDown()
     {
-        //parent::tearDown();
+        Tinebase_TransactionManager::getInstance()->rollBack();
     }
 
     /**
@@ -147,7 +147,6 @@ class Tasks_ControllerTest extends PHPUnit_Framework_TestCase //Tinebase_Abstrac
     
     /**
      * test basic update function
-     *
      */
     public function testUpdateTask()
     {
@@ -166,28 +165,33 @@ class Tasks_ControllerTest extends PHPUnit_Framework_TestCase //Tinebase_Abstrac
                     $this->assertEquals(Zend_Registry::get('currentAccount')->getId(), $utask->last_modified_by);
                     break;
                 case 'notes':
-                	break;
+                    break;
                 default:
-                    $this->assertEquals($value, $utask->$field, "field $field not equal.");
+                    $this->assertEquals($value, $utask->$field, "field $field not equal: " . print_r($value, TRUE));
             }
         }
         return $utask;
     }
     
+    /**
+     * testNonConcurrentUpdate
+     */
     public function testNonConcurrentUpdate()
     {
         $utask = $this->testUpdateTask();
         
-        sleep(1);
         $nonConflictTask = clone $utask;
         $nonConflictTask->summary = 'Second Update of test task 1';
         return $this->_controller->update($nonConflictTask);
     }
     
-    public function testConcurrencyResolveableSameValue() {
+    /**
+     * testConcurrencyResolveableSameValue
+     */
+    public function testConcurrencyResolveableSameValue()
+    {
         $utask = $this->testUpdateTask();
         
-        sleep(1);
         $resolvableConcurrencyTask = clone $utask;
         $resolvableConcurrencyTask->last_modified_time = Tinebase_DateTime::now()->addHour(-1);
         $resolvableConcurrencyTask->percent = 50;
@@ -196,17 +200,19 @@ class Tasks_ControllerTest extends PHPUnit_Framework_TestCase //Tinebase_Abstrac
         return $this->_controller->update($resolvableConcurrencyTask);
     }
     
-    public function testConcurrencyResolveableOtherField() {
+    /**
+     * testConcurrencyResolveableOtherField
+     */
+    public function testConcurrencyResolveableOtherField()
+    {
         $utask = $this->testUpdateTask();
         
-        sleep(1);
         $resolvableConcurrencyTask = clone $utask;
         $resolvableConcurrencyTask->last_modified_time = Tinebase_DateTime::now()->addHour(-1);
         $resolvableConcurrencyTask->percent = 50;
         $resolvableConcurrencyTask->summary = 'Update of test task 1';
         $this->_controller->update($resolvableConcurrencyTask);
         
-        sleep(1);
         $resolvableConcurrencyTask = clone $utask;
         $resolvableConcurrencyTask->last_modified_time = Tinebase_DateTime::now()->addHour(-1);
         $resolvableConcurrencyTask->description = 'other field';
@@ -215,53 +221,95 @@ class Tasks_ControllerTest extends PHPUnit_Framework_TestCase //Tinebase_Abstrac
         $this->_controller->update($resolvableConcurrencyTask);
     }
 
+    /**
+     * try to update the same task twice with the same values, should be resolved by concurrency handling
+     * 
+     * @see 0007108: inspect and solve concurrency conflicts when setting lead relations
+     * @see 0000996: add changes in relations/linked objects to modlog/history
+     */
     public function testConcurrencyDateTime()
     {
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " 1. Update");
         $utask = $this->testUpdateTask();
         
-        sleep(1);
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " 2. Update");
         $resolvableConcurrencyTask = clone $utask;
-        $resolvableConcurrencyTask->last_modified_time = Tinebase_DateTime::now()->addHour(-1);
+        $resolvableConcurrencyTask->due = $utask->due->addMonth(1);
         $resolvableConcurrencyTask->percent = 50;
         $resolvableConcurrencyTask->summary = 'Update of test task 1';
         $this->_controller->update($resolvableConcurrencyTask);
         
-        sleep(1);
-        $resolvableConcurrencyTask = clone $utask;
-        $resolvableConcurrencyTask->last_modified_time = Tinebase_DateTime::now()->addHour(-1);
-        $resolvableConcurrencyTask->due = $resolvableConcurrencyTask->due->addMonth(1);
-        $resolvableConcurrencyTask->percent = 50;
-        $resolvableConcurrencyTask->summary = 'Update of test task 1';
-        $this->_controller->update($resolvableConcurrencyTask);
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " 3. Update");
+        $resolvableConcurrencyTask2 = clone $utask;
+        $resolvableConcurrencyTask2->due = $resolvableConcurrencyTask->due;
+        $resolvableConcurrencyTask2->percent = 50;
+        $resolvableConcurrencyTask2->summary = 'Update of test task 1';
+        
+        try {
+            $updatedTask = $this->_controller->update($resolvableConcurrencyTask2);
+            $this->assertEquals($resolvableConcurrencyTask2->due, $updatedTask->due);
+        } catch (Tinebase_Timemachine_Exception_ConcurrencyConflict $ttecc) {
+            $this->fail($ttecc);
+        }
     }
     
     /**
      * test if non resolvable concurrency problem gets detected
      *
+     *@see 0000554: modlog: records can't be updated in less than 1 second intervals
      */
     public function testConcurrencyFail()
     {
         $utask = $this->testUpdateTask();
         
-        sleep(1);
         $conflictTask = clone $utask;
-        $conflictTask->last_modified_time = Tinebase_DateTime::now()->addHour(-1);
+        $conflictTask->seq = 0;
         $conflictTask->summary = 'Non resolvable conflict';
         $this->setExpectedException('Tinebase_Timemachine_Exception_ConcurrencyConflict');
         $this->_controller->update($conflictTask);
     }
-    
+
     /**
      * 2009-07-14 concurrency management on newly created records 
      */
     public function testConcurrencyFromCreatedTask()
     {
-    	$utask = $this->testUpdateTask();
-    	sleep(1);
-    	
-    	$ctask = clone $this->_persistantTestTask1;
-    	$ctask->description = 'testConcurrencyFromCreatedTask';
-    	
-    	$u2task = $this->_controller->update($ctask);
+        $utask = $this->testUpdateTask();
+        
+        $ctask = clone $this->_persistantTestTask1;
+        $ctask->description = 'testConcurrencyFromCreatedTask';
+        
+        $u2task = $this->_controller->update($ctask);
+    }
+    
+    /**
+     * testConcurrencyLinebreakMismatch
+     * 
+     * @see 0007140: normalize linebreaks in concurrency check
+     */
+    public function testConcurrencyLinebreakMismatch()
+    {
+        $utask = $this->_persistantTestTask1;
+        $utask->description = 'description' . "\n";
+        $utask = $this->_controller->update($utask);
+        
+        // change linebreak in db to \r\n
+        $loggedMods = Tinebase_Timemachine_ModificationLog::getInstance()->getModifications('Tasks', $utask->getId(),
+            'Tasks_Model_Task', 'Sql', Tinebase_DateTime::now()->subMinute(5), $utask->last_modified_time);
+        $this->assertEquals(1, count($loggedMods));
+        $mod = $loggedMods[0]->toArray();
+        $this->assertEquals('description', $mod['modified_attribute']);
+        $mod['new_value'] = 'description' . "\r\n";
+        
+        $modlog = new Tinebase_Db_Table(array('name' => SQL_TABLE_PREFIX . 'timemachine_modlog'));
+        $modlog->update($mod, Tinebase_Core::getDb()->quoteInto('id = ?', $mod['id']));
+        
+        // this should still work as we normalize linebreaks in concurrency check
+        $resolvableConcurrencyTask = clone $utask;
+        $resolvableConcurrencyTask->last_modified_time = Tinebase_DateTime::now()->addHour(-1);
+        $resolvableConcurrencyTask->description = 'description'. "\n";
+        $task = $this->_controller->update($resolvableConcurrencyTask);
+        
+        $this->assertEquals('description'. "\n", $task->description);
     }
 }

@@ -49,9 +49,9 @@ class Setup_Server_Json extends Tinebase_Server_Json
             );
             
             if (! Setup_Core::configFileExists()) {
-            	$anonymnousMethods = array_merge($anonymnousMethods, array(
-	                'Setup.envCheck',
-	            ));
+                $anonymnousMethods = array_merge($anonymnousMethods, array(
+                    'Setup.envCheck',
+                ));
             }
             
             // check json key for all methods but some exceptoins
@@ -77,7 +77,7 @@ class Setup_Server_Json extends Tinebase_Server_Json
             $response = $server->handle($request);
             
         } catch (Exception $exception) {
-            $response = $this->_handleException($server, $request, $exception);
+            $response = $this->_handleException($request, $exception);
         }
         
         echo $response;

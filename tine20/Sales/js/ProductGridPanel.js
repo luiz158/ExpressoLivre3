@@ -97,6 +97,7 @@ Tine.Sales.ProductGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         return new Tine.widgets.grid.FilterToolbar({
             filterModels: Tine.Sales.Model.Product.getFilterModel(),
             defaultFilter: 'query',
+            recordClass: this.recordClass,
             filters: [],
             plugins: [
                 new Tine.widgets.grid.FilterToolbarQuickFilterPlugin()
@@ -111,7 +112,7 @@ Tine.Sales.ProductGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
      * @private
      */
     getColumnModel: function(){
-        return new Ext.grid.ColumnModel({ 
+        return new Ext.grid.ColumnModel({
             defaults: {
                 sortable: true
             },

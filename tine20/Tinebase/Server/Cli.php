@@ -19,23 +19,23 @@
  */
 class Tinebase_Server_Cli implements Tinebase_Server_Interface
 {
+    protected static $_anonymousMethods = array(
+        'Tinebase.triggerAsyncEvents',
+        'Tinebase.executeQueueJob',
+        'Tinebase.monitoringCheckDB',
+        'Tinebase.monitoringCheckConfig',
+        'Tinebase.monitoringCheckCron',
+        'Tinebase.monitoringLoginNumber',
+    );
+    
     /**
-     * init tine framework
+     * return anonymous methods
+     * 
+     * @return array
      */
-    protected function _initFramework()
+    public static function getAnonymousMethods()
     {
-        $this->_setupCliConfig();
-        Tinebase_Core::setupTempDir();
-        Tinebase_Core::setupServerTimezone();
-        Tinebase_Core::setupLogger();
-        Tinebase_Core::setupStreamWrapper();
-        Tinebase_Core::setupSession();
-        Tinebase_Core::set(Tinebase_Core::LOCALE, new Zend_Locale('en_US'));
-        Tinebase_Core::set(Tinebase_Core::USERTIMEZONE, 'UTC');
-        Tinebase_Core::setupDatabaseConnection();
-        Tinebase_Core::setupCache();
-        Tinebase_Core::setupUserTimezone();
-        Tinebase_Core::setupUserLocale();
+        return self::$_anonymousMethods;
     }
     
     /**
@@ -52,7 +52,7 @@ class Tinebase_Server_Cli implements Tinebase_Server_Interface
         $configData['sessiondir'] = Tinebase_Core::getTempDir();
         
         $config = new Zend_Config($configData);
-        Tinebase_Core::set(Tinebase_Core::CONFIG, $config);  
+        Tinebase_Core::set(Tinebase_Core::CONFIG, $config);
     }
     
     /**
@@ -62,24 +62,18 @@ class Tinebase_Server_Cli implements Tinebase_Server_Interface
      */
     public function handle()
     {
-        $opts = Tinebase_Core::get('opts');
+        $method = $this->getRequestMethod();
         
-        if (! in_array($opts->method, array('Tinebase.monitoringCheckDB', 'Tinebase.monitoringCheckConfig'))) {
-            $this->_initFramework();
+        if (! in_array($method, array('Tinebase.monitoringCheckDB', 'Tinebase.monitoringCheckConfig'))) {
+            Tinebase_Core::initFramework();
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
-                .' Is cli request. method: ' . (isset($opts->method) ? $opts->method : 'EMPTY'));
+                .' Is cli request. method: ' . $method);
         }
         
         $tinebaseServer = new Tinebase_Frontend_Cli();
         
-        if (! in_array($opts->method, array(
-            'Tinebase.triggerAsyncEvents',
-            'Tinebase.processQueue',
-            'Tinebase.monitoringCheckDB',
-            'Tinebase.monitoringCheckConfig',
-            'Tinebase.monitoringCheckCron',
-            'Tinebase.monitoringLoginNumber',
-        ))) {
+        $opts = Tinebase_Core::get('opts');
+        if (! in_array($method, self::getAnonymousMethods())) {
             $tinebaseServer->authenticate($opts->username, $opts->password);
         }
         $result = $tinebaseServer->handle($opts);
@@ -87,6 +81,17 @@ class Tinebase_Server_Cli implements Tinebase_Server_Interface
         //@todo remove cli session path
         
         return $result;
+    }
+    
+    /**
+    * returns request method
+    *
+    * @return string|NULL
+    */
+    public function getRequestMethod()
+    {
+        $opts = Tinebase_Core::get('opts');
+        return (isset($opts->method)) ? $opts->method : NULL;
     }
     
     /**

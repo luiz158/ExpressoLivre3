@@ -6,7 +6,7 @@
  * @subpackage  Controller
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2009-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2013 Metaways Infosystems GmbH (http://www.metaways.de)
  * 
  * @todo        parse mail body and add <a> to telephone numbers?
  */
@@ -48,7 +48,7 @@ class Felamimail_Controller_Message
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -56,7 +56,7 @@ class Felamimail_Controller_Message
      *
      * @return Felamimail_Controller_Message
      */
-    public static function getInstance() 
+    public static function getInstance()
     {
         if (self::$_instance === NULL)
         {            
@@ -65,4 +65,5 @@ class Felamimail_Controller_Message
         
         return self::$_instance;
     }
+    
 }

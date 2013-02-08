@@ -15,143 +15,37 @@
  * @package     Tinebase
  * @subpackage  Backend
  */
-class Tinebase_Backend_Sql_Command implements Tinebase_Backend_Sql_Command_Interface
+class Tinebase_Backend_Sql_Command
 {
-
-	/**
-	 * 
-	 * @param Zend_Db_Adapter_Abstract $adapter
-	 * @return string
-	 */
+    protected static $_instances = array();
+    
+    /**
+     * @param Zend_Db_Adapter_Abstract $adapter
+     * @return Tinebase_Backend_Sql_Command_Interface
+     */
+    public static function factory(Zend_Db_Adapter_Abstract $adapter)
+    {
+        $className = __CLASS__ . '_' . self::_getClassName($adapter);
+        
+        // @todo find better array key (add loginname and host)
+        if (!isset(self::$_instances[$className])) {
+            self::$_instances[$className] = new $className($adapter);
+        }
+        
+        return self::$_instances[$className];
+    }
+    
+    /**
+     *
+     * @param Zend_Db_Adapter_Abstract $adapter
+     * @return string
+     */
     private static function _getClassName($adapter)
     {
         $completeClassName = explode('_',get_class($adapter));
         $className = $completeClassName[count($completeClassName)-1];
         $className = str_replace('Oci','Oracle',$className);
-        return $className;		
-    }
-    
-    /**
-     * 
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @return Tinebase_Backend_Sql_Command_Interface 
-     */
-    private static function _getCommand($adapter)
-    {
-    	$className = self::_getClassName($adapter);
-    	$className = __CLASS__ . '_' . $className;
-    	$command = new $className();
-    	return $command;
-    }
-    
-    /**
-     * 
-     * @param $adapter Zend_Db_Adapter_Abstract
-     * @param $on boolean
-     */
-    public static function setAutocommit($adapter, $on)
-    {
-        $command = self::_getCommand($adapter);
         
-        $command->setAutocommit($adapter,$on);
+        return $className;
     }
-    
-    /**
-     * 
-     * @param Tinebase_Container $container
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @return string
-     */
-    public static function getAggregateFunction($adapter,$field)
-    {
-        $command = self::_getCommand($adapter);
-        	    	
-    	return $command->getAggregateFunction($adapter,$field);	
-    }
-    
-    /**
-     * 
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param string $field
-     * @param mixed $returnIfTrue
-     * @param mixed $returnIfFalse
-     * @return string
-     */
-    public static function getIfIsNull($adapter,$field,$returnIfTrue,$returnIfFalse)
-    {
-        $command = self::_getCommand($adapter);
-        	    	
-    	return $command->getIfIsNull($adapter,$field,$returnIfTrue,$returnIfFalse);    	
-    }    
-    
-    /**
-     * 
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param string $field
-     * @param mixed $returnIfTrue
-     * @param mixed $returnIfFalse
-     * @return string
-     */
-    public static function getLike($adapter)
-    {
-        $command = self::_getCommand($adapter);
-        	    	
-    	return $command->getLike($adapter);
-    }
-    
-    /**
-     * 
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param string $field
-     * @param mixed $returnIfTrue
-     * @param mixed $returnIfFalse
-     * @return string
-     */
-    public static function setDate($adapter, $field)
-    {
-        $command = self::_getCommand($adapter);
-        	    	
-    	return $command->setDate($adapter, $field);    	
-    }   
-    
-    /**
-     * 
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @param string $field
-     * @param mixed $returnIfTrue
-     * @param mixed $returnIfFalse
-     * @return string
-     */
-    public static function setDateValue($adapter, $field)
-    {
-        $command = self::_getCommand($adapter);
-        	    	
-    	return $command->setDateValue($adapter, $field);    	
-    }
-
-    /**
-     * 
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @return mixed
-     */
-    public static function getFalseValue($adapter = null)
-    {
-        $command = self::_getCommand($adapter);
-
-        return $command->getFalseValue();
-    }
-
-    /**
-     *
-     * @param Zend_Db_Adapter_Abstract $adapter
-     * @return mixed
-     */    
-    public static function getTrueValue($adapter = null)
-    {
-    	$command = self::_getCommand($adapter);
-    
-    	return $command->getTrueValue();
-    }
-    
-             
 }

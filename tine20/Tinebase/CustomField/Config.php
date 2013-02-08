@@ -30,7 +30,14 @@ class Tinebase_CustomField_Config extends Tinebase_Backend_Sql_Abstract
      * @var string
      */
     protected $_modelName = 'Tinebase_Model_CustomField_Config';
-    
+
+    /**
+     * default column(s) for count
+     *
+     * @var string
+     */
+    protected $_defaultCountCol = 'id';
+
     /**
      * get customfield config ids by grant
      * 
@@ -58,7 +65,7 @@ class Tinebase_CustomField_Config extends Tinebase_Backend_Sql_Abstract
         
         return $result;
     }
-    
+
     /**
      * get acl select
      * 
@@ -88,13 +95,12 @@ class Tinebase_CustomField_Config extends Tinebase_Backend_Sql_Abstract
             return $result;
         }
         
-        $select = $this->_getAclSelect(array('id' => 'customfield_config.id', 'account_grants' => Tinebase_Backend_Sql_Command::getAggregateFunction($this->_db, $this->_db->quoteIdentifier('customfield_acl.account_grant'))));
+        $select = $this->_getAclSelect(array('id' => 'customfield_config.id', 'account_grants' => $this->_dbCommand->getAggregate('customfield_acl.account_grant')));
         $select->where($this->_db->quoteInto($this->_db->quoteIdentifier('customfield_config.id') . ' IN (?)', (array)$_ids))
                ->group(array('customfield_config.id', 'customfield_acl.account_type', 'customfield_acl.account_id'));
         Tinebase_Container::addGrantsSql($select, $_accountId, Tinebase_Model_CustomField_Grant::getAllGrants(), 'customfield_acl');
         
         //if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $select->__toString());
-        $select = Tinebase_Backend_Sql_Abstract::traitGroup($this->_db, $this->_tablePrefix, $select);      
         
         $stmt = $this->_db->query($select);
         $rows = $stmt->fetchAll(Zend_Db::FETCH_ASSOC);

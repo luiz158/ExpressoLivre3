@@ -8,6 +8,7 @@
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  * @copyright   Copyright (c) 2010-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * 
+ * @todo 0007376: Tinebase_FileSystem / Node model refactoring: move all container related functionality to Filemanager
  */
 
 /**
@@ -35,6 +36,11 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
      */
     protected $_basePath;
     
+    /**
+     * stat cache
+     * 
+     * @var array
+     */
     protected $_statCache = array();
     
     /**
@@ -49,7 +55,6 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
      */
     public function __construct() 
     {
-        $this->_currentAccount     = Tinebase_Core::getUser();
         $this->_fileObjectBackend  = new Tinebase_Tree_FileObject();
         $this->_treeNodeBackend    = new Tinebase_Tree_Node();
         
@@ -122,17 +127,56 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
     } 
     
     /**
+     * Get one tree node (by id)
+     *
+     * @param integer|Tinebase_Record_Interface $_id
+     * @param $_getDeleted get deleted records
+     * @return Tinebase_Record_Interface
+     */
+    public function get($_id, $_getDeleted = FALSE)
+    {
+        $node = $this->_treeNodeBackend->get($_id, $_getDeleted);
+        $fileObject = $this->_fileObjectBackend->get($node->object_id);
+        $node->description = $fileObject->description;
+        
+        return $node;
+    }
+    
+    /**
+     * Get multiple tree nodes identified by id
+     *
+     * @param string|array $_id Ids
+     * @return Tinebase_Record_RecordSet of Tinebase_Model_Tree_Node
+     */
+    public function getMultipleTreeNodes($_id) 
+    {
+        return $this->_treeNodeBackend->getMultiple($_id);
+    }
+    
+    /**
      * create container node
      * 
      * @param Tinebase_Model_Container $_container
      */
     public function createContainerNode(Tinebase_Model_Container $_container)
     {
-        $application = Tinebase_Application::getInstance()->getApplicationById($_container->application_id);
-        $path = '/' . $application->getId() . '/' . $_container->type . '/' . $_container->getId();
+        $path = $this->getContainerPath($_container);
         if (!$this->fileExists($path)) {
             $this->mkdir($path);
         }
+    }
+
+    /**
+     * get container path
+     * 
+     * @param Tinebase_Model_Container $container
+     * @return string
+     */
+    public function getContainerPath(Tinebase_Model_Container $container)
+    {
+        $path = $this->getApplicationBasePath($container->application_id, $container->type) . '/' . $container->getId();
+        
+        return $path;
     }
     
     /**
@@ -162,7 +206,7 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
         
         $timestamp = $node->last_modified_time instanceof Tinebase_DateTime ? $node->last_modified_time->getTimestamp() : $node->creation_time->getTimestamp();
         
-        return $timestamp;        
+        return $timestamp;
     }
     
     /**
@@ -222,7 +266,12 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
                 
                 $this->clearStatCache($options['tine20']['path']);
                 
+                Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Writing to file : ' . $options['tine20']['path'] . ' successful.');
+                
                 break;
+                
+            default:
+                Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Got mode : ' . $options['tine20']['mode'] . ' - nothing to do.');
         }
         
         fclose($_handle);
@@ -352,7 +401,7 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
     {
         $node = $this->stat($_path);
         
-        return $node->contenttype;        
+        return $node->contenttype;
     }
     
     /**
@@ -366,7 +415,7 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
     {
         $node = $this->stat($_path);
         
-        return $node->hash;        
+        return $node->hash;
     }
     
     /**
@@ -546,7 +595,7 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
         if (isset($this->_statCache[$_path])) {
             $node = $this->_statCache[$_path];
         } else {
-            $node = $this->_treeNodeBackend->getLastPathNode($_path); 
+            $node = $this->_treeNodeBackend->getLastPathNode($_path);
             $this->_statCache[$_path] = $node;
         }
         
@@ -628,7 +677,7 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
         
         return $treeNode;
     }
-
+    
     /**
      * create new file node
      * 
@@ -653,6 +702,10 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
             'object_id'     => $fileObject->getId(),
             'parent_id'     => $parentId
         ));
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ .
+            ' ' . print_r($treeNode->toArray(), TRUE));
+        
         $treeNode = $this->_treeNodeBackend->create($treeNode);
         
         return $treeNode;
@@ -694,7 +747,7 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
         $result = $this->_treeNodeBackend->search($_filter, $_pagination);
         return $result;
     }
-
+    
     /**
     * search tree nodes count
     *
@@ -761,13 +814,58 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
      * @param Tinebase_Model_Tree_Node $_node
      * @return Tinebase_Model_Tree_Node
      */
-    public function updateNode(Tinebase_Model_Tree_Node $_node)
+    public function update(Tinebase_Model_Tree_Node $_node)
     {
-        $currentNodeObject = $this->_treeNodeBackend->get($_node->getId());
-        $modLog = Tinebase_Timemachine_ModificationLog::getInstance();
-        $modLog->setRecordMetaData($_node, 'update', $currentNodeObject);
-                
+        $currentNodeObject = $this->get($_node->getId());
+        Tinebase_Timemachine_ModificationLog::setRecordMetaData($_node, 'update', $currentNodeObject);
+        
+        // update file object
+        $fileObject = $this->_fileObjectBackend->get($currentNodeObject->object_id);
+        $fileObject->description = $_node->description;
+        $this->_fileObjectBackend->update($fileObject);
+        
         return $this->_treeNodeBackend->update($_node);
+    }
+    
+    /**
+     * get container of node
+     * 
+     * @param Tinebase_Model_Tree_Node|string $node
+     * @return Tinebase_Model_Container
+     */
+    public function getNodeContainer($node)
+    {
+        $nodesPath = $this->getPathOfNode($node);
+        
+        if (count($nodesPath) < 4) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . 
+                ' ' . print_r($nodesPath[0], TRUE));
+            throw new Tinebase_Exception_NotFound('Could not find container for node ' . $nodesPath[0]['id']);
+        }
+        
+        $containerNode = ($nodesPath[2]['name'] === Tinebase_Model_Container::TYPE_PERSONAL) ? $nodesPath[4] : $nodesPath[3];
+        return Tinebase_Container::getInstance()->get($containerNode['name']);
+    }
+    
+    /**
+     * get path of node
+     * 
+     * @param Tinebase_Model_Tree_Node|string $node
+     * @param boolean $getPathAsString
+     * @return array|string
+     */
+    public function getPathOfNode($node, $getPathAsString = FALSE)
+    {
+        $node = $node instanceof Tinebase_Model_Tree_Node ? $node : $this->get($node);
+        
+        $nodesPath = new Tinebase_Record_RecordSet('Tinebase_Model_Tree_Node', array($node));
+        while ($node->parent_id) {
+            $node = $this->get($node->parent_id);
+            $nodesPath->addRecord($node);
+        }
+        
+        $result = ($getPathAsString) ? '/' . implode('/', array_reverse($nodesPath->name)) : array_reverse($nodesPath->toArray());
+        return $result;
     }
     
     /**
@@ -789,6 +887,7 @@ class Tinebase_FileSystem implements Tinebase_Controller_Interface
         $deleteCount = 0;
         foreach ($dirIterator as $item) {
             $subDir = $item->getFileName();
+            if ($subDir[0] == '.') continue;
             if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__
                 . ' Checking ' . $subDir);
             $subDirIterator = new DirectoryIterator($this->_basePath . '/' . $subDir);

@@ -25,10 +25,10 @@ var resourcePicker = new Tine.Tinebase.widgets.form.RecordPickerComboBox({
 });
    </code></pre>
  */
-Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.form.ComboBox, {
+Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.ux.form.ClearableComboBox, {
     /**
      * @cfg {bool} blurOnSelect
-     * blur this combo when record got selected, usefull to be used in editor grids (defaults to false)
+     * blur this combo when record got selected, useful to be used in editor grids (defaults to false)
      */
     blurOnSelect: false,
     
@@ -58,10 +58,32 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.form.ComboBox, 
     selectedRecord: null,
     
     /**
+     * sort by field
+     * 
+     * @type String 
+     */
+    sortBy: null,
+    
+    /**
      * @type string
      * @property lastStoreTransactionId
      */
     lastStoreTransactionId: null,
+    
+    /**
+     * if set to false, it is not possible to add the same record handled in this.editDialog
+     * this.editDialog must also be set
+     * 
+     * @cfg {Boolean} allowLinkingItself
+     */
+    allowLinkingItself: null,
+    
+    /**
+     * the editDialog, the form is nested in. Just needed if this.allowLinkingItself is set to false
+     * 
+     * @cfg Tine.widgets.dialog.EditDialog editDialog
+     */
+    editDialog: null,
     
     triggerAction: 'all',
     pageSize: 10,
@@ -72,6 +94,7 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.form.ComboBox, 
         this.app = Tine.Tinebase.appMgr.get(this.recordClass.getMeta('appName'));
         this.displayField = this.recordClass.getMeta('titleProperty');
         this.valueField = this.recordClass.getMeta('idProperty');
+        this.disableClearer = ! this.allowBlank;
         
         this.loadingText = _('Searching...');
         
@@ -106,7 +129,7 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.form.ComboBox, 
     
     
     /**
-     * prepare paging
+     * prepare paging and sort
      * 
      * @param {Ext.data.Store} store
      * @param {Object} options
@@ -116,12 +139,18 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.form.ComboBox, 
         
         this.lastStoreTransactionId = options.transactionId = Ext.id();
         
-        options.params.paging = {
+        var paging = {
+            // TODO do we need to set start & limit here?
             start: options.params.start,
             limit: options.params.limit,
-            sort: this.valueField,
+            sort: (this.sortBy) ? this.sortBy : this.valueField,
             dir: 'ASC'
         };
+        
+        Ext.applyIf(options.params, paging);
+        
+        // TODO is this needed?
+        options.params.paging = paging;
     },
     
     /**
@@ -167,7 +196,7 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.form.ComboBox, 
             contextmenu: Ext.emptyFn
         });
  
-        this.relayEvents(c, ['contextmenu']);        
+        this.relayEvents(c, ['contextmenu']);
     },
     
     /**
@@ -229,16 +258,29 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.form.ComboBox, 
         var r = this.findRecord(this.valueField, value),
             text = value;
         
-        if(r){
+        if (r){
             text = r.getTitle();
-        }else if(Ext.isDefined(this.valueNotFoundText)){
+            
+            if (this.allowLinkingItself === false) {
+                if (r.getId() == this.editDialog.record.getId()) {
+                    Ext.MessageBox.show({
+                        title: _('Failure'),
+                        msg: _('You tried to link a record with itself. This is not allowed!'),
+                        buttons: Ext.MessageBox.OK,
+                        icon: Ext.MessageBox.ERROR  
+                    });
+                    return;
+                }
+            }
+            
+        } else if (Ext.isDefined(this.valueNotFoundText)){
             text = this.valueNotFoundText;
         }
         this.lastSelectionText = text;
-        if(this.hiddenField){
+        if (this.hiddenField){
             this.hiddenField.value = Ext.value(value, '');
         }
-        Ext.form.ComboBox.superclass.setValue.call(this, text);
+        Tine.Tinebase.widgets.form.RecordPickerComboBox.superclass.setValue.call(this, text);
         this.value = value;
         return this;
     }

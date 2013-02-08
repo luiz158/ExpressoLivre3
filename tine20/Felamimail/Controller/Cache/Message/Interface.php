@@ -66,4 +66,23 @@ interface Felamimail_Controller_Cache_Message_Interface
      * @todo add status/progress to start at later messages when this is called next time?
      */
     public function updateFlags($_folder, $_time = 60);
+    
+    /**
+     * get messages befora a date 
+     * 
+     * @param  mixed  $_folderId
+     * @param  string $_date
+     * @return array
+     */
+    public function SelectBeforeDate($_folderId,$_date);
+    
+    /**
+     * fetch message summary from IMAP server
+     * 
+     * @param string $messageUid
+     * @param string $accountId
+     * @param string $folderId
+     * @return array
+     */
+    public function getMessageSummary($messageUid, $accountId, $folderId = NULL);
 }

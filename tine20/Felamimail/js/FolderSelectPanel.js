@@ -31,7 +31,7 @@ Ext.namespace('Tine.Felamimail');
  * Create a new Tine.Felamimail.FolderSelectPanel
  */
 Tine.Felamimail.FolderSelectPanel = Ext.extend(Ext.Panel, {
-	
+    
     /**
      * Panel config
      * @private
@@ -41,7 +41,7 @@ Tine.Felamimail.FolderSelectPanel = Ext.extend(Ext.Panel, {
     autoScroll: true,
     bodyStyle: 'background-color:white',
     selectedNode: null,
-	
+    
     /**
      * init
      * @private
@@ -65,7 +65,7 @@ Tine.Felamimail.FolderSelectPanel = Ext.extend(Ext.Panel, {
         this.initFolderTree();
         
         Tine.Felamimail.FolderSelectPanel.superclass.initComponent.call(this);
-	},
+    },
     
     /**
      * init actions
@@ -86,13 +86,13 @@ Tine.Felamimail.FolderSelectPanel = Ext.extend(Ext.Panel, {
             minWidth: 70,
             handler: this.onOk,
             scope: this
-        });        
+        });
         
         this.fbar = [
             '->',
             this.action_cancel,
             this.action_ok
-        ];        
+        ];
     },
         
     /**
@@ -122,8 +122,8 @@ Tine.Felamimail.FolderSelectPanel = Ext.extend(Ext.Panel, {
                     draggable: false,
                     allowDrop: false,
                     expanded: false,
-                    text: record.get('name'),
-                    qtip: record.get('host'),
+                    text: Ext.util.format(record.get('name')),
+                    qtip: Tine.Tinebase.common.doubleEncode(record.get('host')),
                     leaf: false,
                     cls: 'felamimail-node-account',
                     delimiter: record.get('delimiter'),

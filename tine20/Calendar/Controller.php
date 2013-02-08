@@ -23,11 +23,17 @@ class Calendar_Controller extends Tinebase_Controller_Event implements Tinebase_
     private static $_instance = NULL;
 
     /**
+     * holds the default Model of this application
+     * @var string
+     */
+    protected static $_defaultModel = 'Calendar_Model_Event';
+    
+    /**
      * don't clone. Use the singleton.
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -69,16 +75,16 @@ class Calendar_Controller extends Tinebase_Controller_Event implements Tinebase_
                 
             case 'Admin_Event_UpdateGroup':
                 if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . ' (' . __LINE__ . ') updated group ' . $_eventObject->group->name);
-                Calendar_Controller_Event::getInstance()->onUpdateGroup($_eventObject->group->getId());
+                Tinebase_ActionQueue::getInstance()->queueAction('Calendar.onUpdateGroup', $_eventObject->group->getId());
                 break;
             case 'Admin_Event_AddGroupMember':
                 if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . ' (' . __LINE__ . ') add groupmember ' . (string) $_eventObject->userId . ' to group ' . (string) $_eventObject->groupId);
-                Calendar_Controller_Event::getInstance()->onUpdateGroup($_eventObject->groupId);
+                Tinebase_ActionQueue::getInstance()->queueAction('Calendar.onUpdateGroup', $_eventObject->groupId);
                 break;
                 
             case 'Admin_Event_RemoveGroupMember':
                 if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . ' (' . __LINE__ . ') removed groupmember ' . (string) $_eventObject->userId . ' from group ' . (string) $_eventObject->groupId);
-                Calendar_Controller_Event::getInstance()->onUpdateGroup($_eventObject->groupId);
+                Tinebase_ActionQueue::getInstance()->queueAction('Calendar.onUpdateGroup', $_eventObject->groupId);
                 break;
                 
             case 'Tinebase_Event_Container_BeforeCreate':
@@ -105,7 +111,8 @@ class Calendar_Controller extends Tinebase_Controller_Event implements Tinebase_
             'owner_id'          => $_account,
             'backend'           => 'Sql',
             'color'             => '#FF6600',
-            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName('Calendar')->getId() 
+            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName('Calendar')->getId(),
+            'model'             => static::$_defaultModel
         ));
         
         $personalContainer = Tinebase_Container::getInstance()->addContainer($newContainer);
@@ -180,5 +187,16 @@ class Calendar_Controller extends Tinebase_Controller_Event implements Tinebase_
     public function sendEventNotifications($_event, $_updater, $_action, $_oldEvent=NULL, $attachs = FALSE)
     {
         Calendar_Controller_EventNotifications::getInstance()->doSendNotifications($_event, $_updater, $_action, $_oldEvent, $attachs);
+    }
+    
+    /**
+     * update group events
+     * 
+     * @param string $_groupId
+     * @return void
+     */
+    public function onUpdateGroup($_groupId)
+    {
+        Calendar_Controller_Event::getInstance()->onUpdateGroup($_groupId);
     }
 }

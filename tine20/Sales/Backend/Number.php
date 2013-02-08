@@ -33,6 +33,13 @@ class Sales_Backend_Number extends Tinebase_Backend_Sql_Abstract
     protected $_modelName = 'Sales_Model_Number';
     
     /**
+     * default column(s) for count
+     *
+     * @var string
+     */
+    protected $_defaultCountCol = 'id';
+
+    /**
      * get next number identified by $_type (i.e. contract) and update db
      *
      * @param   string $_type
@@ -60,7 +67,7 @@ class Sales_Backend_Number extends Tinebase_Backend_Sql_Abstract
             ), TRUE);
             
             $number = $this->create($number);
-        } else {        
+        } else {
             // increase and update
             $number = new Sales_Model_Number($queryResult);
             
@@ -71,6 +78,6 @@ class Sales_Backend_Number extends Tinebase_Backend_Sql_Abstract
             $number = $this->update($number);
         }
         
-        return $number; 
+        return $number;
     }
 }

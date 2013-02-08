@@ -3,7 +3,7 @@
  * 
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2007-2010 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  */
  
  Ext.ns('Tine', 'Tine.widgets');
@@ -95,8 +95,9 @@
      * @param {Array|SelectionModel} records
      */
     updateActions: function(records) {
-        
+        var isFilterSelect = false;
         if (typeof(records.getSelections) == 'function') {
+            isFilterSelect = records.isFilterSelect;
             records = records.getSelections();
         } else if (typeof(records.beginEdit) == 'function') {
             records = [records];
@@ -111,7 +112,7 @@
                 var scope = action.scope || action.initialConfig.scope || window;
                 actionUpdater.call(scope, action, grants, records);
             } else {
-                this.defaultUpdater(action, grants, records);
+                this.defaultUpdater(action, grants, records, isFilterSelect);
             }
         }, this);
         
@@ -127,42 +128,48 @@
      * @param {Ext.Action} action
      * @param {Object} grants
      * @param {Object} records
+     * @param {Boolean} isFilterSelect
      */
-    defaultUpdater: function(action, grants, records) {
-        var nCondition     = records.length != 0 && (records.length > 1 ? action.initialConfig.allowMultiple : true);
-        var grantCondition = (! this.evalGrants) || grants[action.initialConfig.requiredGrant];
-        
+    defaultUpdater: function(action, grants, records, isFilterSelect) {
+        var nCondition = records.length != 0 && (records.length > 1 ? action.initialConfig.allowMultiple : true),
+            mCondition = records && records.length > 1,
+            grantCondition = (! this.evalGrants) || grants[action.initialConfig.requiredGrant];
+
         // @todo discuss if actions are only to be touched if requiredGrant is set
         if (action.initialConfig.requiredGrant && action.initialConfig.requiredGrant != 'addGrant') {
             action.setDisabled(! (grantCondition && nCondition));
         }
-
-        if(nCondition) {
-            if(action.initialConfig.requiredMultipleRight) {
-                if(records && records.length > 1) {
+        
+        // disable on filter selection if required
+        if(action.disableOnFilterSelection && isFilterSelect) {
+            action.setDisabled(true);
+            return;
+        }
+        
+        if (nCondition) {
+            if (mCondition) {
+                if (action.initialConfig.requiredMultipleRight) {
                     var right = action.initialConfig.requiredMultipleRight.split('_');
-                    if(right.length == 2) {
+                    if (right.length == 2) {
                         action.setDisabled(!Tine.Tinebase.common.hasRight(right[0], action.initialConfig.scope.app.name, right[1]));
                     } else {
                         Tine.log.debug('multiple edit right was not properly applied');
                     }
                 }
-            }
-    
-            if(action.initialConfig.requiredMultipleGrant) {
-                var hasRight = true;
-                if(Ext.isArray(records)) {
-                    Ext.each(records, function(record) {
-                        if(record.get('container_id')) {
-                            hasRight = (hasRight && (record.get('container_id').account_grants[action.initialConfig.requiredMultipleGrant]));
-                        } else {
-                            return false;
-                        }
-                    }, this);
-                    action.setDisabled(! hasRight);
+                if(action.initialConfig.requiredMultipleGrant) {
+                    var hasRight = true;
+                    if(Ext.isArray(records)) {
+                        Ext.each(records, function(record) {
+                            if(record.get('container_id') && record.get('container_id').account_grants) {
+                                hasRight = (hasRight && (record.get('container_id').account_grants[action.initialConfig.requiredMultipleGrant]));
+                            } else {
+                                return false;
+                            }
+                        }, this);
+                        action.setDisabled(! hasRight);
+                    }
                 }
             }
-            
             if (action.initialConfig.singularText && action.initialConfig.pluralText && action.initialConfig.translationObject) {
                 var text = action.initialConfig.translationObject.n_(action.initialConfig.singularText, action.initialConfig.pluralText, records.length);
                 action.setText(text);
@@ -193,8 +200,8 @@
 
         var defaultGrant = records.length == 0 ? false : true;
         var grants = {
-            //addGrant:    defaultGrant,
-            //adminGrant:  defaultGrant,
+            addGrant:       defaultGrant,
+            adminGrant:     defaultGrant,
             deleteGrant:    defaultGrant,
             editGrant:      defaultGrant,
             readGrant:      defaultGrant,
@@ -213,15 +220,21 @@
                 records[i].get(this.grantsProperty) : records[i].data;
             
             for (var grant in grants) {
-                if (grants.hasOwnProperty(grant)) {
+                if (grants.hasOwnProperty(grant) && recordGrants && recordGrants.hasOwnProperty(grant)) {
                     grants[grant] = grants[grant] & recordGrants[grant];
                 }
+            }
+        }
+        // if calculated admin right is true, overwrite all grants with true
+        if(grants.adminGrant) {
+            for (var grant in grants) {
+                grants[grant] = true;
             }
         }
         
         return grants;
     }
- };
+};
  
 /**
  * sets text and disabled status of a set of actions according to the grants 
@@ -251,7 +264,9 @@ Tine.widgets.actionUpdater = function(records, actions, containerField, skipGran
         adminGrant:  defaultGrant,
         deleteGrant: defaultGrant,
         editGrant:   defaultGrant,
-        readGrant:   defaultGrant
+        exportGrant: defaultGrant,
+        readGrant:   defaultGrant,
+        syncGrant:   defaultGrant
     };
     
     // calculate sum of grants

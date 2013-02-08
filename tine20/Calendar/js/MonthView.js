@@ -231,7 +231,7 @@ Ext.extend(Tine.Calendar.MonthView, Ext.util.Observable, {
         return {
             from: this.dateMesh[0],
             until: this.dateMesh[this.dateMesh.length -1].add(Date.DAY, 1)
-        };    
+        };
     },
     
     getSelectionModel: function() {
@@ -492,6 +492,7 @@ Ext.extend(Tine.Calendar.MonthView, Ext.util.Observable, {
                 
             var tmpl = this.templates.event;
             data.extraCls = event.get('editGrant') ? 'cal-monthview-event-editgrant' : '';
+            data.extraCls += ' cal-status-' + event.get('status');
             
             if (event.ui.is_all_day_event) {
                 tmpl = this.templates.allDayEvent;

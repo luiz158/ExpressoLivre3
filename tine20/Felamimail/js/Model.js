@@ -4,7 +4,7 @@
  * @package     Felamimail
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * 
  * TODO         think about adding a generic felamimail backend with the exception handler
  */
@@ -210,6 +210,9 @@ Tine.Felamimail.messageBackend = new Tine.Tinebase.data.RecordProxy({
             return [Tine.Felamimail.folderBackend.recordReader(response)];
         };
         
+        // increase timeout as this can take a longer (5 minutes)
+        options.timeout = 300000;
+        
         return this.doXHTTPRequest(options);
     },
     
@@ -217,20 +220,27 @@ Tine.Felamimail.messageBackend = new Tine.Tinebase.data.RecordProxy({
      * fetches body and additional headers (which are needed for the preview panel) into given message
      * 
      * @param {Message} message
+     * @param {Function|Object} callback (NOTE: this has NOTHING to do with standard Ext request callback fn)
      */
     fetchBody: function(message, callback) {
         return this.loadRecord(message, {
             timeout: 240000, // 4 minutes
             scope: this,
-            callback: function(options, success, response) {
-                var msg = this.recordReader(response);
+            success: function(response, options) {
+                var msg = this.recordReader({responseText: Ext.util.JSON.encode(response.data)});
                 // NOTE: Flags from the server might be outdated, so we skip them
                 Ext.copyTo(message.data, msg.data, Tine.Felamimail.Model.Message.getFieldNames().remove('flags'));
-                if (Ext.isFunction(callback)){
+                if (Ext.isFunction(callback)) {
                     callback(message);
+                } else if (callback.success) {
+                    Ext.callback(callback.success, callback.scope, [message]);
+                }
+            },
+            failure: function(exception) {
+                if (callback.failure) {
+                    Ext.callback(callback.failure, callback.scope, [exception]);
                 } else {
-                    Ext.callback(callback[success ? 'success' : 'failure'], callback.scope, [message]);
-                    Ext.callback(callback.callback, callback.scope, [message]);
+                    this.handleRequestException(exception);
                 }
             }
         });
@@ -328,7 +338,7 @@ Tine.Felamimail.messageBackend = new Tine.Tinebase.data.RecordProxy({
  * 
  * Account Record Definition
  */ 
-Tine.Felamimail.Model.Account = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.genericFields.concat([
+Tine.Felamimail.Model.Account = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.modlogFields.concat([
     { name: 'id' },
     { name: 'original_id' }, // client only, used in message compose dialog for accounts combo
     { name: 'user_id' },
@@ -374,7 +384,6 @@ Tine.Felamimail.Model.Account = Tine.Tinebase.data.Record.create(Tine.Tinebase.M
     // ngettext('Account', 'Accounts', n);
     recordName: 'Account',
     recordsName: 'Accounts',
-    containerProperty: 'container_id',
     // ngettext('Email Accounts', 'Email Accounts', n);
     containerName: 'Email Accounts',
     containersName: 'Email Accounts',
@@ -440,7 +449,7 @@ Tine.Felamimail.Model.Account = Tine.Tinebase.data.Record.create(Tine.Tinebase.M
  * 
  * @return {Object}
  */
-Tine.Felamimail.Model.Account.getDefaultData = function() { 
+Tine.Felamimail.Model.Account.getDefaultData = function() {
     var defaults = (Tine.Felamimail.registry.get('defaults')) 
         ? Tine.Felamimail.registry.get('defaults')
         : {};
@@ -578,7 +587,6 @@ Tine.Felamimail.folderBackend = new Tine.Tinebase.data.RecordProxy({
     /**
      * update message cache of given folder for given execution time and sets the client_access_time
      * 
-     * 
      * @param   {String} folderId
      * @param   {Number} executionTime (seconds)
      * @return  {Number} Ext.Ajax transaction id
@@ -601,7 +609,7 @@ Tine.Felamimail.folderBackend = new Tine.Tinebase.data.RecordProxy({
         
         // give 5 times more before timeout
         options.timeout = executionTime * 5000;
-                
+        
         return this.doXHTTPRequest(options);
     },
     
@@ -622,11 +630,16 @@ Tine.Felamimail.folderBackend = new Tine.Tinebase.data.RecordProxy({
  * 
  * Vacation Record Definition
  */ 
-Tine.Felamimail.Model.Vacation = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.genericFields.concat([
+Tine.Felamimail.Model.Vacation = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.modlogFields.concat([
     { name: 'id' },
     { name: 'reason' },
     { name: 'enabled', type: 'boolean'},
     { name: 'days' },
+    { name: 'start_date', type: 'date' },
+    { name: 'end_date', type: 'date' },
+    { name: 'contact_ids' },
+    { name: 'template_id' },
+    { name: 'signature' },
     { name: 'mime' }
 ]), {
     appName: 'Felamimail',
@@ -636,7 +649,6 @@ Tine.Felamimail.Model.Vacation = Tine.Tinebase.data.Record.create(Tine.Tinebase.
     // ngettext('Vacation', 'Vacations', n);
     recordName: 'Vacation',
     recordsName: 'Vacations',
-    //containerProperty: 'container_id',
     // ngettext('record list', 'record lists', n);
     containerName: 'Vacation list',
     containersName: 'Vacation lists'    
@@ -647,7 +659,7 @@ Tine.Felamimail.Model.Vacation = Tine.Tinebase.data.Record.create(Tine.Tinebase.
  * 
  * @return {Object}
  */
-Tine.Felamimail.Model.Vacation.getDefaultData = function() { 
+Tine.Felamimail.Model.Vacation.getDefaultData = function() {
     return {
         days: 7,
         mime: 'multipart/alternative'
@@ -683,7 +695,7 @@ Tine.Felamimail.vacationBackend = new Tine.Tinebase.data.RecordProxy({
  * 
  * Rule Record Definition
  */ 
-Tine.Felamimail.Model.Rule = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.genericFields.concat([
+Tine.Felamimail.Model.Rule = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.modlogFields.concat([
     { name: 'id', sortType: function(value) {
         // should be sorted as int
         return parseInt(value, 10);
@@ -712,7 +724,7 @@ Tine.Felamimail.Model.Rule = Tine.Tinebase.data.Record.create(Tine.Tinebase.Mode
  * 
  * @return {Object}
  */
-Tine.Felamimail.Model.Rule.getDefaultData = function() { 
+Tine.Felamimail.Model.Rule.getDefaultData = function() {
     return {
         enabled: true,
         conditions: [{
@@ -840,7 +852,7 @@ Tine.Felamimail.rulesBackend = new Tine.Tinebase.data.RecordProxy({
  * 
  * Flag Record Definition
  */ 
-Tine.Felamimail.Model.Flag = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.genericFields.concat([
+Tine.Felamimail.Model.Flag = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.modlogFields.concat([
     { name: 'id' },
     { name: 'name' }
 ]), {

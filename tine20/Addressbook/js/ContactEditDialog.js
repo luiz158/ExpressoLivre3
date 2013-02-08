@@ -4,7 +4,7 @@
  * @package     Addressbook
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2009-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  */
 
@@ -37,14 +37,13 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
     getFormItems: function () {
         if (Tine.Tinebase.registry.get('mapPanel') && Tine.widgets.MapPanel) {
             this.mapPanel = new Tine.Addressbook.MapPanel({
-                listeners: {
-                    'add': this.addToDisableOnEditMultiple,
-                    scope: this
-                },
                 layout: 'fit',
                 title: this.app.i18n._('Map'),
                 disabled: (Ext.isEmpty(this.record.get('adr_one_lon')) || Ext.isEmpty(this.record.get('adr_one_lat'))) && (Ext.isEmpty(this.record.get('adr_two_lon')) || Ext.isEmpty(this.record.get('adr_two_lat')))
             });
+            
+            Tine.widgets.dialog.MultipleEditDialogPlugin.prototype.registerSkipItem(this.mapPanel);
+            
         } else {
             this.mapPanel = new Ext.Panel({
                 layout: 'fit',
@@ -77,39 +76,99 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
                         title: this.app.i18n._('Personal Information'),
                         items: [{
                             xtype: 'panel',
-                            layout: 'fit',
-                            width: 90,
-                            height: 120,
-                            style: {
-                                position: 'absolute',
-                                right: '10px',
-                                top: Ext.isGecko ? '7px' : '19px',
-                                'z-index': 100
-                            },
-                            items: [new Ext.ux.form.ImageField({
-                                name: 'jpegphoto',
-                                width: 90,
-                                height: 120
-                            })]
-                        }, {
-                            xtype: 'columnform',
-                            items: [[
-                                new Tine.Tinebase.widgets.keyfield.ComboBox({
-                                fieldLabel: this.app.i18n._('Salutation'),
-                                name: 'salutation',
-                                app: 'Addressbook',
-                                keyFieldName: 'contactSalutation',
-                                value: '',
-                                columnWidth: 0.35,
-                                listeners: {
-                                    scope: this,
-                                    'select': function (combo, record, index) {
-                                        var jpegphoto = this.getForm().findField('jpegphoto');
-                                        // set new empty photo depending on chosen salutation only if user doesn't have own image
-                                        if (Ext.isEmpty(jpegphoto.getValue()) && ! Ext.isEmpty(record.json.image)) {
+                            layout: 'hbox',
+                            align: 'stretch',
+                            items: [{
+                                flex: 1,
+                                xtype: 'columnform',
+                                autoHeight: true,
+                                style:'padding-right: 5px;',
+                                items: [[
+                                    new Tine.Tinebase.widgets.keyfield.ComboBox({
+                                    fieldLabel: this.app.i18n._('Salutation'),
+                                    name: 'salutation',
+                                    app: 'Addressbook',
+                                    keyFieldName: 'contactSalutation',
+                                    value: '',
+                                    columnWidth: 0.35,
+                                    listeners: {
+                                        scope: this,
+                                        'select': function (combo, record, index) {
+                                            var jpegphoto = this.getForm().findField('jpegphoto');
+                                            // set new empty photo depending on chosen salutation only if user doesn't have own image
                                             jpegphoto.setDefaultImage(record.json.image);
                                         }
                                     }
+                                }), {
+                                    columnWidth: 0.65,
+                                    fieldLabel: this.app.i18n._('Title'),
+                                    name: 'n_prefix',
+                                    maxLength: 64
+                                }], [{
+                                    columnWidth: 0.35,
+                                    fieldLabel: this.app.i18n._('First Name'),
+                                    name: 'n_given',
+                                    maxLength: 64
+                                }, {
+                                    columnWidth: 0.30,
+                                    fieldLabel: this.app.i18n._('Middle Name'),
+                                    name: 'n_middle',
+                                    maxLength: 64
+                                }, {
+                                    columnWidth: 0.35,
+                                    fieldLabel: this.app.i18n._('Last Name'),
+                                    name: 'n_family',
+                                    maxLength: 255
+                                }], [{
+                                    columnWidth: 0.65,
+                                    xtype: 'mirrortextfield',
+                                    fieldLabel: this.app.i18n._('Company'),
+                                    name: 'org_name',
+                                    maxLength: 255
+                                }, {
+                                    columnWidth: 0.35,
+                                    fieldLabel: this.app.i18n._('Unit'),
+                                    name: 'org_unit',
+                                    maxLength: 64
+                                }]/* move to seperate tab, [{
+                                    columnWidth: .4,
+                                    fieldLabel: this.app.i18n._('Suffix'), 
+                                    name:'n_suffix'
+                                }, {
+                                    columnWidth: .4,
+                                    fieldLabel: this.app.i18n._('Job Role'), 
+                                    name:'role'
+                                }, {
+                                    columnWidth: .2,
+                                    fieldLabel: this.app.i18n._('Room'), 
+                                    name:'room'
+                                }]*/
+                            ]},
+                                    new Ext.ux.form.ImageField({
+                                    name: 'jpegphoto',
+                                    width: 90,
+                                    height: 120
+                                    })
+                        ]
+                        }, {
+                            xtype: 'columnform',
+                            items: [[
+                                {
+                                    columnWidth: 0.64,
+                                    xtype: 'combo',
+                                    fieldLabel: this.app.i18n._('Display Name'),
+                                    name: 'n_fn',
+                                    disabled: true
+                                }, {
+                                     columnWidth: 0.36,
+                                     fieldLabel: this.app.i18n._('Job Title'),
+                                     name: 'title',
+                                     maxLength: 64
+                                }, {
+                                     width: 90,
+                                     xtype: 'extuxclearabledatefield',
+                                     fieldLabel: this.app.i18n._('Birthday'),
+                                     name: 'bday'
                                 }
                             }), {
                                 columnWidth: 0.30,
@@ -194,7 +253,7 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
                         items: [{
                             xtype: 'columnform',
                             items: [[{
-                                fieldLabel: this.app.i18n._('Phone'), 
+                                fieldLabel: this.app.i18n._('Phone'),
                                 labelIcon: 'images/oxygen/16x16/apps/kcall.png',
                                 name: 'tel_work',
                                 maxLength: 40
@@ -219,7 +278,7 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
                                 name: 'tel_cell_private',
                                 maxLength: 40
                             }, {
-                                fieldLabel: this.app.i18n._('Fax (private)'), 
+                                fieldLabel: this.app.i18n._('Fax (private)'),
                                 labelIcon: 'images/oxygen/16x16/devices/printer.png',
                                 name: 'tel_fax_home',
                                 maxLength: 40
@@ -273,11 +332,11 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
                             title: this.app.i18n._('Company Address'),
                             xtype: 'columnform',
                             items: [[{
-                                fieldLabel: this.app.i18n._('Street'), 
+                                fieldLabel: this.app.i18n._('Street'),
                                 name: 'adr_one_street',
                                 maxLength: 64
                             }, {
-                                fieldLabel: this.app.i18n._('Street 2'), 
+                                fieldLabel: this.app.i18n._('Street 2'),
                                 name: 'adr_one_street2',
                                 maxLength: 64
                             }, {
@@ -285,7 +344,7 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
                                 name: 'adr_one_region',
                                 maxLength: 64
                             }], [{
-                                fieldLabel: this.app.i18n._('Postal Code'), 
+                                fieldLabel: this.app.i18n._('Postal Code'),
                                 name: 'adr_one_postalcode',
                                 maxLength: 64
                             }, {
@@ -302,11 +361,11 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
                             title: this.app.i18n._('Private Address'),
                             xtype: 'columnform',
                             items: [[{
-                                fieldLabel: this.app.i18n._('Street'), 
+                                fieldLabel: this.app.i18n._('Street'),
                                 name: 'adr_two_street',
                                 maxLength: 64
                             }, {
-                                fieldLabel: this.app.i18n._('Street 2'), 
+                                fieldLabel: this.app.i18n._('Street 2'),
                                 name: 'adr_two_street2',
                                 maxLength: 64
                             }, {
@@ -314,7 +373,7 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
                                 name: 'adr_two_region',
                                 maxLength: 64
                             }], [{
-                                fieldLabel: this.app.i18n._('Postal Code'), 
+                                fieldLabel: this.app.i18n._('Postal Code'),
                                 name: 'adr_two_postalcode',
                                 maxLength: 64
                             }, {
@@ -359,7 +418,7 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
                                 preventScrollbars: false,
                                 anchor: '100% 100%',
                                 emptyText: this.app.i18n._('Enter description'),
-                                requiredGrant: 'editGrant'                           
+                                requiredGrant: 'editGrant'
                             }]
                         }),
                         new Tine.widgets.activities.ActivitiesPanel({
@@ -380,7 +439,7 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
                 app: this.appName,
                 record_id: (this.record && ! this.copyRecord) ? this.record.id : '',
                 record_model: this.appName + '_Model_' + this.recordClass.getMeta('modelName')
-            }), this.linkPanel
+            })
             ]
         };
     },
@@ -389,19 +448,11 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
      * init component
      */
     initComponent: function () {
-        
-        this.linkPanel = new Tine.widgets.dialog.LinkPanel({
-            relatedRecords: (Tine.Crm && Tine.Tinebase.common.hasRight('run', 'Crm')) ? {
-                Crm_Model_Lead: {
-                    recordClass: Tine.Crm.Model.Lead,
-                    dlgOpener: Tine.Crm.LeadEditDialog.openWindow
-                }
-            } : {}
-        });
+        var relatedRecords = {};
         
         this.initToolbar();
         
-        this.supr().initComponent.apply(this, arguments);    
+        this.supr().initComponent.apply(this, arguments);
     },
     
     /**
@@ -439,8 +490,8 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
         var isValid = true;
         
         // you need to fill in one of: n_given n_family org_name
-        // @todo required fields should depend on salutation ('company' -> org_name, etc.) 
-        //       and not required fields should be disabled (n_given, n_family, etc.) 
+        // @todo required fields should depend on salutation ('company' -> org_name, etc.)
+        //       and not required fields should be disabled (n_given, n_family, etc.)
         if (form.findField('n_family').getValue() === '' && form.findField('org_name').getValue() === '') {
             var invalidString = String.format(this.app.i18n._('Either {0} or {1} must be given'), this.app.i18n._('Last Name'), this.app.i18n._('Company'));
             
@@ -458,7 +509,7 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
      */
     isMultipleValid: function() {
         var isValid = true;
-        if (((this.getForm().findField('n_family').getValue() === '') && (this.getForm().findField('n_family').edited)) 
+        if (((this.getForm().findField('n_family').getValue() === '') && (this.getForm().findField('n_family').edited))
             && ((this.getForm().findField('org_name').getValue() === '') && (this.getForm().findField('org_name').edited))) {
             var invalidString = String.format(this.app.i18n._('Either {0} or {1} must be given'), this.app.i18n._('Last Name'), this.app.i18n._('Company'));
             this.getForm().findField('n_family').markInvalid(invalidString);
@@ -538,17 +589,18 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
      * onRecordLoad
      */
     onRecordLoad: function () {
-        // NOTE: it comes again and again till 
+        // NOTE: it comes again and again till
         if (this.rendered) {
-            var container;
-                        
+            var container = this.record.get('container_id');
+            
             // handle default container
+            // TODO is this still needed? don't we already have generic default container handling?
             if (! this.record.id) {
                 if (this.forceContainer) {
                     container = this.forceContainer;
                     // only force initially!
                     this.forceContainer = null;
-                } else {
+                } else if (! Ext.isObject(container)) {
                     container = Tine.Addressbook.registry.get('defaultAddressbook');
                 }
                 
@@ -560,10 +612,7 @@ Tine.Addressbook.ContactEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, 
                 this.mapPanel.onRecordLoad(this.record);
             }
         }
-        
         this.supr().onRecordLoad.apply(this, arguments);
-        
-        this.linkPanel.onRecordLoad(this.record);
     }
 });
 
@@ -585,7 +634,7 @@ Tine.Addressbook.ContactEditDialog.openWindow = function (config) {
     var id = (config.record && config.record.id) ? config.record.id : 0;
     var window = Tine.WindowFactory.getWindow({
         width: 800,
-        height: 600,
+        height: 610,
         name: Tine.Addressbook.ContactEditDialog.prototype.windowNamePrefix + id,
         contentPanelConstructor: 'Tine.Addressbook.ContactEditDialog',
         contentPanelConstructorConfig: config

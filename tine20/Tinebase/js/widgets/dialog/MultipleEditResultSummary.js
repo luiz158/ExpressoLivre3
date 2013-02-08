@@ -81,7 +81,7 @@ Ext.extend(Tine.widgets.dialog.MultipleEditResultSummary, Ext.FormPanel, {
     /**
      * init actions
      */
-    initActions: function() {       
+    initActions: function() {
         this.action_update = new Ext.Action({
             text : _('OK'),
             minWidth : 70,
@@ -138,7 +138,7 @@ Ext.extend(Tine.widgets.dialog.MultipleEditResultSummary, Ext.FormPanel, {
         this.window.close();
     },    
     
-    getFormItems: function() { 
+    getFormItems: function() {
         if(this.items) return this.items;
         var allrecs = this.response.totalcount + this.response.failcount;
         
@@ -152,7 +152,7 @@ Ext.extend(Tine.widgets.dialog.MultipleEditResultSummary, Ext.FormPanel, {
         summary += String.format( (this.response.failcount>1) ? _('{0} {1} have invalid data after updating. These {1} have not been changed.') : _('{0} {1} has invalid data after updating. This {1} has not been changed.'), this.response.failcount, rn);
        
         return {
-            border: false,            
+            border: false,
             cls : 'x-ux-display',
             layout: 'ux.display',
             

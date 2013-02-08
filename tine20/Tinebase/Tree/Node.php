@@ -220,7 +220,7 @@ class Tinebase_Tree_Node extends Tinebase_Backend_Sql_Abstract
                     /* on     */ $this->_db->quoteIdentifier("level{$level}_fileobjects.id") . ' = ' . $this->_db->quoteIdentifier("level{$level}_filerevisions.id") . ' AND ' . $this->_db->quoteIdentifier("level{$level}_fileobjects.revision") . ' = ' . $this->_db->quoteIdentifier("level{$level}_filerevisions.revision"),
                     /* select */ array("level{$level}_hash" => 'hash', "level{$level}_size" => 'size')
                 )
-                ->where("level{$level}.name = ?", $pathParts[$level]);
+                ->where($this->_db->quoteIdentifier("level{$level}.name") . ' = ?', $pathParts[$level]);
         }
         
         if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . $select->__toString());
@@ -245,7 +245,7 @@ class Tinebase_Tree_Node extends Tinebase_Backend_Sql_Abstract
                 'type'               => $queryResult["level{$i}_type"],
                 'hash'               => $queryResult["level{$i}_hash"],
                 'size'               => $queryResult["level{$i}_size"],
-            	'revision'           => $queryResult["level{$i}_revision"],
+                'revision'           => $queryResult["level{$i}_revision"],
                 'contenttype'        => $queryResult["level{$i}_contenttype"],
                 'created_by'         => $queryResult["level{$i}_created_by"],
                 'creation_time'      => $queryResult["level{$i}_creation_time"],
@@ -255,10 +255,8 @@ class Tinebase_Tree_Node extends Tinebase_Backend_Sql_Abstract
         }
         
         $resultSet = $this->_rawDataToRecordSet($resultArray);
-        #$resultSet->addIndices(array($_property));
         
         return $resultSet;
-                
     }
     
     /**

@@ -44,7 +44,14 @@ class Addressbook_Backend_Sql extends Tinebase_Backend_Sql_Abstract
      * @var boolean
      */
     protected $_getDisabledContacts = FALSE;
-
+    
+   /**
+    * default column(s) for count
+    *
+    * @var string
+    */
+    protected $_defaultCountCol = 'id';
+    
     /**
      * foreign tables (key => tablename)
      *
@@ -54,7 +61,7 @@ class Addressbook_Backend_Sql extends Tinebase_Backend_Sql_Abstract
         'jpegphoto'    => array(
             'table'         => 'addressbook_image',
             'joinOn'        => 'contact_id',
-            'select'        => array('jpegphoto' => null),
+            'select'        => null, // set by constructor
             'singleValue'   => TRUE,
             'preserve'      => TRUE,
         ),
@@ -65,12 +72,20 @@ class Addressbook_Backend_Sql extends Tinebase_Backend_Sql_Abstract
         ),
     );    
     
-    public function __construct($_dbAdapter=null, array $_options = array())
+    /**
+     * (non-PHPdoc)
+     * @see Tinebase_Backend_Sql_Abstract::__construct()
+     */
+    public function __construct($_dbAdapter = NULL, $_options = array())
     {
     	parent::__construct($_dbAdapter, $_options);
-    	$this->_foreignTables['jpegphoto'] ['select'] = array('jpegphoto' => Tinebase_Backend_Sql_Command::getIfIsNull($this->_db, $this->_db->quoteIdentifier('addressbook_image.contact_id'), 0, 1));    			    	
+        /*
+    	$this->_foreignTables['jpegphoto'] ['select'] = 
+                array('jpegphoto' => Tinebase_Backend_Sql_Command::factory($this->_db)
+                                      ->getIfIsNull($this->_db->quoteIdentifier($this->_tablePrefix . 'addressbook_image.contact_id'), 0, 1));
+         
+         */
     }
-    
     /**
      * fetch one contact of a user identified by his user_id
      *
@@ -84,7 +99,7 @@ class Addressbook_Backend_Sql extends Tinebase_Backend_Sql_Abstract
             ->where($this->_db->quoteIdentifier('accounts.id') . ' = ?', $_userId)
             ->limit(1);
         
-        $this->_traitGroup($select);
+        Tinebase_Backend_Sql_Abstract::traitGroup($select);
         
         $stmt = $this->_db->query($select);
         $queryResult = $stmt->fetch();
@@ -149,10 +164,10 @@ class Addressbook_Backend_Sql extends Tinebase_Backend_Sql_Abstract
     /**
      * returns contact image
      *
-     * @param int $_contactId
-     * @return blob
+     * @param int $contactId
+     * @return blob|string
      */
-    public function getImage($_contactId)
+    public function getImage($contactId)
     {
         $select = $this->_db->select()
             ->from($this->_tablePrefix . 'addressbook_image', array('image'))
@@ -166,16 +181,29 @@ class Addressbook_Backend_Sql extends Tinebase_Backend_Sql_Abstract
     /**
      * saves image to db
      *
-     * @param  int $_contactId
+     * @param  string $contactId
      * @param  blob $imageData
-     * @return blob
+     * @return blob|string
      */
-    public function _saveImage($_contactId, $imageData)
+    public function _saveImage($contactId, $imageData)
     {
-        $this->_db->delete($this->_tablePrefix . 'addressbook_image', $this->_db->quoteInto($this->_db->quoteIdentifier('contact_id') . ' = ?', $_contactId));
+        if (! empty($imageData)) {
+            // make sure that we got a valid image blob
+            try {
+                Tinebase_ImageHelper::getImageInfoFromBlob($imageData);
+            } catch (Exception $e) {
+                Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ 
+                    . ' Invalid image blob data, preserving old image. Error: ' . $e);
+                    
+                // return current image
+                return $this->getImage($contactId);
+            }
+        }
+        
+        $this->_db->delete($this->_tablePrefix . 'addressbook_image', $this->_db->quoteInto($this->_db->quoteIdentifier('contact_id') . ' = ?', $contactId));
         if (! empty($imageData)) {
             $this->_db->insert($this->_tablePrefix . 'addressbook_image', array(
-                'contact_id'    => $_contactId,
+                'contact_id'    => $contactId,
                 'image'         => base64_encode($imageData)
             ));
         }

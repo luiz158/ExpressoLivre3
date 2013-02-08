@@ -5,7 +5,7 @@
  * @package     Felamimail
  * @subpackage  Setup
  * @license     http://www.gnu.org/licenses/agpl.html AGPL3
- * @copyright   Copyright (c) 2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2011-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  */
 class Felamimail_Setup_Update_Release5 extends Setup_Update_Abstract
@@ -240,24 +240,48 @@ class Felamimail_Setup_Update_Release5 extends Setup_Update_Abstract
         
         $this->setApplicationVersion('Felamimail', '5.6');
     }
-    
+
+    /**
+    * update to 5.7
+    * - createVacationTemplatesFolder
+    */
     public function update_6()
     {
-        if ($this->getTableVersion('felamimail_cache_message') < 8) {
-            $declaration = new Setup_Backend_Schema_Field_Xml(
-                '<field>
-                    <name>smime</name>
-                    <type>integer</type>
-                    <default>0</default>
-                    <notnull>true</notnull>
-                </field>'
-            );
+        Felamimail_Setup_Initialize::createVacationTemplatesFolder();
+        $this->setApplicationVersion('Felamimail', '5.7');
+    }
 
-            $this->_backend->addCol('felamimail_cache_message', $declaration);
-
-            $this->setTableVersion('felamimail_cache_message', '8');
-            $this->setApplicationVersion('Felamimail', '5.7');
+    /**
+    * update to 5.8
+    * - add start + end date to vacation
+    */
+    public function update_7()
+    {
+        foreach (array('start_date', 'end_date') as $fieldName) {
+            $declaration = new Setup_Backend_Schema_Field_Xml('
+                <field>
+                    <name>' . $fieldName . '</name>
+                    <type>datetime</type>
+                </field>');
+            try {
+                $this->_backend->addCol('felamimail_sieve_vacation', $declaration);
+            } catch (Zend_Db_Statement_Exception $zdse) {
+                // already done
+            }
         }
+        
+        $this->setTableVersion('felamimail_sieve_vacation', 2);
+        $this->setApplicationVersion('Felamimail', '5.8');
+    }
+    
+    /**
+    * update to 6.0
+    *
+    * @return void
+    */
+    public function update_8()
+    {
+        $this->setApplicationVersion('Felamimail', '6.0');
     }
 
     public function update_7()

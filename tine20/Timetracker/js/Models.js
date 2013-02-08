@@ -4,7 +4,7 @@
  * @package     Timetracker
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  */
  
@@ -14,7 +14,7 @@ Ext.ns('Tine.Timetracker', 'Tine.Timetracker.Model');
  * @type {Array}
  * Timesheet model fields
  */
-Tine.Timetracker.Model.TimesheetArray = Tine.Tinebase.Model.genericFields.concat([
+Tine.Timetracker.Model.TimesheetArray = Tine.Tinebase.Model.modlogFields.concat([
     { name: 'id' },
     { name: 'account_id' },
     { name: 'timeaccount_id' },
@@ -31,6 +31,9 @@ Tine.Timetracker.Model.TimesheetArray = Tine.Tinebase.Model.genericFields.concat
     { name: 'notes'},
     { name: 'tags' },
     { name: 'customfields'}
+    // relations
+    // TODO fix this, relations do not work yet in TS edit dialog (without admin/manage privileges)
+    //{ name: 'relations'}
 ]);
 
 /**
@@ -67,7 +70,7 @@ Tine.Timetracker.Model.Timesheet = Tine.Tinebase.data.Record.create(Tine.Timetra
     copyOmitFields: ['billed_in', 'is_cleared']
 });
 
-Tine.Timetracker.Model.Timesheet.getDefaultData = function() { 
+Tine.Timetracker.Model.Timesheet.getDefaultData = function() {
     return {
         account_id: Tine.Tinebase.registry.get('currentAccount'),
         duration:   '00:30',
@@ -87,6 +90,10 @@ Tine.Timetracker.Model.Timesheet.getFilterModel = function() {
         {label: app.i18n._('Description'),  field: 'description', defaultOperator: 'contains'},
         {label: app.i18n._('Billable'),     field: 'is_billable_combined', valueType: 'bool', defaultValue: true },
         {label: app.i18n._('Cleared'),      field: 'is_cleared_combined',  valueType: 'bool', defaultValue: false },
+        {label: _('Last Modified Time'),                                                field: 'last_modified_time', valueType: 'date'},
+        {label: _('Last Modified By'),                                                  field: 'last_modified_by',   valueType: 'user'},
+        {label: _('Creation Time'),                                                     field: 'creation_time',      valueType: 'date'},
+        {label: _('Created By'),                                                        field: 'created_by',         valueType: 'user'},
         {filtertype: 'tinebase.tag', app: app},
         {filtertype: 'timetracker.timeaccount'}
     ];
@@ -116,7 +123,10 @@ Tine.Timetracker.Model.TimeaccountArray = Tine.Tinebase.Model.genericFields.conc
     { name: 'grants'},
     // tine 2.0 notes + tags
     { name: 'notes'},
-    { name: 'tags' }
+    { name: 'tags' },
+    { name: 'customfields'},
+    // relations
+    { name: 'relations'}
 ]);
 
 /**
@@ -142,7 +152,7 @@ Tine.Timetracker.Model.Timeaccount = Tine.Tinebase.data.Record.create(Tine.Timet
     }
 });
 
-Tine.Timetracker.Model.Timeaccount.getDefaultData = function() { 
+Tine.Timetracker.Model.Timeaccount.getDefaultData = function() {
     return {
         is_open: 1,
         is_billable: true
@@ -151,16 +161,27 @@ Tine.Timetracker.Model.Timeaccount.getDefaultData = function() {
 
 Tine.Timetracker.Model.Timeaccount.getFilterModel = function() {
     var app = Tine.Tinebase.appMgr.get('Timetracker');
-    return [
-        {label: _('Quick search'),          field: 'query',       operators: ['contains']},
-        {label: app.i18n._('Number'),       field: 'number'       },
-        {label: app.i18n._('Title'),        field: 'title'        },
-        {label: app.i18n._('Description'),  field: 'description', operators: ['contains']},
-        {label: app.i18n._('Created By'),   field: 'created_by',  valueType: 'user'},
-        {label: app.i18n._('Status'),       field: 'status',      filtertype: 'timetracker.timeaccountstatus'},
+
+    var filters = [
+        {label: _('Quick search'),              field: 'query',       operators: ['contains']},
+        {label: app.i18n._('Number'),           field: 'number'       },
+        {label: app.i18n._('Title'),            field: 'title'        },
+        {label: app.i18n._('Description'),      field: 'description', operators: ['contains']},
+        {label: app.i18n._('Billed'),           field: 'status',      filtertype: 'timetracker.timeaccountbilled'},
+        {label: app.i18n._('Status'),           field: 'is_open',     filtertype: 'timetracker.timeaccountstatus'},
+        {label: _('Last Modified Time'),        field: 'last_modified_time', valueType: 'date'},
+        {label: _('Last Modified By'),          field: 'last_modified_by',   valueType: 'user'},
+        {label: _('Creation Time'),             field: 'creation_time',      valueType: 'date'},
+        {label: _('Created By'),                field: 'created_by',         valueType: 'user'},
         {label: app.i18n._('Booking deadline'), field: 'deadline'},
         {filtertype: 'tinebase.tag', app: app}
     ];
+    
+    if(Tine.Tinebase.appMgr.get('Sales')) {
+        filters.push({filtertype: 'timetracker.timeaccountcontract'});
+    }
+    
+    return filters;
 };
 
 /**

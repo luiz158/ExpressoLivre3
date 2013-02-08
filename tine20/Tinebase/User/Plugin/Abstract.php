@@ -5,7 +5,7 @@
  * @package     Tinebase
  * @subpackage  User
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2010 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2010-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  */
 
@@ -17,6 +17,16 @@
  */
 abstract class Tinebase_User_Plugin_Abstract implements Tinebase_User_Plugin_SqlInterface
 {
+    /**
+    * @var Zend_Db_Adapter
+    */
+    protected $_db = NULL;
+    
+    /**
+     * @var Tinebase_Backend_Sql_Command_Interface
+     */
+    protected $_dbCommand;
+    
     /**
      * inspect data used to create user
      * 
@@ -36,8 +46,8 @@ abstract class Tinebase_User_Plugin_Abstract implements Tinebase_User_Plugin_Sql
      */
     public function inspectUpdateUser(Tinebase_Model_FullUser $_updatedUser, Tinebase_Model_FullUser $_newUserProperties)
     {
-        if (!isset($_newUserProperties->imapUser)) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' No imap properties found!');
+        if (! isset($_newUserProperties->imapUser) && ! isset($_newUserProperties->smtpUser)) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' No email properties found!');
             return;
         }
         
@@ -65,24 +75,44 @@ abstract class Tinebase_User_Plugin_Abstract implements Tinebase_User_Plugin_Sql
     protected function _appendDomain($_userName)
     {
         if (array_key_exists('domain', $this->_config) && ! empty($this->_config['domain'])) {
-            $_userName .= '@' . $this->_config['domain'];
+            $domain = '@' . $this->_config['domain'];
+            if (strpos($_userName, $domain) === FALSE) {
+                $_userName .= $domain;
+            }
         }
         
         return $_userName;
     }
     
+    /**
+     * set database
+     * 
+     * @param array $_config
+     */
     protected function _getDb($_config)
     {
         $tine20DbConfig = Tinebase_Core::getDb()->getConfig();
         
         if ($this->_config['host'] == $tine20DbConfig['host'] && 
             $this->_config['dbname'] == $tine20DbConfig['dbname'] &&
-            $this->_config['username'] == $tine20DbConfig['username']) {
-                
+            $this->_config['username'] == $tine20DbConfig['username'] &&
+            Tinebase_Core::getDb() instanceof Zend_Db_Adapter_Pdo_Mysql) {
+            
             $this->_db = Tinebase_Core::getDb();
         } else {
-            $this->_db = Zend_Db::factory('Pdo_Mysql', $_config);
+            $dbConfig = array_intersect_key($_config, array_flip(array('host', 'dbname', 'username', 'password', 'prefix', 'port')));
+            $this->_db = Zend_Db::factory('Pdo_Mysql', $dbConfig);
         }
+    }
+    
+    /**
+     * get database object
+     * 
+     * @return Zend_Db_Adapter
+     */
+    public function getDb()
+    {
+        return $this->_db;
     }
     
     /**
@@ -103,17 +133,17 @@ abstract class Tinebase_User_Plugin_Abstract implements Tinebase_User_Plugin_Sql
         
         switch ($_scheme) {
             case 'SSHA256':
-            	$salt = '$5$' . $salt . '$';
-            	break;
-            	
+                $salt = '$5$' . $salt . '$';
+                break;
+                
             case 'SSHA512':
-            	$salt = '$6$' . $salt . '$';
-            	break;
-            	
+                $salt = '$6$' . $salt . '$';
+                break;
+                
             case 'MD5-CRYPT':
             default:
-            	$salt = crypt($_scheme);
-            	break;
+                $salt = crypt($_scheme);
+                break;
         }
 
         return $salt;
@@ -128,9 +158,9 @@ abstract class Tinebase_User_Plugin_Abstract implements Tinebase_User_Plugin_Sql
     abstract protected function _updateUser(Tinebase_Model_FullUser $_updatedUser, Tinebase_Model_FullUser $_newUserProperties);
     
     /**
-     * check if user exists already in dovecot user table
+     * check if user exists already in plugin user table
      * 
      * @param Tinebase_Model_FullUser $_user
      */
     abstract protected function _userExists(Tinebase_Model_FullUser $_user);
-}  
+}

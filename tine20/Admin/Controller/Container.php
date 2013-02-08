@@ -38,7 +38,6 @@ class Admin_Controller_Container extends Tinebase_Controller_Record_Abstract
      */
     private function __construct() 
     {
-        $this->_currentAccount        = Tinebase_Core::getUser();
         $this->_applicationName       = 'Admin';
         $this->_modelName             = 'Tinebase_Model_Container';
         $this->_doContainerACLChecks  = FALSE;
@@ -58,7 +57,7 @@ class Admin_Controller_Container extends Tinebase_Controller_Record_Abstract
      *
      */
     private function __clone() 
-    {        
+    {
     }
 
     /**
@@ -210,10 +209,10 @@ class Admin_Controller_Container extends Tinebase_Controller_Record_Abstract
             
             $translate = Tinebase_Translation::getTranslation('Admin');
             $messageSubject = $translate->_('Your container has been changed');
-            $messageBody = sprintf($translate->_('Your container has been changed by %1$s %2$sNote: %3$s'), $this->_currentAccount->accountDisplayName, "\n\n", $note);
+            $messageBody = sprintf($translate->_('Your container has been changed by %1$s %2$sNote: %3$s'), Tinebase_Core::getUser()->accountDisplayName, "\n\n", $note);
             
             try {
-                Tinebase_Notification::getInstance()->send($this->_currentAccount, array($contact), $messageSubject, $messageBody);
+                Tinebase_Notification::getInstance()->send(Tinebase_Core::getUser(), array($contact), $messageSubject, $messageBody);
             } catch (Exception $e) {
                 Tinebase_Core::getLogger()->WARN(__METHOD__ . '::' . __LINE__ . ' Could not send notification :' . $e);
             }
@@ -230,13 +229,15 @@ class Admin_Controller_Container extends Tinebase_Controller_Record_Abstract
      */
     public function delete($_ids)
     {
-        $deletedRecords = parent::delete($_ids);
+        $containers = new Tinebase_Record_RecordSet('Tinebase_Model_Container');
         
-        Tinebase_Core::getCache()->clean(Zend_Cache::CLEANING_MODE_MATCHING_TAG, array('container'));
+        foreach($_ids as $id) {
+            $containers->addRecord(Tinebase_Container::getInstance()->deleteContainer($id));
+        }
         
-        return $deletedRecords;
+        return $containers;
     }
-    
+
     /**
      * set multiple container grants
      * 
@@ -271,7 +272,7 @@ class Admin_Controller_Container extends Tinebase_Controller_Record_Abstract
                             'account_id'    => $accountId,
                             'account_type'  => $accountType,
                             $grant          => TRUE,
-                        );                        
+                        );
                     }
                 } else {
                     Tinebase_Container::getInstance()->addGrants($container->getId(), $accountType, $accountId, $grantsArray, TRUE);

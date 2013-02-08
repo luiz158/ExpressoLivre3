@@ -138,7 +138,7 @@ Tine.Tinebase.tineInit = {
     initBootSplash: function () {
         
         this.splash = {
-        	xtype: 'container',
+            xtype: 'container',
             id: 'tine-viewport-waitcycle',
             border: false,
             layout: 'fit',
@@ -152,7 +152,7 @@ Tine.Tinebase.tineInit = {
             layout: 'fit',
             border: false,
             items: {
-            	xtype: 'container',
+                xtype: 'container',
                 id: 'tine-viewport-maincardpanel',
                 ref: 'tineViewportMaincardpanel',
                 isWindowMainCardPanel: true,
@@ -241,8 +241,7 @@ Tine.Tinebase.tineInit = {
             'X-Tine20-Request-Type' : 'JSON'
         };
         
-        // to use as jsonprc id
-        Ext.Ajax.requestId = 0;
+        Ext.Ajax.transactions = {};
         
         /**
          * inspect all requests done via the ajax singleton
@@ -257,6 +256,9 @@ Tine.Tinebase.tineInit = {
         Ext.Ajax.on('beforerequest', function (connection, options) {
             options.headers = options.headers || {};
             options.headers['X-Tine20-JsonKey'] = Tine.Tinebase.registry && Tine.Tinebase.registry.get ? Tine.Tinebase.registry.get('jsonKey') : '';
+            options.headers['X-Tine20-TransactionId'] = Tine.Tinebase.data.Record.generateUID();
+            
+            options.url = Ext.urlAppend((options.url ? options.url : Tine.Tinebase.tineInit.requestUrl),  'transactionid=' + options.headers['X-Tine20-TransactionId']);
             
             // convert non Ext.Direct request to jsonrpc
             // - convert params
@@ -283,7 +285,7 @@ Tine.Tinebase.tineInit = {
                     jsonrpc: '2.0',
                     method: options.params.method,
                     params: params,
-                    id: ++Ext.Ajax.requestId
+                    id: ++Ext.Direct.TID
                 });
                 
                 options.cbs = {};
@@ -297,6 +299,11 @@ Tine.Tinebase.tineInit = {
                 delete options.failure;
                 delete options.callback;
             }
+            
+            Ext.Ajax.transactions[options.headers['X-Tine20-TransactionId']] = {
+                date: new Date(),
+                json: options.jsonData
+            };
         });
         
         /**
@@ -315,6 +322,7 @@ Tine.Tinebase.tineInit = {
          *        Memory exhausted to 550
          */
         Ext.Ajax.on('requestcomplete', function (connection, response, options) {
+            delete Ext.Ajax.transactions[options.headers['X-Tine20-TransactionId']];
             
             // detect resoponse errors (e.g. html from xdebug) and convert into error response
             if (! options.isUpload && ! response.responseText.match(/^([{\[])|(<\?xml)+/)) {
@@ -369,8 +377,8 @@ Tine.Tinebase.tineInit = {
                         options.cbs.callback.call(options.scope, options, false, response);
                     } else {
                         var responseData = Ext.decode(response.responseText);
-                        	
-                        exception = responseData.data ? responseData.data : responseData;	
+                            
+                        exception = responseData.data ? responseData.data : responseData;
                         exception.request = options.jsonData;
                         exception.response = response.responseText;
                         
@@ -390,6 +398,7 @@ Tine.Tinebase.tineInit = {
          *       -> timeouts: status code 520
          */
         Ext.Ajax.on('requestexception', function (connection, response, options) {
+            delete Ext.Ajax.transactions[options.headers['X-Tine20-TransactionId']];
             // map connection errors to errorcode 510 and timeouts to 520
             var errorCode = response.status > 0 ? response.status :
                             (response.status === 0 ? 510 : 520);
@@ -401,6 +410,8 @@ Tine.Tinebase.tineInit = {
                     message: 'request exception: ' + response.statusText,
                     traceHTML: response.responseText,
                     request: options.jsonData,
+                    requestHeaders: options.headers,
+                    openTransactions: Ext.Ajax.transactions,
                     response: response.responseText
                 };
                 
@@ -486,11 +497,13 @@ Tine.Tinebase.tineInit = {
                             }
                         }
                     }
-                    
                     // update window factory window type (required after login)
                     if (Tine.Tinebase.registry && Tine.Tinebase.registry.get('preferences')) {
                         var windowType = Tine.Tinebase.registry.get('preferences').get('windowtype');
-                        
+                        // init ApplicationStarter on Ext window once
+                        if(windowType == 'Ext') {
+                            Tine.Tinebase.ApplicationStarter.init();
+                        }
                         if (Tine.WindowFactory && Tine.WindowFactory.windowType !== windowType) {
                             Tine.WindowFactory.windowType = windowType;
                         }
@@ -520,12 +533,12 @@ Tine.Tinebase.tineInit = {
      * Applying registry entries to Tine classes
      */
     overrideFields: function () {
-    	
-    	Ext.override(Ext.ux.file.Upload, {
+        
+        Ext.override(Ext.ux.file.Upload, {
             maxFileUploadSize: Tine.Tinebase.registry.get('maxFileUploadSize'),
             maxPostSize: Tine.Tinebase.registry.get('maxPostSize')
         });
-            	
+                
     },
     
     /**
@@ -701,7 +714,7 @@ Tine.Tinebase.tineInit = {
     /**
      * initialise upload manager
      */
-    initUploadMgr: function () {       
+    initUploadMgr: function () {
         Tine.Tinebase.uploadManager = new Ext.ux.file.UploadManager();
     },
     
@@ -722,7 +735,7 @@ Tine.Tinebase.tineInit = {
      * Last stage of initialisation, to be done after Tine.onReady!
      */
     onLangFilesLoad: function () {
-    	//Ext.ux.form.DateTimeField.prototype.format = Locale.getTranslationData('Date', 'medium') + ' ' + Locale.getTranslationData('Time', 'medium');
+        //Ext.ux.form.DateTimeField.prototype.format = Locale.getTranslationData('Date', 'medium') + ' ' + Locale.getTranslationData('Time', 'medium');
     }    
     
 };

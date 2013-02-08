@@ -4,7 +4,7 @@
  * @package     Felamimail
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2013 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  */
  
@@ -103,7 +103,14 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
     
     enableDrop: true,
     ddGroup: 'recipientDDGroup',
-
+    
+    /**
+     * options are saved in onAfterEdit
+     * 
+     * @type Ext.data.Record
+     */
+    lastEditedRecord: null,
+    
     /**
      * @private
      */
@@ -119,10 +126,9 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
         this.on('rowcontextmenu', this.onCtxMenu, this);
         // this is relayed by the contact search combo
         this.on('contextmenu', this.onCtxMenu.createDelegate(this, [this, null], 0), this);
-            
+        
         this.on('beforeedit', this.onBeforeEdit, this);
         this.on('afteredit', this.onAfterEdit, this);
-        this.on('validateedit', this.onValidateEdit, this);
     },
     
     /**
@@ -153,6 +159,12 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
      * @private
      */
     initStore: function() {
+        
+        if(!this.record) {
+            this.initStore.defer(200, this);
+            return false;
+        }
+        
         this.store = new Ext.data.SimpleStore({
             fields   : ['type', 'address']
         });
@@ -178,7 +190,9 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
             listeners: {
                 scope: this,
                 specialkey: this.onSearchComboSpecialkey,
+                select: this.onSearchComboSelect,
                 blur: function(combo) {
+                    Tine.log.debug('Tine.Felamimail.MessageEditDialog::onSearchComboBlur()');
                     this.getView().el.select('.x-grid3-td-address-editing').removeClass('x-grid3-td-address-editing');
                     
                     // need to update record because we relay blur event and it might not be updated otherwise
@@ -259,28 +273,19 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
      * @param {Event} e
      */
     onSearchComboSpecialkey: function(combo, e) {
-        if (! this.activeEditor) {
-            return;
-        }
-        
-        var value = combo.getValue(),
-            rawValue = combo.getRawValue();
+        var value = combo.getValue();
+        Tine.log.debug('Tine.Felamimail.MessageEditDialog::onSearchComboSpecialkey() -> current value: ' + value);
         
         if (e.getKey() == e.ENTER) {
-            // cancel loading when ENTER is pressed
-            combo.lastStoreTransactionId = null;
-            if (value !== '' || rawValue !== '') {
-                // add another row here as this is not detected by onAfterEdit
-                if (value !== rawValue) {
-                    this.activeEditor.record.set('address', rawValue);
-                    this.activeEditor.record.id = Ext.id();
-                }
-                this.addRowAndDoLayout(this.activeEditor.record);
-                return true;
+            Tine.log.debug('Tine.Felamimail.MessageEditDialog::onSearchComboSpecialkey() -> ENTER');
+            if (this.activeEditor && value !== null && this.activeEditor.record.get('address') != value) {
+                this.activeEditor.record.set('address', value);
             }
-        } else if (e.getKey() == e.BACKSPACE) {
+            this.onSearchComboSelect(combo);
+        } else if (this.activeEditor && e.getKey() == e.BACKSPACE) {
+            Tine.log.debug('Tine.Felamimail.MessageEditDialog::onSearchComboSpecialkey() -> BACKSPACE');
             // remove row on backspace if we have more than 1 rows in grid
-            if (rawValue == '' && this.store.getCount() > 1 && this.activeEditor.row > 0) {
+            if (value == '' && this.store.getCount() > 1 && this.activeEditor.row > 0) {
                 this.store.remove(this.activeEditor.record);
                 this.activeEditor.row -= 1;
                 this.setFixedHeight(false);
@@ -288,7 +293,7 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
                 this.startEditing.defer(50, this, [this.activeEditor.row, this.activeEditor.col]);
                 return true;
             }
-        } else if (e.getKey() == e.ESC) {
+        } else if (this.activeEditor && e.getKey() == e.ESC) {
             // TODO should ESC close the compose window if search combo is already empty?
 //            if (value == '') {
 //                this.fireEvent('specialkey', this, e);
@@ -305,6 +310,20 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
             } else {
                 this.getView().el.select('.x-grid3-td-address-editing').removeClass('x-grid3-td-address-editing');
             }
+            
+            this.fireEvent('specialkey', combo, e);
+            this.getView().el.select('.x-grid3-td-address-editing').removeClass('x-grid3-td-address-editing');
+            this.stopEditing();
+            return false;
+        }
+    },
+    
+    onSearchComboSelect: function(combo) {
+        Tine.log.debug('Tine.Felamimail.MessageEditDialog::onSearchComboSelect()');
+        
+        var value = combo.getValue();
+        if (value !== '') {
+            this.addRowAndDoLayout(this.activeEditor ? this.activeEditor.record : this.lastEditedRecord);
         }
     },
     
@@ -314,20 +333,26 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
      * @param {} oldRecord
      */
     addRowAndDoLayout: function(oldRecord) {
-        this.store.add(new Ext.data.Record({type: oldRecord.data.type, 'address': ''}));
-        this.store.commitChanges();
-        this.setFixedHeight(false);
-        this.ownerCt.doLayout();
-    },        
+        var emptyRecord = this.store.getAt(this.store.findExact('address', ''));
+        if (! emptyRecord) {
+            emptyRecord = new Ext.data.Record({type: oldRecord.data.type, 'address': ''});
+            this.store.add(emptyRecord);
+            this.store.commitChanges();
+            this.setFixedHeight(false);
+            this.ownerCt.doLayout();
+        }
+        
+        this.startEditing.defer(50, this, [this.store.indexOf(emptyRecord), 1]);
+    },
     
     /**
-     * start editing (check if message compose dlg is sending first)
+     * start editing (check if message compose dlg is saving/sending first)
      * 
      * @param {} row
      * @param {} col
      */
     startEditing: function(row, col) {
-        if (! this.composeDlg || ! this.composeDlg.sending) {
+        if (! this.composeDlg || ! this.composeDlg.saving) {
             Tine.Felamimail.RecipientGrid.superclass.startEditing.apply(this, arguments);
         }
     },
@@ -346,7 +371,7 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
         
         this.contextMenu = new Ext.menu.Menu({
             items:  this.action_remove
-        });        
+        });
     },
     
     /**
@@ -365,8 +390,6 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
         
         this.setFixedHeight(true);
         
-        this.relayEvents(this.searchCombo, ['blur' ]);
-        
         this.initDropTarget();
     },
     
@@ -383,7 +406,7 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
                 return true;
             },
             grid: this
-        });        
+        });
     },
     
     /**
@@ -397,10 +420,10 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
             var emptyRecord = this.store.getAt(this.store.findExact('address', '')),
                 type = (emptyRecord) ? emptyRecord.get('type') : 'to';
         }
-                        
+        
         var hasEmail = false,
             added = false;
-
+        
         Ext.each(records, function(record) {
             if (record.hasEmail()) {
                 this.store.add(new Ext.data.Record({type: type, 'address': Tine.Felamimail.getEmailStringFromContact(record)}));
@@ -502,7 +525,10 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
      */
     onAfterEdit: function(o) {
         if (o.field == 'address') {
-            Ext.fly(this.getView().getCell(o.row, o.column)).removeClass('x-grid3-td-address-editing');
+            Tine.log.debug('Tine.Felamimail.MessageEditDialog::onAfterEdit()');
+            Tine.log.debug(o);
+            Ext.fly(this.getView().getCell(o.row, o.column)).removeClass('x-grid3-td-address-editing');    
+            this.lastEditedRecord = o.record;
             if (o.value != '' && (o.originalValue == '' || this.store.findExact('address', '') === -1)) {
                 // use selected type to create new row with empty address and start editing
                 this.addRowAndDoLayout(o.record);
@@ -510,7 +536,7 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
                 this.searchCombo.focus.defer(80, this.searchCombo);
             }
         }
-    },    
+    },
     
     /**
      * delete handler
@@ -519,7 +545,7 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
         var sm = this.getSelectionModel();
         var records = sm.getSelections();
         Ext.each(records, function(record) {
-            if (record.get('address') != '') {
+            if (record.get('address') != '' && this.store.getCount() > 1) {
                 this.store.remove(record);
                 this.store.fireEvent('update', this.store);
             }
@@ -538,15 +564,7 @@ Tine.Felamimail.RecipientGrid = Ext.extend(Ext.grid.EditorGridPanel, {
         Ext.fly(this.getView().getCell(o.row, o.column)).addClass('x-grid3-td-address-editing');
     },
     
-    /**
-     * on validate edit
-     * 
-     * @param {} o
-     */
-    onValidateEdit: function(o) {
-        Ext.fly(this.getView().getCell(o.row, o.column)).removeClass('x-grid3-td-address-editing');
-    },
-     
+    
     /**
      * add recipients to grid store
      * 

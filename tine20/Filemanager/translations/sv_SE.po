@@ -1,0 +1,236 @@
+# 
+# Translators:
+#   <tulken_hultan@hotmail.com>, 2012.
+msgid ""
+msgstr ""
+"Project-Id-Version: Tine 2.0\n"
+"POT-Creation-Date: 2008-05-17 22:12+0100\n"
+"PO-Revision-Date: 2012-11-28 11:47+0000\n"
+"Last-Translator: pschuele <p.schuele@metaways.de>\n"
+"Language-Team: Swedish (Sweden) (http://www.transifex.com/projects/p/tine20/language/sv_SE/)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: sv_SE\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Poedit-Country: GB\n"
+"X-Poedit-Language: en\n"
+"X-Poedit-SourceCharset: utf-8\n"
+
+#: Acl/Rights.php:97
+msgid "manage shared folders"
+msgstr "hantera delade mappar"
+
+#: Acl/Rights.php:98
+msgid "Create new shared folders"
+msgstr "Skapa nya delade mappar"
+
+#: Controller.php:100
+#, python-format
+msgid "%s's personal files"
+msgstr "%s's personliga filer"
+
+#: js/PathFilterModel.js:50
+msgid "path"
+msgstr "väg"
+
+#: js/NodeEditDialog.js:44 js/Filemanager.js:34 js/NodeGridPanel.js:344
+msgid "Save locally"
+msgstr "Spara lokalt"
+
+#: js/NodeEditDialog.js:94 js/NodeEditDialog.js:107
+msgid "Node"
+msgstr ""
+
+#: js/NodeEditDialog.js:113 js/NodeGridPanel.js:133
+msgid "Name"
+msgstr "Namn"
+
+#: js/NodeEditDialog.js:120 js/Model.js:531
+msgid "Type"
+msgstr "Typ"
+
+#: js/NodeEditDialog.js:128 js/NodeGridPanel.js:187
+msgid "Created By"
+msgstr "Skapad Av "
+
+#: js/NodeEditDialog.js:131 js/Model.js:533 js/NodeGridPanel.js:179
+msgid "Creation Time"
+msgstr "Skapad"
+
+#: js/NodeEditDialog.js:140
+msgid "Modified By"
+msgstr ""
+
+#: js/NodeEditDialog.js:143
+msgid "Last Modified"
+msgstr ""
+
+#: js/NodeEditDialog.js:166
+msgid "Description"
+msgstr ""
+
+#: js/NodeEditDialog.js:180
+msgid "Enter description"
+msgstr ""
+
+#: js/NodeTreePanel.js:662 js/NodeTreePanel.js:772 js/NodeGridPanel.js:651
+#: js/NodeGridPanel.js:803
+msgid "Upload Failed"
+msgstr "Uppladdning Misslyckades"
+
+#: js/NodeTreePanel.js:663 js/NodeGridPanel.js:652
+msgid ""
+"Could not upload file. Filesize could be too big. Please notify your "
+"Administrator. Max upload size: "
+msgstr "Kan inte ladda upp filen. Filstorleken kan vara för stor. Var vänlig meddela din Administratör.\nMax uppladdningsstorlek: "
+
+#: js/NodeTreePanel.js:773 js/NodeGridPanel.js:804
+msgid "Putting files in this folder is not allowed!"
+msgstr "Skapa filer i denna mappen är inte tillåtet!"
+
+#: js/GridContextMenu.js:34
+msgid "Please enter the new name of the {0}:"
+msgstr "Var god ange det nya namnet för {0}:"
+
+#: js/GridContextMenu.js:40
+msgid "Not renamed {0}"
+msgstr "Ej omdöpt {0}"
+
+#: js/GridContextMenu.js:40 js/NodeGridPanel.js:503
+msgid "You have to supply a {0} name!"
+msgstr "Du måste ange ett {0} namn!"
+
+#: js/GridContextMenu.js:144 js/NodeGridPanel.js:544
+msgid "Do you really want to delete the following files?"
+msgstr "Vill du verkligen radera följande filer?"
+
+#: js/Model.js:40
+msgid "File"
+msgid_plural "Files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: js/Model.js:44 js/NodeGridPanel.js:155
+msgid "Folder"
+msgid_plural "Folders"
+msgstr[0] ""
+msgstr[1] "Mapp"
+
+#: js/Model.js:282 js/Model.js:298
+msgid "Copying data .. {0}"
+msgstr "Kopierar data .. {0} "
+
+#: js/Model.js:285 js/Model.js:300
+msgid "Moving data .. {0}"
+msgstr "Flyttar data .. {0}"
+
+#: js/Model.js:304
+msgid "Please wait"
+msgstr "Vänlig vänta"
+
+#: js/Model.js:530
+msgid "Quick search"
+msgstr "Snabbsök"
+
+#: js/Model.js:532 js/NodeGridPanel.js:147
+msgid "Contenttype"
+msgstr "Innehållstyp"
+
+#: js/Filemanager.js:26
+msgid "Filemanager"
+msgstr "Filhanterare"
+
+#: js/Filemanager.js:81
+msgid "Service Unavailable"
+msgstr "Service otillgänglig"
+
+#: js/Filemanager.js:82
+msgid ""
+"The Filemanager is not configured correctly. Please refer to the {0}Tine 2.0"
+" Admin FAQ{1} for configuration advice or contact your administrator."
+msgstr "Filhanteraren är inte konfigurerad korrekt. Se {0} Tine 2,0 Admin FAQ {1} för konfigurations råd eller kontakta din administratör."
+
+#: js/Filemanager.js:104
+msgid "Files already exists"
+msgstr "Filer existerar redan"
+
+#: js/Filemanager.js:104
+msgid "Do you want to replace the following file(s)?"
+msgstr "Vill du ersätta följande fil(er)?"
+
+#: js/Filemanager.js:137
+msgid "Failure on create folder"
+msgstr "Det gick inte att skapa en ny mapp"
+
+#: js/Filemanager.js:138
+msgid "Item with this name already exists!"
+msgstr "Ett objekt med detta namnet existerar redan!"
+
+#: js/NodeGridPanel.js:125
+msgid "Tags"
+msgstr ""
+
+#: js/NodeGridPanel.js:140
+msgid "Size"
+msgstr "Storlek"
+
+#: js/NodeGridPanel.js:164
+msgid "Revision"
+msgstr "Revision"
+
+#: js/NodeGridPanel.js:194
+msgid "Last Modified Time"
+msgstr "Senast Ändrad"
+
+#: js/NodeGridPanel.js:201
+msgid "Last Modified By"
+msgstr "Senast Ändrad Av"
+
+#: js/NodeGridPanel.js:249
+msgid "The max. Upload Filesize is {0} MB"
+msgstr "Max storlek för filuppladning är {0} MB"
+
+#: js/NodeGridPanel.js:287
+msgid "Upload"
+msgstr "Ladda upp"
+
+#: js/NodeGridPanel.js:311
+msgid "Edit Properties"
+msgstr ""
+
+#: js/NodeGridPanel.js:322
+msgid "Create Folder"
+msgstr "Skapa Mapp"
+
+#: js/NodeGridPanel.js:333
+msgid "Folder Up"
+msgstr "Mapp Upp"
+
+#: js/NodeGridPanel.js:354 js/NodeGridPanel.js:355 js/NodeGridPanel.js:357
+msgid "Delete"
+msgstr "Radera"
+
+#: js/NodeGridPanel.js:499
+msgid "New Folder"
+msgstr "Ny Mapp"
+
+#: js/NodeGridPanel.js:499
+msgid "Please enter the name of the new folder:"
+msgstr "Var god ange namnet på den nya mappen:"
+
+#: js/NodeGridPanel.js:503
+msgid "No {0} added"
+msgstr "Ingen {0} tillagd"
+
+#: Controller/Node.php:318
+msgid "My folders"
+msgstr "Mina mappar"
+
+#: Controller/Node.php:325
+msgid "Shared folders"
+msgstr "Delade mappar"
+
+#: Controller/Node.php:332
+msgid "Other users folders"
+msgstr "Andra användares mappar"

@@ -4,7 +4,7 @@
  *
  * @package     Addressbook
  * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2008-2012 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2008-2013 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  *
  * @todo        add testSetImage (NOTE: we can't test the upload yet, so we needd to simulate the upload)
@@ -20,6 +20,13 @@ require_once dirname(dirname(__FILE__)) . DIRECTORY_SEPARATOR . 'TestHelper.php'
  */
 class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
 {
+    /**
+     * set geodata for contacts
+     * 
+     * @var boolean
+     */
+    protected $_geodata = FALSE;
+    
     /**
      * instance of test class
      *
@@ -61,6 +68,13 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
     protected $_makeSCleverVisibleAgain = FALSE;
     
     /**
+     * group ids to delete in tearDown
+     * 
+     * @var array
+     */
+    protected $_groupIdsToDelete = NULL;
+    
+    /**
      * Runs the test methods of this class.
      *
      * @access public
@@ -80,6 +94,8 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
      */
     protected function setUp()
     {
+        $this->_geodata = Addressbook_Controller_Contact::getInstance()->setGeoDataForContacts(false);
+        
         // always resolve customfields
         Addressbook_Controller_Contact::getInstance()->resolveCustomfields(TRUE);
         
@@ -115,9 +131,11 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
      */
     protected function tearDown()
     {
+        Addressbook_Controller_Contact::getInstance()->setGeoDataForContacts($this->_geodata);
+        
         $this->_instance->deleteContacts($this->_contactIdsToDelete);
 
-        foreach($this->_customfieldIdsToDelete as $cfd) {
+        foreach ($this->_customfieldIdsToDelete as $cfd) {
             Tinebase_CustomField::getInstance()->deleteCustomField($cfd);
         }
         
@@ -125,6 +143,14 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
             $sclever = Tinebase_User::getInstance()->getFullUserByLoginName('sclever');
             $sclever->visibility = Tinebase_Model_User::VISIBILITY_DISPLAYED;
             Tinebase_User::getInstance()->updateUser($sclever);
+        }
+        
+        if ($this->_groupIdsToDelete) {
+            Admin_Controller_Group::getInstance()->delete($this->_groupIdsToDelete);
+        }
+        
+        if (! empty($this->objects['createdTagIds'])) {
+            Tinebase_Tags::getInstance()->deleteTags($this->objects['createdTagIds']);
         }
     }
 
@@ -167,7 +193,51 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
         }
         $this->assertTrue($found);
     }
+    
+    /**
+     * testSearchContactsByListValueNull
+     */
+    public function testSearchContactsByListValueNull()
+    {
+        $filter = '[
+            {
+                "condition": "OR",
+                "filters": [
+                    {
+                        "condition": "AND",
+                        "filters": [
+                            {
+                                "field": "list",
+                                "operator": "equals",
+                                "value": null,
+                                "id": "ext-record-102"
+                            }
+                        ],
+                        "id": "ext-comp-1211",
+                        "label": "Kontakte"
+                    }
+                ]';
+        $contacts = $this->_instance->searchContacts(Zend_Json::decode($filter), NULL);
+        $this->assertGreaterThan(0, $contacts['totalcount']);
+    }
 
+    /**
+    * testSearchContactsWithBadPaging
+    * 
+    * @see 0006214: LIMIT argument offset=-50 is not valid
+    */
+    public function testSearchContactsWithBadPaging()
+    {
+        $paging = $this->objects['paging'];
+        $paging['start'] = -50;
+        $filter = array(
+            array('field' => 'containerType', 'operator' => 'equals',   'value' => 'all'),
+        );
+    
+        $contacts = $this->_instance->searchContacts($filter, $paging);
+        $this->assertGreaterThan(0, $contacts['totalcount']);
+    }
+    
     /**
      * try to get contacts by missing container
      *
@@ -307,7 +377,7 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
         $this->assertEquals($record['url'],'http://www.phpunit.de','DefaultField "url" was not updated as expected');
         
         // check 'changed' systemnote
-        $this->_checkChangedNote($record['id'], 'adr_one_region ( -> PHPUNIT_multipleUpdate) url ( -> http://www.phpunit.de) customfields ([] -> {');
+        $this->_checkChangedNote($record['id'], 'adr_one_region ( -> PHPUNIT_multipleUpdate) url ( -> http://www.phpunit.de) customfields ( -> {');
         
         // check invalid data
         
@@ -327,24 +397,13 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
      * 
      * @return Tinebase_Model_CustomField_Config
      */
-    protected function _createCustomfield()
+    protected function _createCustomfield($cfName = NULL)
     {
-        $cfName = Tinebase_Record_Abstract::generateUID();
-        
-        $cfc = new Tinebase_Model_CustomField_Config(array(
-            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName('Addressbook')->getId(),
-            'name'              => $cfName,
-            'model'             => 'Addressbook_Model_Contact',
-            'definition'        => array(
-                'label' => Tinebase_Record_Abstract::generateUID(),
-                'type'  => 'string',
-                'uiconfig' => array(
-                    'xtype'  => Tinebase_Record_Abstract::generateUID(),
-                    'length' => 10,
-                    'group'  => 'unittest',
-                    'order'  => 100,
-                )
-            )
+        $cfName = ($cfName !== NULL) ? $cfName : Tinebase_Record_Abstract::generateUID();
+        $cfc = Tinebase_CustomFieldTest::getCustomField(array(
+            'application_id' => Tinebase_Application::getInstance()->getApplicationByName('Addressbook')->getId(),
+            'model'          => 'Addressbook_Model_Contact',
+            'name'           => $cfName,
         ));
         
         $createdCustomField = Tinebase_CustomField::getInstance()->addCustomField($cfc);
@@ -399,7 +458,7 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
         $tag = array(
             'type'          => Tinebase_Model_Tag::TYPE_PERSONAL,
             'name'          => $tagName,
-            'description'	=> 'testModlog',
+            'description'    => 'testModlog',
             'color'         => '#009B31',
         );
         $contact['tags'] = array($tag);
@@ -407,7 +466,11 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
         $result = $this->_instance->saveContact($contact);
         
         $this->assertEquals($tagName, $result['tags'][0]['name']);
-        $this->_checkChangedNote($result['id'], array('tags ([] -> {"added":[{"id":', '"type":"personal"', ',"name":"' . $tagName . '","description":"testModlog","color":"#009B31"'));
+        $this->_checkChangedNote($result['id'], array(
+            '[] -> {"model":"Tinebase_Model_Tag","added":[{"id":"',
+            '"type":"personal"',
+            ',"name":"' . $tagName . '","description":"testModlog","color":"#009B31"'
+        ));
         
         return $result;
     }
@@ -434,9 +497,9 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
     {
         $contact = $this->testTagsModlog();
         $contact['tags'] = array();
-        sleep(1);
+        sleep(1); // make sure that the second change always gets last when fetching notes
         $result = $this->_instance->saveContact($contact);
-        $this->_checkChangedNote($result['id'], array('tags ([{"id":', ' -> {"removed":[{'), 4);
+        $this->_checkChangedNote($result['id'], array('-> {"model":"Tinebase_Model_Tag","added":[],"removed":[{"id":"'), 4);
     }
     
     /**
@@ -495,6 +558,8 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
      */
     public function testUpdateContactWithGeodata()
     {
+        Addressbook_Controller_Contact::getInstance()->setGeoDataForContacts(true);
+        
         $contact = $this->_addContact();
 
         $contact['n_family'] = 'PHPUNIT UPDATE';
@@ -505,7 +570,7 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
         $this->assertEquals($contact['id'], $updatedContact['id'], 'updated produced a new contact');
         $this->assertEquals('PHPUNIT UPDATE', $updatedContact['n_family'], 'updating data failed');
 
-        if (Tinebase_Config::getInstance()->getConfig(Tinebase_Config::MAPPANEL, NULL, TRUE)->value) {
+        if (Tinebase_Config::getInstance()->get(Tinebase_Config::MAPPANEL, TRUE)) {
             // check geo data
             $this->assertEquals('9.99489300545466', $updatedContact['adr_one_lon'], 'wrong geodata (lon)');
             $this->assertEquals('53.5444258235736', $updatedContact['adr_one_lat'], 'wrong geodata (lat)');
@@ -558,8 +623,6 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
             'value'    =>  Tinebase_Core::getUser()->accountDisplayName
         )));
         $sharedTagName = $this->_createAndAttachTag($filter);
-        // need to sleep for 1 second because modlog does not allow to change the same attribute twice in the same second ...
-        sleep(1);
         $personalTagName = $this->_createAndAttachTag($filter, Tinebase_Model_Tag::TYPE_PERSONAL);
 
         // export first and create files array
@@ -575,7 +638,7 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
         $personalTagToDelete = Tinebase_Tags::getInstance()->getTagByName($personalTagName);
         Tinebase_Tags::getInstance()->deleteTags(array($sharedTagToDelete->getId(), $personalTagToDelete->getId()));
     }
-    
+
     /**
      * tag attachment helper
      * 
@@ -585,20 +648,75 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
      */
     protected function _createAndAttachTag($_filter, $_tagType = Tinebase_Model_Tag::TYPE_SHARED)
     {
-        $tagName = Tinebase_Record_Abstract::generateUID();
-        $tag = new Tinebase_Model_Tag(array(
-            'type'          => $_tagType,
+        $tag = $this->_getTag($_tagType);
+        Tinebase_Tags::getInstance()->attachTagToMultipleRecords($_filter, $tag);
+        
+        return $tag->name;
+    }
+    
+    /**
+     * get tag
+     * 
+     * @param string $tagType
+     * @param string $tagName
+     * @return Tinebase_Model_Tag
+     */
+    protected function _getTag($tagType = Tinebase_Model_Tag::TYPE_SHARED, $tagName = NULL)
+    {
+        if ($tagName) {
+            try {
+                $tag = Tinebase_Tags::getInstance()->getTagByName($tagName);
+                return $tag;
+            } catch (Tinebase_Exception_NotFound $tenf) {
+            }
+        } else {
+            $tagName = Tinebase_Record_Abstract::generateUID();
+        }
+        
+        return new Tinebase_Model_Tag(array(
+            'type'          => $tagType,
             'name'          => $tagName,
             'description'   => 'testTagDescription',
             'color'         => '#009B31',
         ));
-        Tinebase_Tags::getInstance()->attachTagToMultipleRecords($_filter, $tag);
-        
-        return $tagName;
     }
 
     /**
+     * testExportXlsWithCustomfield
+     * 
+     * @see 0006634: custom fields missing in XLS export
+     */
+    public function testExportXlsWithCustomfield()
+    {
+        $exportCf = $this->_createCustomfield('exportcf');
+        $filter = new Addressbook_Model_ContactFilter(array(array(
+            'field'    => 'n_fileas',
+            'operator' => 'equals',
+            'value'    =>  Tinebase_Core::getUser()->accountDisplayName
+        )));
+        
+        $ownContact = Addressbook_Controller_Contact::getInstance()->getContactByUserId(Tinebase_Core::getUser()->getId());
+        $ownContact->customfields = array('exportcf' => 'testcustomfieldvalue');
+        Addressbook_Controller_Contact::getInstance()->update($ownContact);
+        
+        $definition = dirname(__FILE__) . '/Export/definitions/adb_cf_xls_test.xml';
+        $exporter = new Addressbook_Export_Xls($filter, Addressbook_Controller_Contact::getInstance(), array('definitionFilename' => $definition));
+        $doc = $exporter->generate();
+        
+        $xlswriter = PHPExcel_IOFactory::createWriter($doc, 'CSV');
+        ob_start();
+        $xlswriter->save('php://output');
+        $out = ob_get_clean();
+        
+        $this->assertContains(Tinebase_Core::getUser()->accountDisplayName, $out, 'display name not found.');
+        $this->assertContains('exportcf', $out, 'customfield not found in headline.');
+        $this->assertContains('testcustomfieldvalue', $out, 'customfield value not found.');
+    }
+    
+    /**
      * test import
+     * 
+     * @see 0006226: Data truncated for column 'adr_two_lon'
      */
     public function testImport()
     {
@@ -621,13 +739,15 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
 
         // import again with clientRecords
         $klaus['adr_one_locality'] = 'Hamburg';
+        // check that empty filter works correctly, db only accepts NULL for empty value here
+        $klaus['adr_two_lon'] = '';
         $clientRecords = array(array(
             'recordData'        => $klaus,
             'resolveStrategy'   => 'mergeMine',
             'index'             => 0,
         ));
         $result = $this->_importHelper(array('dryrun' => 0), $clientRecords);
-        $this->assertEquals(1, $result['totalcount'], 'Should merge Klaus');
+        $this->assertEquals(1, $result['totalcount'], 'Should merge Klaus: ' . print_r($result, TRUE));
         $this->assertEquals(1, $result['duplicatecount'], 'Fritz is no duplicate.');
         $this->assertEquals('Hamburg', $result['results'][0]['adr_one_locality'], 'locality should change');
     }
@@ -653,14 +773,18 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
 
     /**
     * test import with mergeTheirs resolve strategy
+    * 
+    * @see 0007226: tag handling and other import problems
     */
     public function testImportWithResolveStrategyMergeTheirs()
     {
         $result = $this->_importHelper(array('dryrun' => 0));
+        $this->assertEquals(2, count($result['results']), 'no import results');
         $fritz = $result['results'][1];
         $fritz['tags'][] = array(
             'name'        => 'new import tag'
         );
+        $fritz['tel_work'] = '04040';
 
         $clientRecords = array(array(
             'recordData'        => $fritz,
@@ -672,27 +796,42 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
         $this->assertEquals(2, count($result['results'][0]['tags']), 'Should merge tags');
         $this->assertEquals(0, $result['failcount'], 'no failures expected');
         $this->assertEquals(1, $result['duplicatecount'], 'klaus should still be a duplicate');
+        
+        $fritz = $result['results'][0];
+        $fritz['tel_work'] = '04040';
+        // need to adjust user TZ
+        $lastModified = new Tinebase_DateTime($fritz['last_modified_time']);
+        $fritz['last_modified_time'] = $lastModified->setTimezone(Tinebase_Core::get(Tinebase_Core::USERTIMEZONE))->toString();
+        $clientRecords = array(array(
+            'recordData'        => $fritz,
+            'resolveStrategy'   => 'mergeTheirs',
+            'index'             => 1,
+        ));
+        $result = $this->_importHelper(array('dryrun' => 0), $clientRecords);
+        $this->assertEquals(1, $result['totalcount'], 'Should merge fritz: ' . print_r($result, TRUE));
     }
 
     /**
      * import helper
      *
-     * @param array $_additionalOptions
-     * @param array $_clientRecords
+     * @param array $additionalOptions
+     * @param array $clientRecords
+     * @param string $filename
      * @return array
      */
-    protected function _importHelper($_additionalOptions = array('dryrun' => 1), $_clientRecords = array())
+    protected function _importHelper($additionalOptions = array('dryrun' => 1), $clientRecords = array(), $filename = NULL)
     {
         $definition = Tinebase_ImportExportDefinition::getInstance()->getByName('adb_tine_import_csv');
         $definitionOptions = Tinebase_ImportExportDefinition::getOptionsAsZendConfigXml($definition);
-
+        
         $tempFileBackend = new Tinebase_TempFile();
-        $tempFile = $tempFileBackend->createTempFile(dirname(dirname(dirname(dirname(__FILE__)))) . '/tine20/' . $definitionOptions->example);
-        $options = array_merge($_additionalOptions, array(
+        $importFile = ($filename) ? $filename : dirname(dirname(dirname(dirname(__FILE__)))) . '/tine20/' . $definitionOptions->example;
+        $tempFile = $tempFileBackend->createTempFile($importFile);
+        $options = array_merge($additionalOptions, array(
             'container_id'  => $this->container->getId(),
         ));
-        $result = $this->_instance->importContacts($tempFile->getId(), $definition->getId(), $options, $_clientRecords);
-        if (isset($_additionalOptions['dryrun']) && $_additionalOptions['dryrun'] === 0) {
+        $result = $this->_instance->importContacts($tempFile->getId(), $definition->getId(), $options, $clientRecords);
+        if (isset($additionalOptions['dryrun']) && $additionalOptions['dryrun'] === 0) {
             foreach ($result['results'] as $contact) {
                 $this->_contactIdsToDelete[] = $contact['id'];
             }
@@ -706,9 +845,6 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
      */
     public function testImportWithTags()
     {
-        $definition = Tinebase_ImportExportDefinition::getInstance()->getByName('adb_tine_import_csv');
-        $definitionOptions = Tinebase_ImportExportDefinition::getOptionsAsZendConfigXml($definition);
-        
         $options = array(
             'dryrun'     => 0,
             'autotags'   => array(array(
@@ -721,6 +857,7 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
         $result = $this->_importHelper($options);
         $fritz = $result['results'][1];
         
+        //print_r($result);
         $this->assertEquals(2, count($result['results']), 'should import 2');
         $this->assertEquals(1, count($result['results'][0]['tags']), 'no tag added');
         $this->assertEquals('Importliste (19.10.2011)', $result['results'][0]['tags'][0]['name']);
@@ -748,13 +885,136 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
             'resolveStrategy'   => 'mergeMine',
             'index'             => 1,
         ));
-        //print_r($clientRecords);
+        
         $result = $this->_importHelper(array('dryrun' => 0), $clientRecords);
         $this->assertEquals(1, $result['totalcount'], 'Should merge fritz: ' . print_r($result['exceptions'], TRUE));
         $this->assertEquals(2, count($result['results'][0]['tags']), 'Should merge tags');
         $this->assertEquals(NULL, $result['results'][0]['adr_one_locality'], 'Should remove locality');
     }
 
+    /**
+    * testImportWithExistingTag
+    */
+    public function testImportWithExistingTag()
+    {
+        $tag = $this->_getTag(Tinebase_Model_Tag::TYPE_PERSONAL);
+        $tag = Tinebase_Tags::getInstance()->create($tag);
+        
+        $options = array(
+            'dryrun'     => 0,
+            'autotags'   => array($tag->getId()),
+        );
+        $result = $this->_importHelper($options);
+        
+        $this->assertEquals(0, count($result['exceptions']));
+        $this->assertEquals($tag->name, $result['results'][0]['tags'][0]['name']);
+    }
+    
+    /**
+    * testImportWithNewTag
+    */
+    public function testImportWithNewTag()
+    {
+        $tag = $this->_getTag(Tinebase_Model_Tag::TYPE_PERSONAL);
+        
+        $options = array(
+            'dryrun'     => 0,
+            'autotags'   => array($tag->toArray()),
+        );
+        $result = $this->_importHelper($options);
+        
+        $this->assertEquals(0, count($result['exceptions']));
+        $this->assertEquals($tag->name, $result['results'][0]['tags'][0]['name']);
+    }
+    
+    /**
+     * testImportKeepExistingWithTag
+     * 
+     * @see 0006628: tag handling on duplicate resolve actions in import fails
+     */
+    public function testImportKeepExistingWithTag()
+    {
+        $klaus = $this->_tagImportHelper('discard');
+        $this->assertEquals(2, count($klaus['tags']), 'klaus should have both tags: ' . print_r($klaus['tags'], TRUE));
+    }
+    
+    /**
+     * helper for import with tags and keep/discard strategy
+     * 
+     * @param string $resolveStrategy
+     * @return array
+     */
+    protected function _tagImportHelper($resolveStrategy)
+    {
+        $result = $this->_importHelper(array('dryrun' => 0));
+        $klaus =  $result['results'][0];
+        $currentTag = $klaus['tags'][0];
+        $klausId = $klaus['id'];
+        
+        if ($resolveStrategy === 'keep') {
+            unset($klaus['id']);
+        }
+        
+        // keep existing record and discard mine + add new tag
+        $clientRecords = array(array(
+            'recordData'        => $klaus,
+            'resolveStrategy'   => $resolveStrategy,
+            'index'             => 0,
+        ));
+        $tag = $this->_getTag(Tinebase_Model_Tag::TYPE_PERSONAL);
+        $options = array(
+            'dryrun'     => 0,
+            'autotags'   => array($tag->toArray()),
+        );
+        
+        $result = $this->_importHelper($options, $clientRecords);
+        
+        $expectedTotalcount = ($resolveStrategy === 'keep') ? 1 : 0;
+        $this->assertEquals($expectedTotalcount, $result['totalcount'], 'Should discard fritz');
+        $this->assertEquals(1, $result['duplicatecount'], 'fritz should still be a duplicate');
+        
+        $klaus = $this->_instance->getContact($klausId);
+        
+        return $klaus;
+    }
+
+    /**
+     * testImportKeepBothWithTag
+     * 
+     * @see 0006628: tag handling on duplicate resolve actions in import fails
+     */
+    public function testImportKeepBothWithTag()
+    {
+        $klaus = $this->_tagImportHelper('keep');
+        $this->assertEquals(1, count($klaus['tags']), 'klaus should have only one tag: ' . print_r($klaus['tags'], TRUE));
+    }
+    
+    /**
+     * testImportTagWithLongName
+     * 
+     * @see 0007276: import re-creates tags that have names with more than 40 chars
+     * @see 0007356: increase tag name size to 256 chars
+     */
+    public function testImportTagWithLongName()
+    {
+        // import records with long tag name
+        $result = $this->_importHelper(array('dryrun' => 0), array(), dirname(__FILE__) . '/Import/files/adb_tine_import_with_tag.csv');
+        
+        $this->assertEquals(2, $result['totalcount'], 'should import 2 records: ' . print_r($result, TRUE));
+        $this->assertEquals(2, count($result['results'][0]['tags']), 'record should have 2 tags: ' . print_r($result['results'][0], TRUE));
+        
+        // check that tag is only created and added once + remove
+        $tagName = '2202_Netzwerk_national_potentielle_Partner';
+        $tags = Tinebase_Tags::getInstance()->searchTags(new Tinebase_Model_TagFilter(array(
+            'name'  => $tagName,
+            'grant' => Tinebase_Model_TagRight::VIEW_RIGHT,
+            'type'  => Tinebase_Model_Tag::TYPE_SHARED
+        )));
+        $this->objects['createdTagIds'] = $tags->getArrayOfIds();
+        $this->assertEquals(1, count($tags), 'tag not found');
+        $this->assertEquals(2, $tags->getFirstRecord()->occurrence);
+    }
+    
     /**
      * test project relation filter
      */
@@ -1168,7 +1428,6 @@ class Addressbook_JsonTest extends PHPUnit_Framework_TestCase
                     'description' => 'testImport',
                     'color' => '#009B31',
         ));
-        sleep(1);
         $tag = Tinebase_Tags::getInstance()->attachTagToMultipleRecords($filter, $tag);
         $filter = array(array(
             'field'    => 'tag',
@@ -1257,5 +1516,29 @@ Steuernummer 33/111/32212";
         $filter[] = array('field' => 'showDisabled', 'operator' => 'equals',   'value' => TRUE);
         $result = $this->_instance->searchContacts($filter, array());
         $this->assertEquals(1, $result['totalcount']);
+    }
+    
+    /**
+     * test search hidden list -> should not appear
+     * 
+     * @see 0006934: setting a group that is hidden from adb as attendee filter throws exception
+     */
+    public function testSearchHiddenList()
+    {
+        $hiddenGroup = new Tinebase_Model_Group(array(
+            'name'          => 'hiddengroup',
+            'description'   => 'hidden group',
+            'visibility'    => Tinebase_Model_Group::VISIBILITY_HIDDEN
+        ));
+        $hiddenGroup = Admin_Controller_Group::getInstance()->create($hiddenGroup);
+        $this->_groupIdsToDelete = array($hiddenGroup->getId());
+        
+        $filter = array(array(
+            'field'    => 'name',
+            'operator' => 'equals',
+            'value'    => 'hiddengroup'
+        ));
+        $result = $this->_instance->searchLists($filter, array());
+        $this->assertEquals(0, $result['totalcount'], 'should not find hidden list: ' . print_r($result, TRUE));
     }
 }

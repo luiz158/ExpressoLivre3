@@ -6,7 +6,7 @@
  * @subpackage  Controller
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2011-2013 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 
 /**
@@ -31,8 +31,7 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
      */
     private function __construct() 
     {
-        $this->_backend = Felamimail_Backend_Message::getInstance();
-        $this->_currentAccount = Tinebase_Core::getUser();
+        $this->_backend = new Felamimail_Backend_Cache_Sql_Message();
     }
     
     /**
@@ -40,7 +39,7 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -50,7 +49,7 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
      */
     public static function getInstance() 
     {
-        if (self::$_instance === NULL) {            
+        if (self::$_instance === NULL) {
             self::$_instance = new Felamimail_Controller_Message_Send();
         }
         
@@ -130,16 +129,31 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
         $mailToAppend = $this->createMailForSending($_message, $sourceAccount);
         
         $transport = new Felamimail_Transport();
-        $mailAsString = $transport->getRawMessage($mailToAppend);
+        $mailAsString = $transport->getRawMessage($mailToAppend, $this->_getAdditionalHeaders($_message));
         $flags = ($folder->globalname === $targetAccount->drafts_folder) ? array(Zend_Mail_Storage::FLAG_DRAFT) : null;
         
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . 
             ' Appending message ' . $_message->subject . ' to folder ' . $folder->globalname . ' in account ' . $targetAccount->name);
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . 
+            ' ' . $mailAsString);
+        
         Felamimail_Backend_ImapFactory::factory($targetAccount)->appendMessage($mailAsString, $folder->globalname, $flags);
         
         return $_message;
     }
-
+    
+    /**
+     * Bcc recipients need to be added separately because they are removed by default
+     * 
+     * @param Felamimail_Model_Message $message
+     * @return array
+     */
+    protected function _getAdditionalHeaders($message)
+    {
+        $additionalHeaders = ($message && ! empty($message->bcc)) ? array('Bcc' => $message->bcc) : array();
+        return $additionalHeaders;
+    }
+    
     /**
      * create new mail for sending via SMTP
      * 
@@ -186,7 +200,7 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
             
             // append mail to sent folder
             if ($_saveInSent) {
-                $this->_saveInSent($transport, $_account, ($_message !== NULL) ? array('Bcc' => $_message->bcc) : array());
+                $this->_saveInSent($transport, $_account, $this->_getAdditionalHeaders($_message));
             }
             
             if ($_message !== NULL) {
@@ -288,31 +302,40 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
     /**
      * send Zend_Mail message via smtp
      * 
-     * @param  mixed      $_accountId
-     * @param  Zend_Mail  $_message
-     * @param  bool       $_saveInSent
+     * @param  mixed      $accountId
+     * @param  Zend_Mail  $mail
+     * @param  boolean    $saveInSent
+     * @param  Felamimail_Model_Message $originalMessage
      * @return Zend_Mail
      */
-    public function sendZendMail($_accountId, Zend_Mail $_mail, $_saveInSent = false)
+    public function sendZendMail($accountId, Zend_Mail $mail, $saveInSent = false, $originalMessage = NULL)
     {
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . 
-            ' Sending message with subject ' . $_mail->getSubject() 
+            ' Sending message with subject ' . $mail->getSubject() 
         );
-
+        if ($originalMessage !== NULL) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . 
+                ' Original Message subject: ' . $originalMessage->subject . ' / Flag to set: ' . var_export($originalMessage->flags, TRUE)
+            );
+            
+            // this is required for adding the reply/forward flag in _sendMailViaTransport()
+            $originalMessage->original_id = $originalMessage;
+        }
+        
         // increase execution time (sending message with attachments can take a long time)
         $oldMaxExcecutionTime = Tinebase_Core::setExecutionLifeTime(300); // 5 minutes
         
         // get account
-        $account = ($_accountId instanceof Felamimail_Model_Account) ? $_accountId : Felamimail_Controller_Account::getInstance()->get($_accountId);
+        $account = ($accountId instanceof Felamimail_Model_Account) ? $accountId : Felamimail_Controller_Account::getInstance()->get($accountId);
         
-        $this->_setMailFrom($_mail, $account);
-        $this->_setMailHeaders($_mail, $account);
-        $this->_sendMailViaTransport($_mail, $account, NULL, $_saveInSent);
+        $this->_setMailFrom($mail, $account);
+        $this->_setMailHeaders($mail, $account);
+        $this->_sendMailViaTransport($mail, $account, $originalMessage, $saveInSent);
         
         // reset max execution time to old value
         Tinebase_Core::setExecutionLifeTime($oldMaxExcecutionTime);
         
-        return $_mail;
+        return $mail;
     }
     
     /**
@@ -423,6 +446,8 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
                     
                     $address = $punycodeConverter->encode($address);
                     
+                    if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Add ' . $type . ' address: ' . $address);
+                    
                     switch($type) {
                         case 'to':
                             $_mail->addTo($address);
@@ -449,11 +474,11 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
      * @param Tinebase_Mail $_mail
      * @param Felamimail_Model_Account $_account
      * @param Felamimail_Model_Message $_message
-     * 
-     * @todo what has to be set in the 'In-Reply-To' header?
      */
     protected function _setMailHeaders(Zend_Mail $_mail, Felamimail_Model_Account $_account, Felamimail_Model_Message $_message = NULL)
     {
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Setting mail headers');
+        
         // add user agent
         $_mail->addHeader('User-Agent', 'Tine 2.0 Email Client (version ' . TINE20_CODENAME . ' - ' . TINE20_PACKAGESTRING . ')');
         $_mail->setReturnPath($_account->email);
@@ -463,10 +488,16 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
             $_mail->addHeader('Organization', $_account->organization);
         }
         
+        // set message-id (we could use Zend_Mail::createMessageId() here)
+        if ($_mail->getMessageId() === NULL) {
+            $domainPart = substr($_account->email, strpos($_account->email, '@'));
+            $uid = Tinebase_Record_Abstract::generateUID();
+            $_mail->setMessageId('<' . $uid . $domainPart . '>');
+        }
+        
         if ($_message !== NULL) {
-            // set in reply to
             if ($_message->flags && $_message->flags == Zend_Mail_Storage::FLAG_ANSWERED && $_message->original_id instanceof Felamimail_Model_Message) {
-                $_mail->addHeader('In-Reply-To', $_message->original_id->messageuid);
+                $this->_addReplyHeaders($_message);
             }
 
             //set the header request response
@@ -481,8 +512,10 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
    
             // add other headers
             if (! empty($_message->headers) && is_array($_message->headers)) {
-                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Adding custom headers: ' . print_r($_message->headers, TRUE));
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                    . ' Adding custom headers: ' . print_r($_message->headers, TRUE));
                 foreach ($_message->headers as $key => $value) {
+                    $value = $this->_trimHeader($key, $value);
                     $_mail->addHeader($key, $value);
                 }
             }
@@ -490,22 +523,44 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
     }
     
     /**
+     * trim message headers (Zend_Mail only supports < 998 chars)
+     * 
+     * @param string $value
+     * @return string
+     */
+    protected function _trimHeader($key, $value)
+    {
+        if (strlen($value) + strlen($key) > 998) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                . ' Trimming header ' . $key);
+            
+            $value = substr(trim($value), 0, (995 - strlen($key)));
+
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ 
+                . $value);
+        }
+        
+        return $value;
+    }
+    
+    /**
      * set In-Reply-To and References headers
      * 
-     * @param Zend_Mail $mail
      * @param Felamimail_Model_Message $message
      * 
      * @see http://www.faqs.org/rfcs/rfc2822.html / Section 3.6.4.
      */
-    protected function _addReplyHeaders(Zend_Mail $mail, Felamimail_Model_Message $message)
+    protected function _addReplyHeaders(Felamimail_Model_Message $message)
     {
         $originalHeaders = Felamimail_Controller_Message::getInstance()->getMessageHeaders($message->original_id);
         if (! isset($originalHeaders['message-id'])) {
             // no message-id -> skip this
             return;
         }
+
+        $messageHeaders = is_array($message->headers) ? $message->headers : array();
+        $messageHeaders['In-Reply-To'] = $originalHeaders['message-id'];
         
-        $mail->addHeader('In-Reply-To', $originalHeaders['message-id']);
         $references = '';
         if (isset($originalHeaders['references'])) {
             $references = $originalHeaders['references'] . ' ';
@@ -513,15 +568,9 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
             $references = $originalHeaders['in-reply-to'] . ' ';
         }
         $references .= $originalHeaders['message-id'];
+        $messageHeaders['References'] = $references;
         
-        while (strlen($references) > 998) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ 
-                . ' Very long references header, need to cut some chars off.');
-            $pos = strpos($references, ' ');
-            $references = substr($references, (($pos !== FALSE) ? $pos : 80));
-        }
-        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . $references);
-        $mail->addHeader('References', $references);
+        $message->headers = $messageHeaders;
     }
     
     /**
@@ -532,12 +581,22 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
      */
     protected function _addAttachments(Tinebase_Mail $_mail, Felamimail_Model_Message $_message)
     {
-        if (isset($_message->attachments)) {
-            $size = 0;
-            $tempFileBackend = Tinebase_TempFile::getInstance();
-            foreach ($_message->attachments as $attachment) {
+        if (! isset($_message->attachments) || empty($_message->attachments)) {
+            return;
+        }
+
+        $size = 0;
+        $tempFileBackend = Tinebase_TempFile::getInstance();
+        foreach ($_message->attachments as $attachment) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__
+                . ' Adding attachment: ' . (is_object($attachment) ? print_r($attachment->toArray(), TRUE) : print_r($attachment, TRUE)));
+            
+            if ($attachment['type'] == Felamimail_Model_Message::CONTENT_TYPE_MESSAGE_RFC822 && $_message->original_id instanceof Felamimail_Model_Message) {
+                $part = $this->getMessagePart($_message->original_id, ($_message->original_part_id) ? $_message->original_part_id : NULL);
+                $part->decodeContent();
                 
-                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Adding attachment: ' . print_r($attachment, TRUE));
+                $name = $attachment['name'] . '.eml';
+                $type = $attachment['type'];
                 
                 if ($attachment['partId'] && $_message->original_id instanceof Felamimail_Model_Message) {
 
@@ -575,8 +634,19 @@ class Felamimail_Controller_Message_Send extends Felamimail_Controller_Message_A
                 $part->filename = Zend_Mime::encodeQuotedPrintableHeader($name, "UTF-8"); // RFC2047 encode
                 $part->type = $type . '; name="' . Zend_Mime::encodeQuotedPrintableHeader($name, "UTF-8") . '"';
                 
-                $_mail->addAttachment($part);
+                $name = $tempFile->name;
+                $type = $tempFile->type;
             }
+            
+            $part->disposition = Zend_Mime::DISPOSITION_ATTACHMENT;
+            $name = Zend_Mime::encodeQuotedPrintableHeader($name, 'utf-8');
+            $partTypeString = $type . '; name="' . $name . '"';
+            $part->type = $partTypeString;
+            
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                . ' Adding attachment ' . $partTypeString);
+            
+            $_mail->addAttachment($part);
         }
     }
 }

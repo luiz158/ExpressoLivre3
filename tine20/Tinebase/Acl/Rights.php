@@ -81,7 +81,7 @@ class Tinebase_Acl_Rights extends Tinebase_Acl_Rights_Abstract
      * disabled. use the singleton
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -106,7 +106,7 @@ class Tinebase_Acl_Rights extends Tinebase_Acl_Rights_Abstract
         
         return self::$_instance;
     }        
-            
+    
     /**
      * get all possible application rights
      *
@@ -114,7 +114,7 @@ class Tinebase_Acl_Rights extends Tinebase_Acl_Rights_Abstract
      * @return  array   all application rights
      */
     public function getAllApplicationRights($_application = NULL)
-    {        
+    {
         $allRights = parent::getAllApplicationRights();
                 
         if ( $_application === NULL || $_application === 'Tinebase' ) {
@@ -165,4 +165,15 @@ class Tinebase_Acl_Rights extends Tinebase_Acl_Rights_Abstract
         return $rightDescriptions;
     }
     
+    /**
+     * only return admin / run rights
+     * 
+     * @return  array with translated descriptions for admin and run rights
+     * 
+     * @todo this should be called in getTranslatedRightDescriptions / parent::getTranslatedRightDescriptions() renamed
+     */
+    public static function getTranslatedBasicRightDescriptions()
+    {
+        return parent::getTranslatedRightDescriptions();
+    }
 }

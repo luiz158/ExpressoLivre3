@@ -17,43 +17,7 @@ Ext.namespace('Tine.Felamimail');
  * TODO use Ext.apply to get this
  */
 Tine.Felamimail.setTreeContextMenus = function() {
-        
-    // inactive
-    /*
-    var updateCacheConfigAction = {
-        text: String.format(_('Update {0} Cache'), this.app.i18n._('Message')),
-        iconCls: 'action_update_cache',
-        scope: this,
-        handler: function() {
-            Ext.Ajax.request({
-                params: {
-                    method: 'Felamimail.refreshFolder',
-                    folderId: this.ctxNode.attributes.folder_id
-                },
-                scope: this,
-                success: function(_result, _request){
-                    if (this.ctxNode.id == this.getSelectionModel().getSelectedNode().id) {
-                        // update message cache
-                        //this.updateFolderStatus([this.ctxNode]);
-                    }
-                }
-            });
-        }
-    };
-
-    var reloadFolderAction = {
-        text: String.format(_('Reload {0}'), this.app.i18n._('Folder')),
-        iconCls: 'x-tbar-loading',
-        scope: this,
-        handler: function() {
-            if (this.ctxNode) {
-                // call update folder status from felamimail app
-                //this.updateFolderStatus([this.ctxNode]);
-            }
-        }
-    };
-    */
-
+    
     // define additional actions
     var emptyFolderAction = {
         text: this.app.i18n._('Empty Folder'),
@@ -164,7 +128,7 @@ Tine.Felamimail.setTreeContextMenus = function() {
     };
 
     var editVacationAction = {
-        text: this.app.i18n._('Set Vacation Message'),
+        text: this.app.i18n._('Edit Vacation Message'),
         iconCls: 'action_email_replyAll',
         scope: this,
         handler: function() {
@@ -180,7 +144,7 @@ Tine.Felamimail.setTreeContextMenus = function() {
     };
     
     var editRulesAction = {
-        text: this.app.i18n._('Set Filter Rules'),
+        text: this.app.i18n._('Edit Filter Rules'),
         iconCls: 'action_email_forward',
         scope: this,
         handler: function() {

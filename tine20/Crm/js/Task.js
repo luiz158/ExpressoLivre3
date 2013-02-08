@@ -4,7 +4,7 @@
  * @package     Crm
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2009-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  * TODO         use Tine.widgets.grid.LinkGridPanel
  */
@@ -22,8 +22,6 @@ Ext.ns('Tine.Crm.Task');
  * </p>
  * 
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @author      Philipp Schuele <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2009 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 Tine.Crm.Task.GridPanel = Ext.extend(Ext.ux.grid.QuickaddGridPanel, {
     /**
@@ -84,11 +82,11 @@ Tine.Crm.Task.GridPanel = Ext.extend(Ext.ux.grid.QuickaddGridPanel, {
         this.app = this.app ? this.app : Tine.Tinebase.appMgr.get('Crm');
         this.title = this.app.i18n._('Tasks');
         this.recordEditDialogOpener = Tine.Tasks.TaskEditDialog.openWindow;
-        this.recordClass = Tine.Tasks.Task;
+        this.recordClass = Tine.Tasks.Model.Task;
         
-        this.storeFields = Tine.Tasks.TaskArray;
+        this.storeFields = Tine.Tasks.Model.TaskArray;
         this.storeFields.push({name: 'relation'});   // the relation object           
-        this.storeFields.push({name: 'relation_type'});     
+        this.storeFields.push({name: 'relation_type'});
         
         // create delegates
         this.initStore = Tine.Crm.LinkGridPanel.initStore.createDelegate(this);
@@ -150,7 +148,7 @@ Tine.Crm.Task.GridPanel = Ext.extend(Ext.ux.grid.QuickaddGridPanel, {
                     grid.fireEvent('celldblclick', grid, row, 1, e);
                 });
             }
-        }, this);        
+        }, this);
         
         Tine.Crm.Task.GridPanel.superclass.initComponent.call(this);
     },
@@ -247,19 +245,25 @@ Tine.Crm.Task.GridPanel = Ext.extend(Ext.ux.grid.QuickaddGridPanel, {
         };
         task = Tine.Tasks.JsonBackend.recordReader(response);
         
+        Tine.log.debug('Tine.Crm.Task.GridPanel::onUpdate - Task has been updated:');
+        Tine.log.debug(task);
+        
+        // remove task relations to prevent cyclic relation structure
+        task.data.relations = null;
+        
         var myTask = this.store.getById(task.id);
         
-        if (myTask) { 
+        if (myTask) {
             // copy values from edited task
             myTask.beginEdit();
-            for (var p in task.data) { 
+            for (var p in task.data) {
                 myTask.set(p, task.get(p));
             }
             myTask.endEdit();
             
         } else {
             task.data.relation_type = 'task';
-            this.store.add(task);        
+            this.store.add(task);
         }
     }
 });

@@ -18,7 +18,7 @@ Ext.namespace('Tine.Crm', 'Tine.Crm.Model');
  * Lead Record Definition
  */ 
 Tine.Crm.Model.Lead = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.genericFields.concat([
-        {name: 'id',            type: 'int'},
+        {name: 'id',            type: 'string'},
         {name: 'lead_name',     type: 'string'},
         {name: 'leadstate_id',  type: 'int'},
         {name: 'leadtype_id',   type: 'int'},
@@ -39,12 +39,13 @@ Tine.Crm.Model.Lead = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.gener
         {name: 'relations'},
         {name: 'products'},
         {name: 'tags'},
-        {name: 'notes'}
+        {name: 'notes'},
+        {name: 'customfields', isMetaField: true}
     ]), {
     appName: 'Crm',
     modelName: 'Lead',
     idProperty: 'id',
-    titleProperty: 'title',
+    titleProperty: 'lead_name',
     // ngettext('Lead', 'Leads', n);
     recordName: 'Lead',
     recordsName: 'Leads',
@@ -106,12 +107,12 @@ Tine.Crm.Model.Lead.getFilterModel = function() {
             {label: app.i18n._('Probability'), field: 'probability', valueType: 'percentage'},
             {label: app.i18n._('Turnover'),    field: 'turnover', valueType: 'number', defaultOperator: 'greater'},
             {filtertype: 'tinebase.tag', app: app},
-            {label: app.i18n._('Last modified'),   field: 'last_modified_time', valueType: 'date'},
-            {label: app.i18n._('Last modifier'),   field: 'last_modified_by',   valueType: 'user'},
-            {label: app.i18n._('Creation Time'),   field: 'creation_time',      valueType: 'date'},
-            {label: app.i18n._('Creator'),         field: 'created_by',         valueType: 'user'},
+            {label: _('Last Modified Time'),                                                field: 'last_modified_time', valueType: 'date'},
+            {label: _('Last Modified By'),                                                  field: 'last_modified_by',   valueType: 'user'},
+            {label: _('Creation Time'),                                                     field: 'creation_time',      valueType: 'date'},
+            {label: _('Created By'),                                                        field: 'created_by',         valueType: 'user'},
             {filtertype: 'crm.contact'},
-            {filtertype: 'foreignrecord', app: app, foreignRecordClass: Tine.Tasks.Task, ownField: 'task'}
+            {filtertype: 'foreignrecord', app: app, foreignRecordClass: Tine.Tasks.Model.Task, ownField: 'task'}
         ];
         
     if (Tine.Sales && Tine.Tinebase.common.hasRight('run', 'Sales')) {
@@ -151,7 +152,6 @@ Tine.Crm.Model.Settings = Tine.Tinebase.data.Record.create([
     // ngettext('Settings', 'Settings', n);
     recordName: 'Settings',
     recordsName: 'Settingss',
-    containerProperty: 'container_id',
     // ngettext('record list', 'record lists', n);
     containerName: 'Settings',
     containersName: 'Settings',

@@ -19,8 +19,17 @@ class Tasks_Setup_Update_Release5 extends Setup_Update_Abstract
         $tasksAppId = Tinebase_Application::getInstance()->getApplicationByName('Tasks')->getId();
         
         // remove status_id keys
-        $this->_backend->dropForeignKey('tasks', 'tasks::status_id--tasks_status::id');
-        $this->_backend->dropIndex('tasks', 'status_id');
+        try {
+            $this->_backend->dropForeignKey('tasks', 'tasks::status_id--tasks_status::id');
+        } catch (Zend_Db_Statement_Exception $zdse) {
+            // do nothing (fk not found)
+        }
+    
+        try {
+            $this->_backend->dropIndex('tasks', 'status_id');
+        } catch (Zend_Db_Statement_Exception $zdse) {
+            // do nothing (fk not found)
+        }
         
         // need to replace all NULL values first
         $this->_db->update(SQL_TABLE_PREFIX . 'tasks', array(
@@ -130,7 +139,11 @@ class Tasks_Setup_Update_Release5 extends Setup_Update_Abstract
     {
         $tasksAppId = Tinebase_Application::getInstance()->getApplicationByName('Tasks')->getId();
 
-        // alter status_id -> status
+        // need to replace all NULL values first
+        $this->_db->update(SQL_TABLE_PREFIX . 'tasks', array(
+            'priority' => 1,
+        ), "`priority` IS NULL");
+        
         $declaration = new Setup_Backend_Schema_Field_Xml('
             <field>
                 <name>priority</name>
@@ -151,7 +164,7 @@ class Tasks_Setup_Update_Release5 extends Setup_Update_Abstract
         $tasksPriorityConfig = array(
             'name'    => Tasks_Config::TASK_PRIORITY,
             'records' => array(
-                array('id' => 'LOW', 	'value' => 'low', 	   'icon' => 'images/oxygen/16x16/actions/go-down.png', 'system' => true), //_('low')
+                array('id' => 'LOW',    'value' => 'low',      'icon' => 'images/oxygen/16x16/actions/go-down.png', 'system' => true), //_('low')
                 array('id' => 'NORMAL', 'value' => 'normal',   'icon' => 'images/oxygen/16x16/actions/go-next.png', 'system' => true), //_('normal')
                 array('id' => 'HIGH',   'value' => 'high',     'icon' => 'images/oxygen/16x16/actions/go-up.png',   'system' => true), //_('high')
                 array('id' => 'URGENT', 'value' => 'urgent',   'icon' => 'images/oxygen/16x16/emblems/emblem-important.png', 'system' => true), //_('urgent')
@@ -173,5 +186,32 @@ class Tasks_Setup_Update_Release5 extends Setup_Update_Abstract
         
         $this->setTableVersion('tasks', '5');
         $this->setApplicationVersion('Tasks', '5.3');
+    }
+    
+    /**
+     * update to 5.4
+     * - status_id might be set in state as sort column
+     */
+    public function update_3()
+    {
+        $stmt = $this->_db->query("SELECT * FROM `" . SQL_TABLE_PREFIX . "state`");
+        $stateDatas = $stmt->fetchAll(Zend_Db::FETCH_ASSOC);
+        foreach ($stateDatas as $state) {
+            $this->_db->update(SQL_TABLE_PREFIX . 'state', array(
+                'data' => str_replace('sort%3Do%253Afield%253Ds%25253Astatus_id', 'sort%3Do%253Afield%253Ds%25253Astatus', $state['data'])
+            ), "`id` = '{$state['id']}'");
+        }
+        
+        $this->setApplicationVersion('Tasks', '5.4');
+    }
+    
+    /**
+    * update to 6.0
+    *
+    * @return void
+    */
+    public function update_4()
+    {
+        $this->setApplicationVersion('Tasks', '6.0');
     }
 }

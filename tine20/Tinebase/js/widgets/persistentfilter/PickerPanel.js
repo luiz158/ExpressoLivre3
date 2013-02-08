@@ -42,7 +42,8 @@ Tine.widgets.persistentfilter.PickerPanel = Ext.extend(Ext.tree.TreePanel, {
     /**
      * @private
      */
-    autoScroll : true,
+    autoScroll : false,
+    autoHeight: true,
     border : false,
     rootVisible : false,
 
@@ -69,7 +70,7 @@ Tine.widgets.persistentfilter.PickerPanel = Ext.extend(Ext.tree.TreePanel, {
         this.recordCollection = this.store.queryBy(function(record, id) {
             if(record.get('application_id') == this.app.id) {
                 if(this.contentType) {
-                    var modelName = this.app.appName + '_Model_' + this.contentType + 'Filter'; 
+                    var modelName = this.app.appName + '_Model_' + this.contentType + 'Filter';
                     if(record.get('model') == modelName) {
                         return true;
                     } else {
@@ -99,14 +100,14 @@ Tine.widgets.persistentfilter.PickerPanel = Ext.extend(Ext.tree.TreePanel, {
         });
 
         new Ext.tree.TreeSorter(this, {
-            property: 'sorting',                   
+            property: 'sorting',
             sortType : function(node) {
                 return node.attributes.sorting;
             }
         });
 
         this.on('nodedrop', function() {
-            this.saveState();           
+            this.saveState();
         }, this);
 
         this.filterNode = this.filterNode || new Ext.tree.AsyncTreeNode({
@@ -134,6 +135,8 @@ Tine.widgets.persistentfilter.PickerPanel = Ext.extend(Ext.tree.TreePanel, {
         }, this);
 
         this.on('contextmenu', this.onContextMenu, this);
+        
+        this.currentUser = Tine.Tinebase.registry.get('currentAccount');
     },
 
     /**
@@ -161,7 +164,7 @@ Tine.widgets.persistentfilter.PickerPanel = Ext.extend(Ext.tree.TreePanel, {
             node.attributes.sorting = i;
             var rec = this.recordCollection.get(node.attributes.id);
             var oldSort = rec.get('sorting');
-            if(oldSort != i) {    
+            if(oldSort != i) {
                 rec.set('sorting', i);
                 rec.commit();
             }
@@ -277,7 +280,7 @@ Tine.widgets.persistentfilter.PickerPanel = Ext.extend(Ext.tree.TreePanel, {
         }
 
         var record = this.store.getById(node.id);
-        var isHidden = record.isShipped();
+        var isHidden = ! this.hasRight(node.attributes);
     
         var menu = new Ext.menu.Menu({
             items : [{
@@ -346,7 +349,7 @@ Tine.widgets.persistentfilter.PickerPanel = Ext.extend(Ext.tree.TreePanel, {
      */
     onOverwritePersistentFilter : function(node) {
         
-        var record = this.store.getById(node.id);        
+        var record = this.store.getById(node.id);
         Ext.MessageBox.confirm(_('Overwrite?'), String.format(_('Do you want to overwrite the favorite "{0}"?'), node.text), function(_btn) {
             if (_btn == 'yes') {
                 Ext.MessageBox.wait(_('Please wait'), String.format(_('Overwriting Favorite "{0}"'), node.text));
@@ -385,11 +388,13 @@ Tine.widgets.persistentfilter.PickerPanel = Ext.extend(Ext.tree.TreePanel, {
         }
                 
         var height = 160;
-        if ((Tine.Tinebase.common.hasRight('manage_shared_favorites', this.app.name)) && (!record.isDefault())) height = 185;
+        
+        if (this.hasRight() && (!record.isDefault())) height = 185;
         
         var newWindow = Tine.WindowFactory.getWindow({
             modal : true,
             app : this.app,
+            modelName: this.contentType,
             record : record,
             title : title,
             width : 300,
@@ -404,7 +409,20 @@ Tine.widgets.persistentfilter.PickerPanel = Ext.extend(Ext.tree.TreePanel, {
         }, this);
         
     },
-
+    
+    /**
+     * checks right
+     * 
+     * @param {Object} filter
+     * @return {Boolean}
+     */
+    hasRight: function(filter) {
+        if(filter && filter.created_by == this.currentUser.accountId) {
+            return true;
+        }
+        return (Tine.Tinebase.common.hasRight('manage_shared_' + this.contentType.toLowerCase() + '_favorites', this.app.name))
+    },
+    
     /**
      * create or update a favorite
      * 
@@ -472,7 +490,9 @@ Tine.widgets.persistentfilter.PickerPanel = Ext.extend(Ext.tree.TreePanel, {
     
     
     getNewEmptyRecord: function() {
-        var model = this.filterModel;
+        var model = this.filterModel,
+            ftb = this.getFilterToolbar();
+            
         if (!model) {
             var recordClass = this.recordClass || this.treePanel ? this.treePanel.recordClass : ftb.store.reader.recordType;
             model = recordClass.getMeta('appName') + '_Model_' + recordClass.getMeta('modelName') + 'Filter';
@@ -507,8 +527,7 @@ Tine.widgets.persistentfilter.PickerPanel = Ext.extend(Ext.tree.TreePanel, {
  *            config
  * @constructor Create a new Tine.widgets.persistentfilter.PickerTreePanelLoader
  */
-Tine.widgets.persistentfilter.PickerTreePanelLoader = Ext.extend(
-        Tine.widgets.tree.Loader, {
+Tine.widgets.persistentfilter.PickerTreePanelLoader = Ext.extend(Tine.widgets.tree.Loader, {
 
             /**
              * @cfg {Ext.util.MixedCollection} recordCollection
@@ -569,7 +588,7 @@ Tine.widgets.persistentfilter.PickerTreePanelLoader = Ext.extend(
                     Ext.apply(attr, {
                         isPersistentFilter : isPersistentFilter,
                         text : Ext.util.Format.htmlEncode(this.app.i18n._hidden(attr.name)),
-                        qtip : Ext.util.Format.htmlEncode(attr.description ? this.app.i18n._hidden(attr.description) + ' ' + addText : addText),
+                        qtip : Tine.Tinebase.common.doubleEncode(attr.description ? this.app.i18n._hidden(attr.description) + ' ' + addText : addText),
                         selected : attr.id === this.selectedFilterId,
                         id : attr.id,
 

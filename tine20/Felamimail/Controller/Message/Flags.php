@@ -41,8 +41,7 @@ class Felamimail_Controller_Message_Flags extends Felamimail_Controller_Message_
      */
     private function __construct() 
     {
-        $this->_backend = Felamimail_Backend_Message::getInstance();
-        $this->_currentAccount = Tinebase_Core::getUser();
+        $this->_backend = new Felamimail_Backend_Cache_Sql_Message();
     }
     
     /**
@@ -50,7 +49,7 @@ class Felamimail_Controller_Message_Flags extends Felamimail_Controller_Message_
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -60,7 +59,7 @@ class Felamimail_Controller_Message_Flags extends Felamimail_Controller_Message_
      */
     public static function getInstance() 
     {
-        if (self::$_instance === NULL) {            
+        if (self::$_instance === NULL) {
             self::$_instance = new Felamimail_Controller_Message_Flags();
         }
         
@@ -98,6 +97,8 @@ class Felamimail_Controller_Message_Flags extends Felamimail_Controller_Message_
      * @param array                     $_flags
      * @param string                    $_mode add/clear
      * @return Tinebase_Record_RecordSet with affected folders
+     * 
+     * @todo use iterator here
      */
     protected function _addOrClearFlags($_messages, $_flags, $_mode = 'add')
     {
@@ -105,8 +106,8 @@ class Felamimail_Controller_Message_Flags extends Felamimail_Controller_Message_
         
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $_mode. ' flags: ' . print_r($_flags, TRUE));
         
-        // only get the first 100 messages if we got a filtergroup   
-        $pagination = ($_messages instanceof Tinebase_Model_Filter_FilterGroup) ? new Tinebase_Model_Pagination(array('sort' => $this->_backend->getTableName() . '.folder_id', 'start' => 0, 'limit' => 100)) : NULL;
+        // only get the first 100 messages if we got a filtergroup
+        $pagination = ($_messages instanceof Tinebase_Model_Filter_FilterGroup) ? new Tinebase_Model_Pagination(array('sort' => 'folder_id', 'start' => 0, 'limit' => 100)) : NULL;
         $messagesToUpdate = $this->_convertToRecordSet($_messages, TRUE, $pagination);
         
         $lastFolderId       = null;
@@ -138,7 +139,7 @@ class Felamimail_Controller_Message_Flags extends Felamimail_Controller_Message_
                     } else if ($_mode === 'clear') {
                         $folderCounterById[$lastFolderId] = array(
                             'incrementUnreadCounter' => 0
-                        );                        
+                        );
                     }
                 }
                 

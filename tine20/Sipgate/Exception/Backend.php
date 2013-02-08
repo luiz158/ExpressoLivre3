@@ -18,6 +18,17 @@
  */
 class Sipgate_Exception_Backend extends Sipgate_Exception
 {
+    /**
+     * construct
+     * 
+     * @param string $_message
+     * @param integer $_code
+     * @return void
+     */
+    public function __construct($_message = 'General Backend Exception.', $_code = 950) {
+        // _('General Backend Exception.')
+        parent::__construct($_message, $_code);
+    }
 }
 
 ?>

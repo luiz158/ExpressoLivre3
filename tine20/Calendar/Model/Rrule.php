@@ -297,8 +297,12 @@ class Calendar_Model_Rrule extends Tinebase_Record_Abstract
      * @param Tinebase_Record_RecordSet $_events
      * @param Calendar_Model_EventFilter $_filter
      */
-    public static function mergeAndRemoveNonMatchingRecurrences(Tinebase_Record_RecordSet $_events, Calendar_Model_EventFilter $_filter)
+    public static function mergeAndRemoveNonMatchingRecurrences(Tinebase_Record_RecordSet $_events, Calendar_Model_EventFilter $_filter = NULL)
     {
+        if (!$_filter) {
+            return;
+        }
+        
         $period = $_filter->getFilter('period');
         if ($period) {
             self::mergeRecurrenceSet($_events, $period->getFrom(), $period->getUntil());
@@ -316,7 +320,7 @@ class Calendar_Model_Rrule extends Tinebase_Record_Abstract
     /**
      * returns next occurrence _ignoring exceptions_ or NULL if there is none/not computable
      * 
-     * NOTE: computing the next occurrence of an open end rrule can be dangoures, as it might result
+     * NOTE: computing the next occurrence of an open end rrule can be dangerous, as it might result
      *       in a endless loop. Therefore we only make a limited number of attempts before giving up.
      * 
      * @param  Calendar_Model_Event         $_event
@@ -327,6 +331,10 @@ class Calendar_Model_Rrule extends Tinebase_Record_Abstract
      */
     public static function computeNextOccurrence($_event, $_exceptions, $_from, $_which = 1)
     {
+        if ($_which === 0) {
+            return $_event;
+        }
+        
         $freqMap = array(
             self::FREQ_DAILY   => Tinebase_DateTime::MODIFIER_DAY,
             self::FREQ_WEEKLY  => Tinebase_DateTime::MODIFIER_WEEK,
@@ -583,7 +591,7 @@ class Calendar_Model_Rrule extends Tinebase_Record_Abstract
             $recurEvent->dtstart = clone ($computationStartDate);
             
             $originatorsDtstart = clone $recurEvent->dtstart;
-            $originatorsDtstart->setTimezone($_event->originator_tz);            
+            $originatorsDtstart->setTimezone($_event->originator_tz);
             
             $recurEvent->dtstart->add($originatorsOriginalDtstart->get('I') - $originatorsDtstart->get('I'), Tinebase_DateTime::MODIFIER_HOUR);
 
@@ -593,10 +601,14 @@ class Calendar_Model_Rrule extends Tinebase_Record_Abstract
             }            
             
             // we calculate dtend from the event length, as events during a dst boundary could get dtend less than dtstart otherwise 
-            $recurEvent->dtend = clone $recurEvent->dtstart;  
+            $recurEvent->dtend = clone $recurEvent->dtstart;
             $recurEvent->dtend->add($eventLength);
             
             $recurEvent->setRecurId();
+            
+            if ($_from->compare($recurEvent->dtend) >= 0) {
+                continue;
+            }
             
             if (! in_array($recurEvent->recurid, $_exceptionRecurIds)) {
                 self::addRecurrence($recurEvent, $_recurSet);

@@ -79,7 +79,7 @@ class Tinebase_Model_Filter_DateTime extends Tinebase_Model_Filter_Date
             $value[0] = $this->_convertStringToUTC($value[0]);
             $value[1] = $this->_convertStringToUTC($value[1]);
             
-        } else  {            
+        } else  {
             $value = ($_value instanceof DateTime) ? $_value->toString(Tinebase_Record_Abstract::ISO8601LONG) : $_value;
         }
         

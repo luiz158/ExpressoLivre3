@@ -30,7 +30,7 @@ interface Tinebase_User_Plugin_SqlInterface extends Tinebase_User_Plugin_Interfa
      * 
      * @param Tinebase_Model_User  $_user  the user object
      */
-    public function inspectGetUserByProperty(Tinebase_Model_User $_user);    
+    public function inspectGetUserByProperty(Tinebase_Model_User $_user);
     
     /**
      * inspect data used to update user
@@ -61,13 +61,14 @@ interface Tinebase_User_Plugin_SqlInterface extends Tinebase_User_Plugin_Interfa
      * 
      * @param  string  $_userId
      * @param  string  $_password
+     * @param  bool    $_encrypt encrypt password
      */
-    public function inspectSetPassword($_userId, $_password);
+    public function inspectSetPassword($_userId, $_password, $_encrypt = TRUE);
 
     /**
      * delete user by id
      *
      * @param   Tinebase_Model_FullUser $_user
      */
-    public function inspectDeleteUser(Tinebase_Model_FullUser $_user);    
+    public function inspectDeleteUser(Tinebase_Model_FullUser $_user);
 }  

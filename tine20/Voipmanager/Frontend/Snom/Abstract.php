@@ -24,13 +24,13 @@ abstract class Voipmanager_Frontend_Snom_Abstract extends Tinebase_Frontend_Abst
     protected function _authenticate()
     {
         if (!isset($_SERVER['PHP_AUTH_USER'])) {
-            Zend_Registry::get('logger')->debug(__METHOD__ . '::' . __LINE__ . ' PHP_AUTH_USER not set');
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' PHP_AUTH_USER not set');
             header('WWW-Authenticate: Basic realm="Tine 2.0"');
             header('HTTP/1.0 401 Unauthorized');
             exit;
         }
         
-        Zend_Registry::get('logger')->debug(__METHOD__ . '::' . __LINE__ . ' authenticate ' . $_SERVER['PHP_AUTH_USER']);
+        Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' authenticate ' . $_SERVER['PHP_AUTH_USER']);
         
         $authAdapter = new Zend_Auth_Adapter_DbTable(Tinebase_Core::getDb());
         $authAdapter->setTableName(SQL_TABLE_PREFIX . 'snom_phones')
@@ -43,7 +43,7 @@ abstract class Voipmanager_Frontend_Snom_Abstract extends Tinebase_Frontend_Abst
         $authResult = $authAdapter->authenticate();
         
         if (!$authResult->isValid()) {
-            Zend_Registry::get('logger')->warn(__METHOD__ . '::' . __LINE__ . ' authentication failed for ' . $_SERVER['PHP_AUTH_USER']);
+            Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ . ' authentication failed for ' . $_SERVER['PHP_AUTH_USER']);
             header('WWW-Authenticate: Basic realm="Tine 2.0"');
             header('HTTP/1.0 401 Unauthorized');
             exit;
@@ -55,13 +55,16 @@ abstract class Voipmanager_Frontend_Snom_Abstract extends Tinebase_Frontend_Abst
      *
      * @return string the complete URI http://hostname/path/index.php
      */
-    protected function _getBaseUrl()
+    protected function _getBaseUrl($phone = null)
     {
         if (! isset($_SERVER['HTTP_HOST']) && ! isset($_SERVER["SERVER_NAME"]) || ! isset($_SERVER['SERVER_PORT'])) {
             throw new Voipmanager_Exception_UnexpectedValue('could not detect server name or port');
         }
         
         $protocol = !empty($_SERVER['HTTPS']) ? 'https://' : 'http://';
+        if ($phone instanceof Voipmanager_Model_Snom_Phone) {
+            $protocol .= $phone->http_client_user . ':' . $phone->http_client_pass . '@';
+        }
         $name = !empty($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : $_SERVER['SERVER_NAME'];
         $port = $_SERVER['SERVER_PORT'] != '80' && $_SERVER['SERVER_PORT'] != '443' ? ':' . $_SERVER['SERVER_PORT'] : '' ;
         
@@ -75,9 +78,12 @@ abstract class Voipmanager_Frontend_Snom_Abstract extends Tinebase_Frontend_Abst
      *
      * @return string the complete URI http://hostname/path/index.php
      */
-    public static function getBaseUrl()
+    public static function getBaseUrl($phone = null)
     {
         $protocol = !empty($_SERVER['HTTPS']) ? 'https://' : 'http://';
+        if ($phone instanceof Voipmanager_Model_Snom_Phone) {
+            $protocol .= $phone->http_client_user . ':' . $phone->http_client_pass . '@';
+        }
         $name = !empty($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : $_SERVER['SERVER_NAME'];
         $port = $_SERVER['SERVER_PORT'] != '80' && $_SERVER['SERVER_PORT'] != '443' ? ':' . $_SERVER['SERVER_PORT'] : '' ;
         

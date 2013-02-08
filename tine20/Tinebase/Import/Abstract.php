@@ -6,7 +6,7 @@
  * @subpackage  Import
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2010-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2010-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 
 /**
@@ -42,6 +42,10 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
         'model'             => '',
         'shared_tags'       => 'create', //'onlyexisting',
         'autotags'          => array(),
+        'encoding'          => 'auto',
+        'encodingTo'        => 'UTF-8',
+        'useStreamFilter'   => TRUE,
+        'postMappingHook'   => null
     );
     
     /**
@@ -86,6 +90,9 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
      */
     public function importFile($_filename, $_clientRecordData = array())
     {
+        if (preg_match('/^win/i', PHP_OS)) {
+           $_filename = utf8_decode($_filename);
+        }
         if (! file_exists($_filename)) {
             throw new Tinebase_Exception_NotFound("File $_filename not found.");
         }
@@ -119,7 +126,7 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
     /**
      * import the data
      *
-     * @param  resource $_resource (if $_filename is a stream)
+     * @param resource $_resource (if $_filename is a stream)
      * @param array $_clientRecordData
      * @return array with import data (imported records, failures, duplicates and totalcount)
      */
@@ -129,15 +136,50 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
             . ' Starting import of ' . ((! empty($this->_options['model'])) ? $this->_options['model'] . 's' : ' records'));
         
         $this->_initImportResult();
+        $this->_appendStreamFilters($_resource);
         $this->_beforeImport($_resource);
         $this->_doImport($_resource, $_clientRecordData);
-        
-        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
-            . ' Import finished. (total: ' . $this->_importResult['totalcount'] 
-            . ' fail: ' . $this->_importResult['failcount'] 
-            . ' duplicates: ' . $this->_importResult['duplicatecount']. ')');
+        $this->_logImportResult();
         
         return $this->_importResult;
+    }
+    
+    /**
+     * append stream filter for correct linebreaks
+     * - iconv with IGNORE
+     * - replace linebreaks
+     * 
+     * @param resource $resource
+     */
+    protected function _appendStreamFilters($resource)
+    {
+        if (! $resource || ! isset($this->_options['useStreamFilter']) || ! $this->_options['useStreamFilter']) {
+            return;
+        }
+
+        if (! isset($this->_options['encoding']) || $this->_options['encoding'] === 'auto' && extension_loaded('mbstring')) {
+            require_once 'StreamFilter/ConvertMbstring.php';
+            $filter = 'convert.mbstring';
+        } else if (isset($this->_options['encoding']) && $this->_options['encoding'] !== $this->_options['encodingTo']) {
+            $filter = 'convert.iconv.' . $this->_options['encoding'] . '/' . $this->_options['encodingTo'] . '//IGNORE';
+        } else {
+            $filter = NULL;
+        }
+            
+        if ($filter !== NULL) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                . ' Add convert stream filter: ' . $filter);
+            stream_filter_append($resource, $filter);
+        }
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
+            . ' Adding streamfilter for correct linebreaks');
+        require_once 'StreamFilter/StringReplace.php';
+        $filter = stream_filter_append($resource, 'str.replace', STREAM_FILTER_READ, array(
+            'search'            => '/\r\n{0,1}/',
+            'replace'           => "\r\n",
+            'searchIsRegExp'    => TRUE
+        ));
     }
     
     /**
@@ -156,13 +198,12 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
      */
     protected function _beforeImport($_resource = NULL)
     {
-        
     }
     
     /**
      * do import: loop data -> convert to records -> import records
      * 
-     * @param resource $_resource
+     * @param mixed $_resource
      * @param array $_clientRecordData
      */
     protected function _doImport($_resource = NULL, $_clientRecordData = array())
@@ -208,11 +249,11 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
                     
                     // just add autotags to record (if id is available)
                     if ($recordToImport->getId()) {
-                        $this->_addAutoTags($recordToImport);
-                        call_user_func(array($this->_controller, $this->_options['updateMethod']), $recordToImport);
+                        $record = call_user_func(array($this->_controller, 'get'), $recordToImport->getId());
+                        $this->_addAutoTags($record);
+                        call_user_func(array($this->_controller, $this->_options['updateMethod']), $record);
                     }
                 }
-                    
             } catch (Exception $e) {
                 $this->_handleImportException($e, $recordIndex, $recordToImport);
             }
@@ -280,6 +321,33 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
     }
     
     /**
+     * Runs a user defined script
+     *
+     * @param array $data
+     */
+    protected function _postMappingHook ($data)
+    {
+        $jsonEncodedData = Zend_Json::encode($data);
+        $jsonDecodedData = null;
+
+        $script = escapeshellcmd($this->_options['postMappingHook']['path']);
+        if (file_exists($this->_options['postMappingHook']['path'])) {
+            if (! is_executable($script)) {
+                throw new Tinebase_Exception_AccessDenied("The Script is not executable. Path: " . $script);
+            }
+            $jDataToSend =  escapeshellarg($jsonEncodedData);
+            $jsonDecodedData = Zend_Json::decode(shell_exec("$script $jDataToSend"));
+        } else {
+            throw new Tinebase_Exception_UnexpectedValue("Script does not exists. Path: " . $script);
+        }
+        if (! is_array($jsonDecodedData) || ! $jsonDecodedData)
+        {
+            throw new Tinebase_Exception_UnexpectedValue("Something went wrong while running postMappingHook!");
+        }
+        return $jsonDecodedData;
+    }
+    
+    /**
      * do conversions (transformations, charset, replacements ...)
      *
      * @param array $_data
@@ -295,12 +363,64 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
         } else {
             $data = $_data;
         }
-
-        foreach ($data as $key => $value) {
-            $data[$key] = $this->_encode($value);
+        
+        foreach ($data as $key => $value) { 
+            $data[$key] = $this->_convertEncoding($value);
         }
-                
+
         return $data;
+    }
+    
+    /**
+     * convert encoding
+     * NOTE: always do encoding with //IGNORE as we do not know the actual encoding in some cases
+     * 
+     * @param string|array $_value
+     * @return string|array
+     */
+    protected function _convertEncoding($_value)
+    {
+        if (empty($_value) || (! isset($this->_options['encodingTo']) || (isset($this->_options['useStreamFilter']) && $this->_options['useStreamFilter']))) {
+            return $_value;
+        }
+        
+        if (is_array($_value)) {
+            $result = array();
+            foreach ($_value as $singleValue) {
+                $result[] = $this->_doConvert($singleValue);
+            }
+        } else {
+            $result = $this->_doConvert($_value);
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * convert string with iconv or mb_convert_encoding
+     * 
+     * @param string $string
+     * @return string
+     */
+    protected function _doConvert($string)
+    {
+        if ((! isset($this->_options['encoding']) || $this->_options['encoding'] === 'auto') && extension_loaded('mbstring')) {
+            $encoding = mb_detect_encoding($string, array('utf-8', 'iso-8859-1', 'windows-1252', 'iso-8859-15'));
+            if ($encoding !== FALSE) {
+                $encodingFn = 'mb_convert_encoding';
+                $result = @mb_convert_encoding($string, $this->_options['encodingTo'], $encoding);
+            }
+        } else if (isset($this->_options['encoding'])) {
+            $encoding = $this->_options['encoding'];
+            $encodingFn = 'iconv';
+            $result = @iconv($encoding, $this->_options['encodingTo'] . '//TRANSLIT', $string);
+        } else {
+            return $string;
+        }
+
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ 
+            . ' Encoded ' . $string . ' from ' . $encoding . ' to ' . $this->_options['encodingTo'] . ' using ' . $encodingFn . ' . => ' . $result);
+        return $result;
     }
     
     /**
@@ -329,36 +449,28 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
                 $data[$key] = $field['fixed'];
             } else if (isset($field['append'])) {
                 $data[$key] .= $field['append'] . $_data[$key];
+            } else if (isset($field['typecast'])) {
+                switch ($field['typecast']) {
+                    case 'int':
+                    case 'integer':
+                        $data[$key] = (integer) $_data[$key];
+                        break; 
+                    case 'string':
+                        $data[$key] = (string) $_data[$key];
+                        break;
+                    case 'bool':
+                    case 'boolean':
+                        $data[$key] = (string) $_data[$key];
+                        break;
+                    default:
+                        $data[$key] = $_data[$key];
+                }
             } else {
                 $data[$key] = $_data[$key];
             }
         }
         
         return $data;
-    }
-    
-    /**
-     * encode values
-     * 
-     * @param string|array $_value
-     * @return string|array
-     */
-    protected function _encode($_value)
-    {
-        if (! isset($this->_options['encoding']) || ! isset($this->_options['encodingTo']) || $this->_options['encoding'] === $this->_options['encodingTo']) {
-            return $_value;
-        }
-        
-        if (is_array($_value)) {
-            $result = array();
-            foreach ($_value as $singleValue) {
-                $result[] = @iconv($this->_options['encoding'], $this->_options['encodingTo'], $singleValue);
-            }
-        } else {
-            $result = @iconv($this->_options['encoding'], $this->_options['encodingTo'], $_value);
-        }
-        
-        return $result;
     }
 
     /**
@@ -462,6 +574,9 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
                 $result->addRecord($tagToAdd);
             }
         }
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ 
+            . ' ' . print_r($result->toArray(), TRUE));
     
         return $result;
     }
@@ -476,25 +591,39 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
      */
     protected function _getSingleTag($_name, $_tagData = array(), $_create = TRUE)
     {
-        $name = (strlen($_name) > 40) ? substr($_name, 0, 40) : $_name;
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__
+            . ' Tag name: ' . $_name . ' / data: ' . print_r($_tagData, TRUE));
+        
+        $name = $_name;
+        if (isset($_tagData['name'])) {
+            $_tagData['name'] = $name;
+        }
         
         $tag = NULL;
-        try {
-            $tag = Tinebase_Tags::getInstance()->getTagByName($name, NULL, 'Tinebase', TRUE);
         
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
-                ' Added existing tag ' . $name . ' to record.');
-            
-        } catch (Tinebase_Exception_NotFound $tenf) {
-            if ($_create) {
-                $tagData = (! empty($_tagData)) ? $_tagData : array(
-                    'name'          => $name,
-                );
-                $tag = $this->_createTag($tagData);
-            } else {
-                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
-                    . ' Do not create shared tag (option not set)');
+        if (isset($_tagData['id'])) {
+            try {
+                $tag = Tinebase_Tags::getInstance()->get($_tagData['id']);
+                return $tag;
+            } catch (Tinebase_Exception_NotFound $tenf) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                    . ' Could not find tag by id: ' . $_tagData['id']);
             }
+        }
+        
+        try {
+            $tag = Tinebase_Tags::getInstance()->getTagByName($name, Tinebase_Model_TagRight::USE_RIGHT, NULL);
+            return $tag;
+        } catch (Tinebase_Exception_NotFound $tenf) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                . ' Could not find tag by name: ' . $name);
+        }
+        
+        if ($_create) {
+            $tagData = (! empty($_tagData)) ? $_tagData : array(
+                'name' => $name,
+            );
+            $tag = $this->_createTag($tagData);
         }
         
         return $tag;
@@ -514,27 +643,32 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
         $description  = substr((isset($_tagData['description'])) ? $_tagData['description'] : $_tagData['name'] . ' (imported)', 0, 50);
         $type         = (isset($_tagData['type']) && ! empty($_tagData['type'])) ? $_tagData['type'] : Tinebase_Model_Tag::TYPE_SHARED;
         $color        = (isset($_tagData['color'])) ? $_tagData['color'] : '#ffffff';
-                
+        
         $newTag = new Tinebase_Model_Tag(array(
             'name'          => $_tagData['name'],
             'description'   => $description,
             'type'          => strtolower($type),
             'color'         => $color,
+            'type'          => $type,
         ));
         
-        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Creating new shared tag: ' . $_tagData['name']);
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
+            . ' Creating new ' . $type . ' tag: ' . $_tagData['name']);
         
         $tag = Tinebase_Tags::getInstance()->createTag($newTag, TRUE);
         
-        $right = new Tinebase_Model_TagRight(array(
-            'tag_id'        => $newTag->getId(),
-            'account_type'  => Tinebase_Acl_Rights::ACCOUNT_TYPE_ANYONE,
-            'account_id'    => 0,
-            'view_right'    => TRUE,
-            'use_right'     => TRUE,
-        ));
-        Tinebase_Tags::getInstance()->setRights($right);
-        Tinebase_Tags::getInstance()->setContexts(array('any'), $newTag->getId());
+        // @todo should be moved to Tinebase_Tags / always be done for all kinds of tags on create
+        if ($type === Tinebase_Model_Tag::TYPE_SHARED) {
+            $right = new Tinebase_Model_TagRight(array(
+                'tag_id'        => $newTag->getId(),
+                'account_type'  => Tinebase_Acl_Rights::ACCOUNT_TYPE_ANYONE,
+                'account_id'    => 0,
+                'view_right'    => TRUE,
+                'use_right'     => TRUE,
+            ));
+            Tinebase_Tags::getInstance()->setRights($right);
+            Tinebase_Tags::getInstance()->setContexts(array('any'), $newTag->getId());
+        }
         
         return $tag;
     }
@@ -550,16 +684,29 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
         
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
             ' Trying to add ' . count($autotags) . ' autotag(s) to record.');
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . print_r($autotags, TRUE));
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . print_r($_record->toArray(), TRUE));
         
         $tags = ($_record->tags instanceof Tinebase_Record_RecordSet) ? $_record->tags : new Tinebase_Record_RecordSet('Tinebase_Model_Tag');
         foreach ($autotags as $tagData) {
-            $tagData = $this->_doAutoTagReplacements($tagData);
-            $tag = $this->_getSingleTag($tagData['name'], $tagData);
+            if (is_string($tagData)) {
+                try {
+                    $tag = Tinebase_Tags::getInstance()->get($tagData);
+                } catch (Tinebase_Exception_NotFound $tenf) {
+                    if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $tenf);
+                    $tag = NULL;
+                }
+            } else {
+                $tagData = $this->_doAutoTagReplacements($tagData);
+                $tag = $this->_getSingleTag($tagData['name'], $tagData);
+            }
             if ($tag !== NULL) {
                 $tags->addRecord($tag);
             }
         }
         $_record->tags = $tags;
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . print_r($tags->toArray(), TRUE));
     }
     
     /**
@@ -603,6 +750,7 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
     {
         $autotags = (array_key_exists('tag', $this->_options['autotags']) && count($this->_options['autotags']) == 1) 
             ? $this->_options['autotags']['tag'] : $this->_options['autotags'];
+
         $autotags = (array_key_exists('name', $autotags)) ? array($autotags) : $autotags;
         
         if (array_key_exists('tag', $autotags)) {
@@ -628,6 +776,7 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
     protected function _importAndResolveConflict(Tinebase_Record_Abstract $_record, $_resolveStrategy = NULL)
     {
         if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' resolveStrategy: ' . $_resolveStrategy);
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . print_r($_record->toArray(), TRUE));
         
         switch ($_resolveStrategy) {
             case 'mergeTheirs':
@@ -659,7 +808,7 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
     protected function _handleImportException(Exception $_e, $_recordIndex, $_record = NULL)
     {
         if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' ' . $_e->getMessage());
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $_e->getTraceAsString());
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . $_e->getTraceAsString());
         
         if ($_e instanceof Tinebase_Exception_Duplicate) {
             $this->_importResult['duplicatecount']++;
@@ -672,14 +821,25 @@ abstract class Tinebase_Import_Abstract implements Tinebase_Import_Interface
                 'clientRecord' => ($_record !== NULL && $_record instanceof Tinebase_Record_Abstract) ? $_record->toArray() 
                     : (is_array($_record) ? $_record : array()),
             );
-        }        
+        }
 
         $this->_importResult['exceptions']->addRecord(new Tinebase_Model_ImportException(array(
-            'code'            => $_e->getCode(),
-            'message'        => $_e->getMessage(),
+            'code'          => $_e->getCode(),
+            'message'       => $_e->getMessage(),
             'exception'     => $exception,
             'index'         => $_recordIndex,
         )));
+    }
+    
+    /**
+     * log import result
+     */
+    protected function _logImportResult()
+    {
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
+            . ' Import finished. (total: ' . $this->_importResult['totalcount'] 
+            . ' fail: ' . $this->_importResult['failcount'] 
+            . ' duplicates: ' . $this->_importResult['duplicatecount']. ')');
     }
     
     /**

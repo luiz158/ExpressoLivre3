@@ -4,7 +4,7 @@
  * 
  * @package     ActiveSync
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2010-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2010-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Cornelius Weiss <c.weiss@metaways.de>
  */
 
@@ -29,24 +29,280 @@ class ActiveSync_Controller_CalendarTests extends ActiveSync_TestCase
     
     protected $_controllerName = 'ActiveSync_Controller_Calendar';
     
-    protected $_specialFolderName = 'calendar-root';
-    
-    protected $_class = ActiveSync_Controller::CLASS_CALENDAR;
+    protected $_class = Syncroton_Data_Factory::CLASS_CALENDAR;
     
     /**
      * @var array test objects
      */
     protected $objects = array();
     
-    protected $_testXMLInput = '<!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/"><Sync xmlns="uri:AirSync" xmlns:Calendar="uri:Calendar"><Collections><Collection><Class>Calendar</Class><SyncKey>9</SyncKey><CollectionId>41</CollectionId><DeletesAsMoves/><GetChanges/><WindowSize>50</WindowSize><Options><FilterType>5</FilterType></Options><Commands><Change><ServerId>6de7cb687964dc6eea109cd81750177979362217</ServerId><ApplicationData><Calendar:Timezone>xP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAFAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAFAAIAAAAAAAAAxP///w==</Calendar:Timezone><Calendar:AllDayEvent>0</Calendar:AllDayEvent><Calendar:BusyStatus>2</Calendar:BusyStatus><Calendar:DtStamp>20101125T150537Z</Calendar:DtStamp><Calendar:EndTime>20101123T160000Z</Calendar:EndTime><Calendar:Sensitivity>0</Calendar:Sensitivity><Calendar:Subject>Repeat</Calendar:Subject><Calendar:StartTime>20101123T130000Z</Calendar:StartTime><Calendar:UID>6de7cb687964dc6eea109cd81750177979362217</Calendar:UID><Calendar:MeetingStatus>1</Calendar:MeetingStatus><Calendar:Attendees><Calendar:Attendee><Calendar:Name>Lars Kneschke</Calendar:Name><Calendar:Email>lars@kneschke.de</Calendar:Email></Calendar:Attendee></Calendar:Attendees><Calendar:Recurrence><Calendar:Type>0</Calendar:Type><Calendar:Interval>1</Calendar:Interval><Calendar:Until>20101128T225959Z</Calendar:Until></Calendar:Recurrence><Calendar:Exceptions><Calendar:Exception><Calendar:Deleted>0</Calendar:Deleted><Calendar:ExceptionStartTime>20101125T130000Z</Calendar:ExceptionStartTime><Calendar:StartTime>20101125T140000Z</Calendar:StartTime><Calendar:EndTime>20101125T170000Z</Calendar:EndTime><Calendar:Subject>Repeat mal anders</Calendar:Subject><Calendar:BusyStatus>2</Calendar:BusyStatus><Calendar:AllDayEvent>0</Calendar:AllDayEvent></Calendar:Exception><Calendar:Exception><Calendar:Deleted>1</Calendar:Deleted><Calendar:ExceptionStartTime>20101124T130000Z</Calendar:ExceptionStartTime></Calendar:Exception></Calendar:Exceptions><Calendar:Reminder>15</Calendar:Reminder></ApplicationData></Change></Commands></Collection></Collections></Sync>';
+    protected $_testXMLInput = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
+    <Sync xmlns="uri:AirSync" xmlns:Calendar="uri:Calendar">
+        <Collections>
+            <Collection>
+                <Class>Calendar</Class>
+                <SyncKey>9</SyncKey>
+                <CollectionId>41</CollectionId>
+                <DeletesAsMoves/>
+                <GetChanges/>
+                <WindowSize>50</WindowSize>
+                <Options><FilterType>5</FilterType></Options>
+                <Commands>
+                    <Change>
+                        <ServerId>6de7cb687964dc6eea109cd81750177979362217</ServerId>
+                        <ApplicationData>
+                            <Calendar:Timezone>xP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAFAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAFAAIAAAAAAAAAxP///w==</Calendar:Timezone>
+                            <Calendar:AllDayEvent>0</Calendar:AllDayEvent>
+                            <Calendar:BusyStatus>2</Calendar:BusyStatus>
+                            <Calendar:DtStamp>20121125T150537Z</Calendar:DtStamp>
+                            <Calendar:EndTime>20121123T160000Z</Calendar:EndTime>
+                            <Calendar:Sensitivity>0</Calendar:Sensitivity>
+                            <Calendar:Subject>Repeat</Calendar:Subject>
+                            <Calendar:StartTime>20121123T130000Z</Calendar:StartTime>
+                            <Calendar:UID>6de7cb687964dc6eea109cd81750177979362217</Calendar:UID>
+                            <Calendar:MeetingStatus>1</Calendar:MeetingStatus>
+                            <Calendar:Attendees>
+                                <Calendar:Attendee>
+                                    <Calendar:Name>Lars Kneschke</Calendar:Name>
+                                    <Calendar:Email>lars@kneschke.de</Calendar:Email>
+                                </Calendar:Attendee>
+                            </Calendar:Attendees>
+                            <Calendar:Recurrence>
+                                <Calendar:Type>0</Calendar:Type><Calendar:Interval>1</Calendar:Interval><Calendar:Until>20121128T225959Z</Calendar:Until>
+                            </Calendar:Recurrence>
+                            <Calendar:Exceptions>
+                                <Calendar:Exception>
+                                    <Calendar:Deleted>0</Calendar:Deleted><Calendar:ExceptionStartTime>20121125T130000Z</Calendar:ExceptionStartTime><Calendar:StartTime>20121125T140000Z</Calendar:StartTime><Calendar:EndTime>20121125T170000Z</Calendar:EndTime><Calendar:Subject>Repeat mal anders</Calendar:Subject><Calendar:BusyStatus>2</Calendar:BusyStatus><Calendar:AllDayEvent>0</Calendar:AllDayEvent>
+                                </Calendar:Exception>
+                                <Calendar:Exception>
+                                    <Calendar:Deleted>1</Calendar:Deleted><Calendar:ExceptionStartTime>20121124T130000Z</Calendar:ExceptionStartTime></Calendar:Exception>
+                                </Calendar:Exceptions>
+                            <Calendar:Reminder>15</Calendar:Reminder>
+                            <Body xmlns="uri:AirSyncBase"><Type>1</Type><Data>Hello</Data></Body>
+                        </ApplicationData>
+                    </Change>
+                </Commands>
+            </Collection>
+        </Collections>
+    </Sync>';
     
-    protected $_testXMLInput_palmPreV12 = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/"><Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase" xmlns:Calendar="uri:Calendar"><Collections><Collection><Class>Calendar</Class><SyncKey>345</SyncKey><CollectionId>calendar-root</CollectionId><DeletesAsMoves/><GetChanges/><WindowSize>50</WindowSize><Options><FilterType>4</FilterType><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type></AirSyncBase:BodyPreference></Options><Commands><Change><ServerId>3452c1dd3f21d1c12589e517f0c6a928137113a4</ServerId><ApplicationData><AirSyncBase:Body><AirSyncBase:Type>1</AirSyncBase:Type><AirSyncBase:Data>test beschreibung zeile 1&#13;
+    protected $_testXMLInput_palmPreV12 = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
+    <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase" xmlns:Calendar="uri:Calendar">
+        <Collections>
+            <Collection>
+                <Class>Calendar</Class>
+                <SyncKey>345</SyncKey>
+                <CollectionId>calendar-root</CollectionId>
+                <DeletesAsMoves/>
+                <GetChanges/>
+                <WindowSize>50</WindowSize>
+                <Options>
+                    <FilterType>4</FilterType><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type></AirSyncBase:BodyPreference>
+                </Options>
+                <Commands>
+                    <Change>
+                        <ServerId>3452c1dd3f21d1c12589e517f0c6a928137113a4</ServerId>
+                        <ApplicationData>
+                            <AirSyncBase:Body>
+                                <AirSyncBase:Type>1</AirSyncBase:Type>
+                                <AirSyncBase:Data>test beschreibung zeile 1&#13;
 Zeile 2&#13;
-Zeile 3</AirSyncBase:Data></AirSyncBase:Body><Calendar:Timezone>xP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAFAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAFAAIAAAAAAAAAxP///w==</Calendar:Timezone><Calendar:UID>3452c1dd3f21d1c12589e517f0c6a928137113a4</Calendar:UID><Calendar:DtStamp>20101104T070652Z</Calendar:DtStamp><Calendar:Subject>GM straussberg2</Calendar:Subject><Calendar:MeetingStatus>1</Calendar:MeetingStatus><Calendar:OrganizerName>Nadine Blau</Calendar:OrganizerName><Calendar:OrganizerEmail>meine@mail.com</Calendar:OrganizerEmail><Calendar:Attendees><Calendar:Attendee><Calendar:Name>Nadine Blau</Calendar:Name><Calendar:Email>meine@mail.com</Calendar:Email></Calendar:Attendee></Calendar:Attendees><Calendar:BusyStatus>0</Calendar:BusyStatus><Calendar:AllDayEvent>1</Calendar:AllDayEvent><Calendar:StartTime>20101103T230000Z</Calendar:StartTime><Calendar:EndTime>20101106T230000Z</Calendar:EndTime><Calendar:Sensitivity>0</Calendar:Sensitivity></ApplicationData></Change></Commands></Collection></Collections></Sync>';
+Zeile 3</AirSyncBase:Data>
+                            </AirSyncBase:Body>
+                            <Calendar:Timezone>xP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAFAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAFAAIAAAAAAAAAxP///w==</Calendar:Timezone>
+                            <Calendar:UID>3452c1dd3f21d1c12589e517f0c6a928137113a4</Calendar:UID>
+                            <Calendar:DtStamp>20101104T070652Z</Calendar:DtStamp>
+                            <Calendar:Subject>GM straussberg2</Calendar:Subject>
+                            <Calendar:MeetingStatus>1</Calendar:MeetingStatus>
+                            <Calendar:OrganizerName>Nadine Blau</Calendar:OrganizerName>
+                            <Calendar:OrganizerEmail>meine@mail.com</Calendar:OrganizerEmail>
+                            <Calendar:Attendees><Calendar:Attendee><Calendar:Name>Nadine Blau</Calendar:Name><Calendar:Email>meine@mail.com</Calendar:Email></Calendar:Attendee></Calendar:Attendees>
+                            <Calendar:BusyStatus>0</Calendar:BusyStatus>
+                            <Calendar:AllDayEvent>1</Calendar:AllDayEvent>
+                            <Calendar:StartTime>20101103T230000Z</Calendar:StartTime>
+                            <Calendar:EndTime>20101106T230000Z</Calendar:EndTime>
+                            <Calendar:Sensitivity>0</Calendar:Sensitivity>
+                        </ApplicationData>
+                    </Change>
+                </Commands>
+            </Collection>
+        </Collections>
+    </Sync>';
     
-    protected $_testXMLInput_DailyRepeatingEvent = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/"><Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase" xmlns:Calendar="uri:Calendar"><Collections><Collection><Class>Calendar</Class><SyncKey>8</SyncKey><CollectionId>calendar-root</CollectionId><DeletesAsMoves/><GetChanges/><WindowSize>100</WindowSize><Options><FilterType>4</FilterType><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize></AirSyncBase:BodyPreference><AirSyncBase:BodyPreference><AirSyncBase:Type>3</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize><AirSyncBase:AllOrNone>1</AirSyncBase:AllOrNone></AirSyncBase:BodyPreference><Conflict>1</Conflict></Options><Commands><Add><ClientId>1073741902</ClientId><ApplicationData><Calendar:Timezone>xP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAFAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAFAAIAAAAAAAAAxP///w==</Calendar:Timezone><Calendar:AllDayEvent>0</Calendar:AllDayEvent><Calendar:BusyStatus>2</Calendar:BusyStatus><Calendar:DtStamp>20101224T082738Z</Calendar:DtStamp><Calendar:EndTime>20101220T100000Z</Calendar:EndTime><Calendar:MeetingStatus>0</Calendar:MeetingStatus><Calendar:Reminder>15</Calendar:Reminder><Calendar:Sensitivity>0</Calendar:Sensitivity><Calendar:Subject>Tdfffdd</Calendar:Subject><Calendar:StartTime>20101220T090000Z</Calendar:StartTime><Calendar:UID>040000008200E00074C5B7101A82E00800000000DCA959CF1C69F280D15448CF43450B301000000019B5FB15984956377D4EBEFE125A8EF6</Calendar:UID><Calendar:Recurrence><Calendar:Until>20101222T230000Z</Calendar:Until><Calendar:Interval>1</Calendar:Interval><Calendar:Type>0</Calendar:Type></Calendar:Recurrence></ApplicationData></Add></Commands></Collection></Collections></Sync>';    
+    protected $_testXMLInput_DailyRepeatingEvent = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
+    <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase" xmlns:Calendar="uri:Calendar">
+        <Collections>
+            <Collection>
+                <Class>Calendar</Class>
+                <SyncKey>8</SyncKey>
+                <CollectionId>calendar-root</CollectionId>
+                <DeletesAsMoves/><GetChanges/>
+                <WindowSize>100</WindowSize>
+                <Options><FilterType>4</FilterType><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize></AirSyncBase:BodyPreference><AirSyncBase:BodyPreference><AirSyncBase:Type>3</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize><AirSyncBase:AllOrNone>1</AirSyncBase:AllOrNone></AirSyncBase:BodyPreference><Conflict>1</Conflict></Options>
+                <Commands>
+                    <Add>
+                        <ClientId>1073741902</ClientId>
+                        <ApplicationData><Calendar:Timezone>xP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAFAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAFAAIAAAAAAAAAxP///w==</Calendar:Timezone>
+                            <Calendar:AllDayEvent>0</Calendar:AllDayEvent>
+                            <Calendar:BusyStatus>2</Calendar:BusyStatus>
+                            <Calendar:DtStamp>20101224T082738Z</Calendar:DtStamp>
+                            <Calendar:EndTime>20101220T100000Z</Calendar:EndTime>
+                            <Calendar:MeetingStatus>0</Calendar:MeetingStatus>
+                            <Calendar:Reminder>15</Calendar:Reminder>
+                            <Calendar:Sensitivity>0</Calendar:Sensitivity>
+                            <Calendar:Subject>Tdfffdd</Calendar:Subject>
+                            <Calendar:StartTime>20101220T090000Z</Calendar:StartTime>
+                            <Calendar:UID>040000008200E00074C5B7101A82E00800000000DCA959CF1C69F280D15448CF43450B301000000019B5FB15984956377D4EBEFE125A8EF6</Calendar:UID>
+                            <Calendar:Recurrence>
+                                <Calendar:Until>20101222T230000Z</Calendar:Until>
+                                <Calendar:Interval>1</Calendar:Interval>
+                                <Calendar:Type>0</Calendar:Type>
+                            </Calendar:Recurrence>
+                        </ApplicationData>
+                    </Add>
+                </Commands>
+            </Collection>
+        </Collections>
+    </Sync>';
+
+    protected $_testXMLInput_SamsungGalaxyStatus = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
+    <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase" xmlns:Calendar="uri:Calendar">
+        <Collections>
+            <Collection>
+                <Class>Calendar</Class>
+                <SyncKey>20</SyncKey>
+                <CollectionId>calendar-root</CollectionId>
+                <DeletesAsMoves/>
+                <GetChanges/>
+                <WindowSize>5</WindowSize>
+                <Options><FilterType>4</FilterType><BodyPreference xmlns="uri:AirSyncBase"><Type>1</Type><TruncationSize>400000</TruncationSize></BodyPreference></Options>
+                <Commands>
+                    <Change>
+                        <ServerId>b2b0593bc21c89e5d07edb7b5caa56ff7e243e92</ServerId>
+                        <ApplicationData>
+                            <Timezone xmlns="uri:Calendar">xP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAEAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAFAAIAAAAAAAAAxP///w==</Timezone>
+                            <AllDayEvent xmlns="uri:Calendar">0</AllDayEvent>
+                            <StartTime xmlns="uri:Calendar">20120229T120000Z</StartTime>
+                            <EndTime xmlns="uri:Calendar">20120229T140000Z</EndTime>
+                            <DtStamp xmlns="uri:Calendar">20120228T093153Z</DtStamp>
+                            <Subject xmlns="uri:Calendar">testtermin</Subject>
+                            <Sensitivity xmlns="uri:Calendar">0</Sensitivity>
+                            <OrganizerEmail xmlns="uri:Calendar">user2@example.com</OrganizerEmail>
+                            <Reminder xmlns="uri:Calendar">30</Reminder>
+                            <UID xmlns="uri:Calendar">2b4a047d3f71b4d47d2d3907f4a27d70f650cd30</UID>
+                            <Attendees xmlns="uri:Calendar">
+                                <Attendee><Name>user1@example.com</Name><Email>user1@example.com</Email><AttendeeType>1</AttendeeType></Attendee>
+                                <Attendee><Name>user2@example.com</Name><Email>user2@example.com</Email><AttendeeType>1</AttendeeType></Attendee>
+                                <Attendee><Name>user3@example.com</Name><Email>user3@example.com</Email><AttendeeType>1</AttendeeType></Attendee>
+                            </Attendees>
+                            <BusyStatus xmlns="uri:Calendar">0</BusyStatus>
+                            <MeetingStatus xmlns="uri:Calendar">3</MeetingStatus>
+                        </ApplicationData>
+                    </Change>
+                </Commands>
+            </Collection>
+        </Collections>
+    </Sync>';
     
-    protected $_testXMLOutput = '<!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/"><Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase" xmlns:Calendar="uri:Calendar"><Collections><Collection><Class>Calendar</Class><SyncKey>17</SyncKey><CollectionId>calendar-root</CollectionId><Commands><Change><ClientId>1</ClientId><ApplicationData/></Change></Commands></Collection></Collections></Sync>';
+    protected $_testXMLInputOutlook13 = '<?xml version="1.0" encoding="utf-8"?>
+    <!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
+    <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase" xmlns:Calendar="uri:Calendar">
+      <Collections>
+        <Collection>
+          <SyncKey>5</SyncKey>
+          <CollectionId>calendar-root</CollectionId>
+          <DeletesAsMoves>0</DeletesAsMoves>
+          <GetChanges>0</GetChanges>
+          <WindowSize>512</WindowSize>
+          <Options>
+            <FilterType>0</FilterType>
+            <BodyPreference xmlns="uri:AirSyncBase">
+              <Type>2</Type>
+              <AllOrNone>1</AllOrNone>
+            </BodyPreference>
+          </Options>
+          <Commands>
+            <Change>
+              <ServerId>d8a9cecb073736aa78c95a249f383123cc03365b</ServerId>
+              <ApplicationData>
+                <Timezone xmlns="uri:Calendar">xP///1cALgAgAEUAdQByAG8AcABlACAAUwB0AGEAbgBkAGEAcgBkACAAVABpAG0AZQAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAFAAMAAAAAAAAAAAAAAFcALgAgAEUAdQByAG8AcABlACAARABhAHkAbABpAGcAaAB0ACAAVABpAG0AZQAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAFAAIAAAAAAAAAxP///w==</Timezone>
+                <DtStamp xmlns="uri:Calendar">20120914T125503Z</DtStamp>
+                <StartTime xmlns="uri:Calendar">20120914T140000Z</StartTime>
+                <Subject xmlns="uri:Calendar">TEST9</Subject>
+                <UID xmlns="uri:Calendar">fd4b68a5871aa0082284e9bc5664a35da207b75b</UID>
+                <OrganizerName xmlns="uri:Calendar">unittest@tine20.org</OrganizerName>
+                <OrganizerEmail xmlns="uri:Calendar">unittest@tine20.org</OrganizerEmail>
+                <Attendees xmlns="uri:Calendar">
+                  <Attendee>
+                    <Email>unittest@tine20.org</Email>
+                    <Name>Admin Account, Tine 2.0</Name>
+                    <AttendeeStatus>3</AttendeeStatus>
+                    <AttendeeType>1</AttendeeType>
+                  </Attendee>
+                  <Attendee>
+                    <Email>pwulf@tine20.org</Email>
+                    <Name>Wulf, Paul</Name>
+                    <AttendeeStatus>0</AttendeeStatus>
+                    <AttendeeType>1</AttendeeType>
+                  </Attendee>
+                </Attendees>
+                <EndTime xmlns="uri:Calendar">20120914T143000Z</EndTime>
+                <Recurrence xmlns="uri:Calendar">
+                  <Type>0</Type>
+                  <Interval>1</Interval>
+                  <Occurrences>3</Occurrences>
+                </Recurrence>
+                <Exceptions xmlns="uri:Calendar">
+                  <Exception>
+                    <ExceptionStartTime>20120916T140000Z</ExceptionStartTime>
+                    <StartTime>20120916T140000Z</StartTime>
+                    <DtStamp>20120914T125503Z</DtStamp>
+                    <EndTime>20120916T143000Z</EndTime>
+                    <Sensitivity>0</Sensitivity>
+                    <BusyStatus>2</BusyStatus>
+                    <Attendees>
+                      <Attendee>
+                        <Email>unittest@tine20.org</Email>
+                        <Name>Admin Account, Tine 2.0</Name>
+                        <AttendeeStatus>0</AttendeeStatus>
+                        <AttendeeType>1</AttendeeType>
+                      </Attendee>
+                      <Attendee>
+                        <Email>unittest@tine20.org</Email>
+                        <Name>Admin Account, Tine 2.0</Name>
+                        <AttendeeStatus>3</AttendeeStatus>
+                        <AttendeeType>1</AttendeeType>
+                      </Attendee>
+                      <Attendee>
+                        <Email>pwulf@tine20.org</Email>
+                        <Name>Wulf, Paul</Name>
+                        <AttendeeStatus>4</AttendeeStatus>
+                        <AttendeeType>1</AttendeeType>
+                      </Attendee>
+                    </Attendees>
+                  </Exception>
+                </Exceptions>
+                <Sensitivity xmlns="uri:Calendar">0</Sensitivity>
+                <AllDayEvent xmlns="uri:Calendar">0</AllDayEvent>
+                <MeetingStatus xmlns="uri:Calendar">1</MeetingStatus>
+                <ResponseRequested xmlns="uri:Calendar">1</ResponseRequested>
+              </ApplicationData>
+            </Change>
+          </Commands>
+        </Collection>
+      </Collections>
+    </Sync>';
+    
+    protected $_testXMLMeetingResponse = '<?xml version="1.0" encoding="utf-8"?>
+    <!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
+    <MeetingResponse xmlns="uri:MeetingResponse" xmlns:Search="uri:Search">
+        <Request>
+            <UserResponse>2</UserResponse>
+            <CollectionId>17</CollectionId>
+            <RequestId>f0c79775b6b44be446f91187e24566aa1c5d06ab</RequestId>
+            <InstanceId>20121125T130000Z</InstanceId>
+        </Request>
+    </MeetingResponse>';
     
     /**
      * Runs the test methods of this class.
@@ -65,369 +321,322 @@ Zeile 3</AirSyncBase:Data></AirSyncBase:Body><Calendar:Timezone>xP///wAAAAAAAAAA
      * @see ActiveSync/ActiveSync_TestCase::setUp()
      */
     protected function setUp()
-    {   	
-        parent::setUp();	
+    {
+        parent::setUp();
         
         // replace email to make current user organizer and attendee
         $this->_testXMLInput = str_replace('lars@kneschke.de', Tinebase_Core::getUser()->accountEmailAddress, $this->_testXMLInput);
-        
-        $event = new Calendar_Model_Event(array(
-            'uid'           => Tinebase_Record_Abstract::generateUID(),
-            'summary'       => 'SyncTest',
-            'dtstart'       => Tinebase_DateTime::now()->addMonth(1)->toString(Tinebase_Record_Abstract::ISO8601LONG), //'2009-04-25 18:00:00',
-            'dtend'         => Tinebase_DateTime::now()->addMonth(1)->addHour(1)->toString(Tinebase_Record_Abstract::ISO8601LONG), //'2009-04-25 18:30:00',
-            'originator_tz' => 'Europe/Berlin',
-            'container_id'  => $this->_getContainerWithSyncGrant()->getId(),
-            Tinebase_Model_Grants::GRANT_EDIT     => true,
-            'attendee'      => new Tinebase_Record_RecordSet('Calendar_Model_Attender', array(
-                array(
-                    'user_id' => Tinebase_Core::getUser()->contact_id,
-                    'user_type' => Calendar_Model_Attender::USERTYPE_USER,
-                    'status' => Calendar_Model_Attender::STATUS_ACCEPTED
-                )
-            ))
-        ));
-        
-        $event = Calendar_Controller_Event::getInstance()->create($event);
-        
-        $this->objects['event'] = $event;
-        
-        $event2MonthsBack = new Calendar_Model_Event(array(
-            'uid'           => Tinebase_Record_Abstract::generateUID(),
-            'summary'       => 'SyncTest',
-            'dtstart'       => Tinebase_DateTime::now()->subMonth(2)->toString(Tinebase_Record_Abstract::ISO8601LONG), //'2009-04-25 18:00:00',
-            'dtend'         => Tinebase_DateTime::now()->subMonth(2)->addHour(1)->toString(Tinebase_Record_Abstract::ISO8601LONG), //'2009-04-25 18:30:00',
-            'originator_tz' => 'Europe/Berlin',
-            'container_id'  => $this->_getContainerWithSyncGrant()->getId(),
-            Tinebase_Model_Grants::GRANT_EDIT     => true,
-        ));
-        
-        $event = Calendar_Controller_Event::getInstance()->create($event2MonthsBack);
-        
-        $this->objects['event2MonthsBack'] = $event;
-        
-        $eventDaily = new Calendar_Model_Event(array(
-            'uid'           => Tinebase_Record_Abstract::generateUID(),
-            'summary'       => 'SyncTest',
-            'dtstart'       => Tinebase_DateTime::now()->addMonth(1)->toString(Tinebase_Record_Abstract::ISO8601LONG), //'2009-05-25 18:00:00',
-            'dtend'         => Tinebase_DateTime::now()->addMonth(1)->addHour(1)->toString(Tinebase_Record_Abstract::ISO8601LONG), //'2009-05-25 19:00:00',
-            'originator_tz' => 'Europe/Berlin',
-            'rrule'         => 'FREQ=DAILY;INTERVAL=1;UNTIL=' . Tinebase_DateTime::now()->addMonth(1)->addDay(6)->setHour(22)->setMinute(59)->setSecond(59)->toString(Tinebase_Record_Abstract::ISO8601LONG), //2009-05-31 22:59:59',
-            'container_id'  => $this->_getContainerWithSyncGrant()->getId(),
-            Tinebase_Model_Grants::GRANT_EDIT     => true,
-        ));
-                
-        $eventDaily = Calendar_Controller_Event::getInstance()->create($eventDaily);
-        
-        // compute recurset
-        $recurSet = Calendar_Model_Rrule::computeRecurrenceSet($eventDaily, new Tinebase_Record_RecordSet('Calendar_Model_Event'), $eventDaily->dtstart, $eventDaily->rrule_until);
-        
-        // first deleted instance
-        Calendar_Controller_Event::getInstance()->createRecurException($recurSet[0], true);
-        
-        // second deleted instance
-        Calendar_Controller_Event::getInstance()->createRecurException($recurSet[1], true);
-        
-        // first exception instance
-        $recurSet[2]->dtstart->addHour(2);
-        $recurSet[2]->dtend->addHour(2);
-        $recurSet[2]->summary = 'Test Exception 1';
-        Calendar_Controller_Event::getInstance()->createRecurException($recurSet[2]);
-        
-        // first exception instance
-        $recurSet[3]->dtstart->addHour(3);
-        $recurSet[3]->dtend->addHour(3);
-        $recurSet[3]->summary = 'Test Exception 2';
-        Calendar_Controller_Event::getInstance()->createRecurException($recurSet[3]);
-        
-        // reread event from database again
-        $eventDaily = Calendar_Controller_Event::getInstance()->get($eventDaily);        
-        #var_dump($eventDaily->toArray());
-        
-        $this->objects['eventDaily'] = $eventDaily;
-        
-        Tinebase_Core::getPreference('ActiveSync')->setValue(ActiveSync_Preference::DEFAULTCALENDAR, $this->_getContainerWithSyncGrant()->getId());
-        
-        ########### define test filter
-        $filterBackend = new Tinebase_PersistentFilter_Backend_Sql();
-        
-        try {
-            $filter = $filterBackend->getByProperty('Calendar Sync Test', 'name');
-        } catch (Tinebase_Exception_NotFound $e) {
-            $filter = new Tinebase_Model_PersistentFilter(array(
-                'application_id'    => Tinebase_Application::getInstance()->getApplicationByName('Calendar')->getId(),
-                'account_id'        => Tinebase_Core::getUser()->getId(),
-                'model'             => 'Calendar_Model_EventFilter',
-                'filters'           => array(array(
-                    'field'     => 'container_id', 
-                    'operator'  => 'equals', 
-                    'value'     => $this->_getContainerWithSyncGrant()->getId()
-                )),
-                'name'              => 'Calendar Sync Test',
-                'description'       => 'Created by unit test'
-            ));
-            
-            $filter = $filterBackend->create($filter);
+    }
+    
+    public function testCreateEntry($syncrotonFolder = null)
+    {
+        if ($syncrotonFolder === null) {
+            $syncrotonFolder = $this->testCreateFolder();
         }
-        $this->objects['filter'] = $filter;
-        
-        
-        ########### define test devices
-        $palm = ActiveSync_Backend_DeviceTests::getTestDevice(Syncope_Model_Device::TYPE_WEBOS);
-        $palm->owner_id     = $this->_testUser->getId();
-        $palm->calendarfilter_id = $this->objects['filter']->getId();
-        $this->objects['deviceWebOS']   = ActiveSync_Controller_Device::getInstance()->create($palm);
-        
-        $iphone = ActiveSync_Backend_DeviceTests::getTestDevice(Syncope_Model_Device::TYPE_IPHONE);
-        $iphone->owner_id   = $this->_testUser->getId();
-        $iphone->calendarfilter_id = $this->objects['filter']->getId();
-        $this->objects['deviceIPhone'] = ActiveSync_Controller_Device::getInstance()->create($iphone);
-    }
-
-    /**
-     * test xml generation for IPhone
-     */
-    public function testAppendXml()
-    {
-        $imp                   = new DOMImplementation();
-        
-        $dtd                   = $imp->createDocumentType('AirSync', "-//AIRSYNC//DTD AirSync//EN", "http://www.microsoft.com/");
-        $testDom               = $imp->createDocument('uri:AirSync', 'Sync', $dtd);
-        $testDom->formatOutput = true;
-        $testDom->encoding     = 'utf-8';
-        
-        $collections    = $testDom->documentElement->appendChild($testDom->createElementNS('uri:AirSync', 'Collections'));
-        $collection     = $collections->appendChild($testDom->createElementNS('uri:AirSync', 'Collection'));
-        $commands       = $collection->appendChild($testDom->createElementNS('uri:AirSync', 'Commands'));
-        $add            = $commands->appendChild($testDom->createElementNS('uri:AirSync', 'Add'));
-        $appData        = $add->appendChild($testDom->createElementNS('uri:AirSync', 'ApplicationData'));
-        
-        
-        $controller = new ActiveSync_Controller_Calendar($this->objects['deviceIPhone'], new Tinebase_DateTime(null, null, 'de_DE'));
-        
-        $controller->appendXML($appData, null, $this->objects['event']->getId(), array());
-        
-        // namespace === uri:Calendar
-        $endTime = $this->objects['event']->dtend->format("Ymd\THis") . 'Z';
-        $this->assertEquals($endTime, @$testDom->getElementsByTagNameNS('uri:Calendar', 'EndTime')->item(0)->nodeValue, $testDom->saveXML());
-        $this->assertEquals($this->objects['event']->uid, @$testDom->getElementsByTagNameNS('uri:Calendar', 'UID')->item(0)->nodeValue, $testDom->saveXML());
-        
-        // try to encode XML until we have wbxml tests
-        $outputStream = fopen("php://temp", 'r+');
-        $encoder = new Wbxml_Encoder($outputStream, 'UTF-8', 3);
-        $encoder->encode($testDom);
-    }
     
-    /**
-     * testAppendXml_allDayEvent
-     */
-    public function testAppendXml_allDayEvent()
-    {
-        $startDate = Tinebase_DateTime::now()->setTime(0,0,0)->addMonth(1);
-        $endDate   = Tinebase_DateTime::now()->setTime(23,59,59)->addMonth(1)->addDay(3);
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_WEBOS), Tinebase_DateTime::now());
+    
+        $xml = new SimpleXMLElement($this->_testXMLInput);
+        $syncrotonEvent = new Syncroton_Model_Event($xml->Collections->Collection->Commands->Change[0]->ApplicationData);
+    
+        $serverId = $controller->createEntry($syncrotonFolder->serverId, $syncrotonEvent);
+    
+        $syncrotonEvent = $controller->getEntry(new Syncroton_Model_SyncCollection(array('collectionId' => $syncrotonFolder->serverId)), $serverId);
+    
+        #echo '----------------' . PHP_EOL; foreach ($syncrotonEvent as $key => $value) {echo "$key => "; var_dump($value);}
         
-        $allDayEvent = new Calendar_Model_Event(array(
-            'summary'       => 'Allday SyncTest',
-            'dtstart'       => $startDate->toString(Tinebase_Record_Abstract::ISO8601LONG), //'2009-04-25 18:00:00'
-            'dtend'         => $endDate->toString(Tinebase_Record_Abstract::ISO8601LONG),   //'2009-04-25 23:59:59'
-            'is_all_day_event' => true,
-            'originator_tz' => 'Europe/Berlin',
-            'rrule'         => 'FREQ=DAILY;INTERVAL=1;UNTIL=' . Tinebase_DateTime::now()->addMonth(1)->addDay(6)->setHour(22)->setMinute(59)->setSecond(59)->toString(Tinebase_Record_Abstract::ISO8601LONG),
-            'container_id'  => $this->_getContainerWithSyncGrant()->getId(),
-            Tinebase_Model_Grants::GRANT_EDIT     => true,
-        ));
-        $allDayEvent = Calendar_Controller_Event::getInstance()->create($allDayEvent);
-        $this->objects['events']['allDayEvent'] = $allDayEvent;
+        $this->assertEquals(0,         $syncrotonEvent->allDayEvent, 'alldayEvent');
+        $this->assertEquals(2,         $syncrotonEvent->busyStatus);
+        $this->assertEquals('Repeat',  $syncrotonEvent->subject);
+        $this->assertEquals(15,        $syncrotonEvent->reminder);
+        $this->assertTrue($syncrotonEvent->endTime instanceof DateTime);
+        $this->assertTrue($syncrotonEvent->startTime instanceof DateTime);
+        $this->assertEquals('20121123T160000Z', $syncrotonEvent->endTime->format('Ymd\THis\Z'));
+        $this->assertEquals('20121123T130000Z', $syncrotonEvent->startTime->format('Ymd\THis\Z'));
+        $this->assertEquals(1, count($syncrotonEvent->attendees), 'event: ' . var_export($syncrotonEvent->attendees, TRUE));
+        $this->assertEquals(Tinebase_Core::getUser()->accountEmailAddress, $syncrotonEvent->attendees[0]->email, 'event: ' . var_export($syncrotonEvent, TRUE));
         
-        $dom     = $this->_getOutputDOMDocument();
-        $appData = $dom->getElementsByTagNameNS('uri:AirSync', 'ApplicationData')->item(0);
-
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS)); 
+        //Body
+        $this->assertTrue($syncrotonEvent->body instanceof Syncroton_Model_EmailBody);
+        $this->assertEquals('Hello', $syncrotonEvent->body->data);
         
-        $controller->appendXML($appData, null, $allDayEvent->getId(), array());
+        // Recurrence
+        $this->assertTrue($syncrotonEvent->recurrence instanceof Syncroton_Model_EventRecurrence);
+        $this->assertEquals(Syncroton_Model_EventRecurrence::TYPE_DAILY, $syncrotonEvent->recurrence->type);
+        $this->assertEquals(1, $syncrotonEvent->recurrence->interval);
+        $this->assertTrue($syncrotonEvent->recurrence->until instanceof DateTime);
+        $this->assertEquals('20121128T225959Z', $syncrotonEvent->recurrence->until->format('Ymd\THis\Z'));
         
-        #$dom->formatOutput = true; echo $dom->saveXML(); $dom->formatOutput = false;
+        // Exceptions
+        $this->assertEquals(2, count($syncrotonEvent->exceptions));
+        $this->assertTrue($syncrotonEvent->exceptions[0] instanceof Syncroton_Model_EventException);
+        $this->assertEquals(0, $syncrotonEvent->exceptions[0]->deleted, 'exception deleted');
+        $this->assertEquals('Repeat mal anders', $syncrotonEvent->exceptions[0]->subject);
+        $this->assertEquals('20121125T130000Z', $syncrotonEvent->exceptions[0]->exceptionStartTime->format('Ymd\THis\Z'));
+        $this->assertEquals('20121125T170000Z', $syncrotonEvent->exceptions[0]->endTime->format('Ymd\THis\Z'));
+        $this->assertEquals('20121125T140000Z', $syncrotonEvent->exceptions[0]->startTime->format('Ymd\THis\Z'));
         
-        # ;'20110106T000000Z'
-        $this->assertEquals($endDate->addSecond(1)->format('Ymd\THis\Z'), @$dom->getElementsByTagNameNS('uri:Calendar', 'EndTime')->item(0)->nodeValue, $dom->saveXML());
-        // check that no Exceptions tag is set
-        $this->assertEquals(0,                                            $dom->getElementsByTagNameNS('uri:Calendar', 'Exceptions')->length);
+        $this->assertEquals(1, $syncrotonEvent->exceptions[1]->deleted);
+        $this->assertEquals('20121124T130000Z', $syncrotonEvent->exceptions[1]->exceptionStartTime->format('Ymd\THis\Z'));
+        
+        return array($serverId, $syncrotonEvent);
     }
     
-    /**
-     * test xml generation for IPhone
-     * 
-     * FIXME fix this test! -> seems to fail depending on the current time / date 
-     */
-    public function testAppendXml_dailyEvent()
+    public function testCreateEntryPalmPreV12($syncrotonFolder = null)
     {
-        $imp                   = new DOMImplementation();
+        if ($syncrotonFolder === null) {
+            $syncrotonFolder = $this->testCreateFolder();
+        }
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), Tinebase_DateTime::now());
+    
+        $xml = new SimpleXMLElement($this->_testXMLInput_palmPreV12);
+        $syncrotonEvent = new Syncroton_Model_Event($xml->Collections->Collection->Commands->Change[0]->ApplicationData);
+    
+        $serverId = $controller->createEntry($syncrotonFolder->serverId, $syncrotonEvent);
+    
+        $syncrotonEvent = $controller->getEntry(new Syncroton_Model_SyncCollection(array('collectionId' => $syncrotonFolder->serverId)), $serverId);
+    
+        #echo '----------------' . PHP_EOL; foreach ($syncrotonEvent as $key => $value) {echo "$key => "; var_dump($value);}
         
-        $dtd                   = $imp->createDocumentType('AirSync', "-//AIRSYNC//DTD AirSync//EN", "http://www.microsoft.com/");
-        $testDom               = $imp->createDocument('uri:AirSync', 'Sync', $dtd);
-        $testDom->formatOutput = true;
-        $testDom->encoding     = 'utf-8';
-        $testDom->documentElement->setAttributeNS('http://www.w3.org/2000/xmlns/' ,'xmlns:Calendar', 'uri:Calendar');
-        
-        $collections    = $testDom->documentElement->appendChild($testDom->createElementNS('uri:AirSync', 'Collections'));
-        $collection     = $collections->appendChild($testDom->createElementNS('uri:AirSync', 'Collection'));
-        $commands       = $collection->appendChild($testDom->createElementNS('uri:AirSync', 'Commands'));
-        $add            = $commands->appendChild($testDom->createElementNS('uri:AirSync', 'Add'));
-        $appData        = $add->appendChild($testDom->createElementNS('uri:AirSync', 'ApplicationData'));
-        
-        
-        $controller = new ActiveSync_Controller_Calendar($this->objects['deviceIPhone'], new Tinebase_DateTime());     
-        
-        $controller->appendXML($appData, null, $this->objects['eventDaily']->getId(), array());
-        
-        // namespace === uri:Calendar
-        $this->assertEquals(ActiveSync_Controller_Calendar::RECUR_TYPE_DAILY, @$testDom->getElementsByTagNameNS('uri:Calendar', 'Type')->item(0)->nodeValue, $testDom->saveXML());
-        $this->assertEquals(4, @$testDom->getElementsByTagNameNS('uri:Calendar', 'Exception')->length, $testDom->saveXML());
-        $this->assertEquals(4, @$testDom->getElementsByTagNameNS('uri:Calendar', 'ExceptionStartTime')->length, $testDom->saveXML());
-        $this->assertEquals(3, @$testDom->getElementsByTagNameNS('uri:Calendar', 'Subject')->length, $testDom->saveXML());
-        
-        $endTime = $this->objects['eventDaily']->dtend->format("Ymd\THis") . 'Z';
-        $this->assertEquals($endTime, @$testDom->getElementsByTagNameNS('uri:Calendar', 'EndTime')->item(0)->nodeValue, $testDom->saveXML());
-        
-        $untilTime = Calendar_Model_Rrule::getRruleFromString($this->objects['eventDaily']->rrule)->until->format("Ymd\THis") . 'Z';
-        $this->assertEquals($untilTime, @$testDom->getElementsByTagNameNS('uri:Calendar', 'Until')->item(0)->nodeValue, $testDom->saveXML());
-        
+        $this->assertEquals(1,         $syncrotonEvent->allDayEvent);
+        $this->assertTrue($syncrotonEvent->endTime instanceof DateTime);
+        $this->assertTrue($syncrotonEvent->startTime instanceof DateTime);
+        $this->assertEquals('20101106T230000Z', $syncrotonEvent->endTime->format('Ymd\THis\Z'));
+        $this->assertEquals('20101103T230000Z', $syncrotonEvent->startTime->format('Ymd\THis\Z'));
+    
+        return array($serverId, $syncrotonEvent);
     }
     
-    /**
-     * test update of record
-     * 
-     * @return Tinebase_Record_Abstract
-     */
-    public function testChangeEntryInBackend()
+    public function testCreateEntryDailyRepeating($syncrotonFolder = null)
     {
-        $recordId = $this->testAddEntryToBackend();
+        if ($syncrotonFolder === null) {
+            $syncrotonFolder = $this->testCreateFolder();
+        }
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), Tinebase_DateTime::now());
+    
+        $xml = new SimpleXMLElement($this->_testXMLInput_DailyRepeatingEvent);
+        $syncrotonEvent = new Syncroton_Model_Event($xml->Collections->Collection->Commands->Add[0]->ApplicationData);
+    
+        $serverId = $controller->createEntry($syncrotonFolder->serverId, $syncrotonEvent);
+    
+        $syncrotonEvent = $controller->getEntry(new Syncroton_Model_SyncCollection(array('collectionId' => $syncrotonFolder->serverId)), $serverId);
+    
+        #echo '----------------' . PHP_EOL; foreach ($syncrotonEvent as $key => $value) {echo "$key => "; var_dump($value);}
         
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
+        $this->assertEquals(0, $syncrotonEvent->allDayEvent);
+        $this->assertTrue($syncrotonEvent->endTime instanceof DateTime);
+        $this->assertTrue($syncrotonEvent->startTime instanceof DateTime);
+        $this->assertEquals('20101220T100000Z', $syncrotonEvent->endTime->format('Ymd\THis\Z'));
+        $this->assertEquals('20101220T090000Z', $syncrotonEvent->startTime->format('Ymd\THis\Z'));
     
-        $xml = simplexml_import_dom($this->_getInputDOMDocument());
-        $recordId = $controller->change($this->_getContainerWithSyncGrant()->getId(), $recordId, $xml->Collections->Collection->Commands->Change[0]->ApplicationData);
-    
-        $this->assertTrue(!empty($recordId));
-    
-        return $recordId;
-    }
+        // Recurrence
+        $this->assertTrue($syncrotonEvent->recurrence instanceof Syncroton_Model_EventRecurrence);
+        $this->assertEquals(Syncroton_Model_EventRecurrence::TYPE_DAILY, $syncrotonEvent->recurrence->type);
+        $this->assertEquals(1, $syncrotonEvent->recurrence->interval);
+        $this->assertTrue($syncrotonEvent->recurrence->until instanceof DateTime);
+        $this->assertEquals('20101223T225959Z', $syncrotonEvent->recurrence->until->format('Ymd\THis\Z'));
         
-    /**
-     * test get list all record ids not older than 2 weeks back
-     */
-    public function testGetServerEntries2WeeksBack()
-    {
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
-    
-        $records = $controller->getServerEntries($this->_specialFolderName, Syncope_Command_Sync::FILTER_2_WEEKS_BACK);
-
-        $this->assertNotContains($this->objects['event2MonthsBack']->getId(), $records, 'found event 2 months back');
-    }
-    
-    /**
-     * (non-PHPdoc)
-     * @see ActiveSync/ActiveSync_TestCase::_validateGetServerEntries()
-     */
-    protected function _validateGetServerEntries($_recordId)
-    {
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
-        $records = $controller->getServerEntries($this->_specialFolderName, Syncope_Command_Sync::FILTER_NOTHING);
-        
-        $this->assertContains($_recordId, $records, 'event not found');
+        return array($serverId, $syncrotonEvent);
     }
     
-    /**
-     * test xml generation for IPhone
-     */
-    public function testConvertToTine20Model()
+    public function testCreateEntrySamsungGalaxyStatus($syncrotonFolder = null)
     {
-        if (empty(Tinebase_Core::getUser()->accountEmailAddress)) {
-            $this->markTestSkipped('current user has no email address');
+        if ($syncrotonFolder === null) {
+            $syncrotonFolder = $this->testCreateFolder();
+        }
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_SMASUNGGALAXYS2), Tinebase_DateTime::now());
+    
+        $xml = new SimpleXMLElement($this->_testXMLInput_SamsungGalaxyStatus);
+        $syncrotonEvent = new Syncroton_Model_Event($xml->Collections->Collection->Commands->Change[0]->ApplicationData);
+    
+        $serverId = $controller->createEntry($syncrotonFolder->serverId, $syncrotonEvent);
+    
+        $syncrotonEvent = $controller->getEntry(new Syncroton_Model_SyncCollection(array('collectionId' => $syncrotonFolder->serverId)), $serverId);
+    
+        #echo '----------------' . PHP_EOL; foreach ($syncrotonEvent as $key => $value) {echo "$key => "; var_dump($value);}
+        
+        $this->assertEquals(Syncroton_Model_Event::BUSY_STATUS_BUSY, $syncrotonEvent->busyStatus);
+        
+        return array($serverId, $syncrotonEvent);
+    }
+    
+    public function testCreateEntryOutlook13($syncrotonFolder = null)
+    {
+        if ($syncrotonFolder === null) {
+            $syncrotonFolder = $this->testCreateFolder();
+        }
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_WEBOS), Tinebase_DateTime::now());
+    
+        $xml = new SimpleXMLElement($this->_testXMLInputOutlook13);
+        $syncrotonEvent = new Syncroton_Model_Event($xml->Collections->Collection->Commands->Change[0]->ApplicationData);
+    
+        $tine20Event = $controller->toTineModel($syncrotonEvent);
+//         $serverId = $controller->createEntry($syncrotonFolder->serverId, $syncrotonEvent);
+    
+        $this->assertFalse(!!$tine20Event->exdate[0]->is_deleted);
+    }
+    
+    public function testUpdateEntry($syncrotonFolder = null)
+    {
+        if ($syncrotonFolder === null) {
+            $syncrotonFolder = $this->testCreateFolder();
+        }
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), Tinebase_DateTime::now());
+    
+        list($serverId, $syncrotonEvent) = $this->testCreateEntry($syncrotonFolder);
+    
+        unset($syncrotonEvent->recurrence);
+        unset($syncrotonEvent->exceptions);
+        
+        // need to creaate new controller to set new sync timestamp for concurrency handling
+        $syncTimestamp = Calendar_Controller_Event::getInstance()->get($serverId)->last_modified_time;
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), $syncTimestamp);
+        $serverId = $controller->updateEntry($syncrotonFolder->serverId, $serverId, $syncrotonEvent);
+        
+        $syncrotonEvent = $controller->getEntry(new Syncroton_Model_SyncCollection(array('collectionId' => $syncrotonFolder->serverId)), $serverId);
+    
+        $this->assertFalse($syncrotonEvent->recurrence instanceof Syncroton_Model_EventRecurrence);
+    
+        return array($serverId, $syncrotonEvent);
+    }
+    
+    public function testRecurEventExceptionFilters($syncrotonFolder = null)
+    {
+        if ($syncrotonFolder === null) {
+            $syncrotonFolder = $this->testCreateFolder();
         }
         
-        $xml = simplexml_import_dom($this->_getInputDOMDocument());
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), Tinebase_DateTime::now());
         
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
+        list($serverId, $syncrotonEvent) = $this->testCreateEntry($syncrotonFolder);
         
-        $event = $controller->toTineModel($xml->Collections->Collection->Commands->Change[0]->ApplicationData);
+        // remove testuser as attendee
+        $eventBackend = new Calendar_Backend_Sql();
+        $exception = $eventBackend->getByProperty($syncrotonEvent->uID . '-' . $syncrotonEvent->exceptions[0]->exceptionStartTime->format(Tinebase_Record_Abstract::ISO8601LONG), 'recurid');
+        $ownAttendee = Calendar_Model_Attender::getOwnAttender($exception->attendee);
+        $eventBackend->deleteAttendee(array($ownAttendee->getId()));
         
-        $this->assertEquals('Repeat'             , $event->summary);
-        $this->assertEquals(2                    , count($event->exdate));
-        $this->assertEquals('2010-11-23 12:45:00', $event->alarms[0]->alarm_time->format(Tinebase_Record_Abstract::ISO8601LONG));
+        $syncrotonEvent = $controller->getEntry(new Syncroton_Model_SyncCollection(array('collectionId' => $syncrotonFolder->serverId)), $serverId);
+        
+        // assert fallout by filter
+        $this->assertTrue((bool) $syncrotonEvent->exceptions[0]->deleted);
+        $this->assertTrue((bool) $syncrotonEvent->exceptions[1]->deleted);
     }
     
-    /**
-     * testConvertToTine20Model_fromPalm
-     */
-    public function testConvertToTine20Model_fromPalm()
+    public function testStatusUpdate($syncrotonFolder = null)
     {
-        $xml = simplexml_import_dom($this->_getInputDOMDocument($this->_testXMLInput_palmPreV12));
+        if ($syncrotonFolder === null) {
+            $syncrotonFolder = $this->testCreateFolder();
+        }
         
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), Tinebase_DateTime::now());
         
-        $event = $controller->toTineModel($xml->Collections->Collection->Commands->Change[0]->ApplicationData);
+        list($serverId, $syncrotonEvent) = $this->testCreateEntry($syncrotonFolder);
         
-        //var_dump($event->toArray());
+        // transfer event to other user
+        $rwright = array_value('rwright', $this->_personas = Zend_Registry::get('personas'));
+        $eventBackend = new Calendar_Backend_Sql();
+        $eventBackend->updateMultiple($eventBackend->getMultipleByProperty($syncrotonEvent->uID, 'uid')->id, array(
+            'container_id'  => Tinebase_Core::getPreference('Calendar')->getValueForUser(Calendar_Preference::DEFAULTCALENDAR, $rwright->getId()),
+            'organizer'     => $rwright->contact_id
+        ));
         
-        $this->assertEquals('2010-11-03 23:00:00', $event->dtstart->format(Tinebase_Record_Abstract::ISO8601LONG));
-        $this->assertEquals('2010-11-06 22:59:59', $event->dtend->format(Tinebase_Record_Abstract::ISO8601LONG));
-        $this->assertTrue(!!$event->is_all_day_event);
-        $this->assertEquals("test beschreibung zeile 1\r\nZeile 2\r\nZeile 3", $event->description);
+        $syncrotonEvent->exceptions[0]->busyStatus = 1;
+        $syncrotonEvent->exceptions[0]->subject = 'do not update';
+        $serverId = $controller->updateEntry($syncrotonFolder->serverId, $serverId, $syncrotonEvent);
+        
+        $syncrotonEvent = $controller->getEntry(new Syncroton_Model_SyncCollection(array('collectionId' => $syncrotonFolder->serverId)), $serverId);
+        
+        $event = Calendar_Controller_Event::getInstance()->get($serverId);
+        
+        // how to validate container / it's not present in syncroton event?
+        $this->assertEquals(1, $syncrotonEvent->exceptions[0]->busyStatus);
+        $this->assertNotEquals('do not update', $syncrotonEvent->exceptions[0]->subject);
     }
     
-    /**
-     * testConvertToTine20Model_dailyRepeatingEvent
-     */
-    public function testConvertToTine20Model_dailyRepeatingEvent()
+    public function testMeetingResponse()
     {
-        $xml = simplexml_import_dom($this->_getInputDOMDocument($this->_testXMLInput_DailyRepeatingEvent));
+        $syncrotonFolder = $this->testCreateFolder();
         
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
+        list($serverId, $event) = $this->testCreateEntry($syncrotonFolder);
         
-        $event = $controller->toTineModel($xml->Collections->Collection->Commands->Add[0]->ApplicationData);
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), Tinebase_DateTime::now());
         
-        $this->assertEquals('2010-12-20 09:00:00', $event->dtstart->format(Tinebase_Record_Abstract::ISO8601LONG));
-        $this->assertEquals('2010-12-20 10:00:00', $event->dtend->format(Tinebase_Record_Abstract::ISO8601LONG));
-        $this->assertEquals('2010-12-23 22:59:59', $event->rrule->until->format(Tinebase_Record_Abstract::ISO8601LONG));
+        $XMLMeetingResponse = $this->_testXMLMeetingResponse;
+        
+        $XMLMeetingResponse = str_replace('<CollectionId>17</CollectionId>', '<CollectionId>' . $syncrotonFolder->serverId . '</CollectionId>', $XMLMeetingResponse);
+        $XMLMeetingResponse = str_replace('<RequestId>f0c79775b6b44be446f91187e24566aa1c5d06ab</RequestId>', '<RequestId>' . $serverId . '</RequestId>', $XMLMeetingResponse);
+        $XMLMeetingResponse = str_replace('<InstanceId>20121125T130000Z</InstanceId>', '', $XMLMeetingResponse);
+        
+        $xml = new SimpleXMLElement($XMLMeetingResponse);
+        
+        $meetingResponse = new Syncroton_Model_MeetingResponse($xml->Request[0]);
+        
+        $eventId = $controller->setAttendeeStatus($meetingResponse);
+        
+        $event = Calendar_Controller_Event::getInstance()->get($serverId);
+        $ownAttendee = Calendar_Model_Attender::getOwnAttender($event->attendee);
+        
+        $this->assertEquals(Calendar_Model_Attender::STATUS_TENTATIVE, $ownAttendee->status);
     }
     
-    /**
-     * test search events
-     */
-    public function testSearch()
+    public function testMeetingResponseWithExistingInstanceId()
     {
-    #    $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
-
-    #    $xml = simplexml_import_dom($this->_getInputDOMDocument());
+        $syncrotonFolder = $this->testCreateFolder();
         
-    #    $record = $controller->createEntry($this->_getContainerWithSyncGrant()->getId(), $xml->Collections->Collection->Commands->Change[0]->ApplicationData);
-    #    $this->objects['events'][] = $record;
+        list($serverId, $event) = $this->testCreateEntry($syncrotonFolder);
         
-    #    $event = $controller->search($this->_specialFolderName, $xml->Collections->Collection->Commands->Change[0]->ApplicationData);
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), new Tinebase_DateTime(null, null, 'de_DE'));
         
-    #    $this->assertEquals(1       , count($event));
-    #    $this->assertEquals('Repeat', $event[0]->summary);
+        $XMLMeetingResponse = $this->_testXMLMeetingResponse;
+        
+        $XMLMeetingResponse = str_replace('<CollectionId>17</CollectionId>', '<CollectionId>' . $syncrotonFolder->serverId . '</CollectionId>', $XMLMeetingResponse);
+        $XMLMeetingResponse = str_replace('<RequestId>f0c79775b6b44be446f91187e24566aa1c5d06ab</RequestId>', '<RequestId>' . $serverId . '</RequestId>', $XMLMeetingResponse);
+        
+        $xml = new SimpleXMLElement($XMLMeetingResponse);
+        
+        $meetingResponse = new Syncroton_Model_MeetingResponse($xml->Request[0]);
+        
+        $eventId = $controller->setAttendeeStatus($meetingResponse);
+        
+        $event = Calendar_Controller_MSEventFacade::getInstance()->get($serverId);
+        $instance = $event->exdate->filter('is_deleted', 0)->getFirstRecord();
+        $ownAttendee = Calendar_Model_Attender::getOwnAttender($instance->attendee);
+        
+        $this->assertEquals(Calendar_Model_Attender::STATUS_TENTATIVE, $ownAttendee->status);
     }
     
-    /**
-     * test get multiple
-     * 
-     * @todo check alarm
-     */
-    public function testGetMultiple()
+    public function testMeetingResponseWithNewInstanceId()
     {
-        $this->markTestSkipped();
+        $syncrotonFolder = $this->testCreateFolder();
         
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
-        $xml = simplexml_import_dom($this->_getInputDOMDocument());
+        list($serverId, $event) = $this->testCreateEntry($syncrotonFolder);
         
-        $record = $controller->createEntry($this->_getContainerWithSyncGrant()->getId(), $xml->Collections->Collection->Commands->Change[0]->ApplicationData);
-        $this->objects['events'][] = $record;
-        $events = $controller->getMultiple(array($record->getId()));
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), new Tinebase_DateTime(null, null, 'de_DE'));
         
-        $this->assertEquals(1       , count($events));
-        $this->assertEquals('Repeat', $events[0]->summary);
+        $XMLMeetingResponse = $this->_testXMLMeetingResponse;
+        
+        $XMLMeetingResponse = str_replace('<CollectionId>17</CollectionId>', '<CollectionId>' . $syncrotonFolder->serverId . '</CollectionId>', $XMLMeetingResponse);
+        $XMLMeetingResponse = str_replace('<RequestId>f0c79775b6b44be446f91187e24566aa1c5d06ab</RequestId>', '<RequestId>' . $serverId . '</RequestId>', $XMLMeetingResponse);
+        $XMLMeetingResponse = str_replace('<InstanceId>20121125T130000Z</InstanceId>', '<InstanceId>20121126T130000Z</InstanceId>', $XMLMeetingResponse);
+        
+        $xml = new SimpleXMLElement($XMLMeetingResponse);
+        
+        $meetingResponse = new Syncroton_Model_MeetingResponse($xml->Request[0]);
+        
+        $eventId = $controller->setAttendeeStatus($meetingResponse);
+        
+        $event = Calendar_Controller_MSEventFacade::getInstance()->get($serverId);
+        $event->exdate->sort('dtstart', 'DESC');
+        $instance = $event->exdate->filter('is_deleted', 0)->getFirstRecord();
+        $ownAttendee = Calendar_Model_Attender::getOwnAttender($instance->attendee);
+        
+        $this->assertEquals(Calendar_Model_Attender::STATUS_TENTATIVE, $ownAttendee->status);
     }
     
     /**
@@ -435,11 +644,11 @@ Zeile 3</AirSyncBase:Data></AirSyncBase:Body><Calendar:Timezone>xP///wAAAAAAAAAA
      * 
      * TODO finish this -> assertion fails atm because the event is found even if it is in an unsyncable folder and has no attendees (but 1 exdate)
      */
-    public function testUnsyncableSearch()
+    public function _testUnsyncableSearch()
     {
         $this->markTestSkipped();
         
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
+        $controller = $this->_getController($this->_getDevice(Syncroton_Model_Device::TYPE_WEBOS));
 
         $xml = simplexml_import_dom($this->_getInputDOMDocument());
         
@@ -455,18 +664,23 @@ Zeile 3</AirSyncBase:Data></AirSyncBase:Body><Calendar:Timezone>xP///wAAAAAAAAAA
     }
     
     /**
-     * test supported folders
+     * testEventWithTags
+     * 
+     * @see 0007346: events with tags are not synced
      */
-    public function testGetAllFolders()
+    public function testEventWithTags()
     {
-        $controller = new ActiveSync_Controller_Calendar($this->objects['deviceIPhone'], new Tinebase_DateTime(null, null, 'de_DE'));
+        $event = ActiveSync_TestCase::getTestEvent();
+        $event->tags = array(array(
+            'name' => 'test tag',
+            'type' => Tinebase_Model_Tag::TYPE_PERSONAL
+        ));
+        $event = Calendar_Controller_Event::getInstance()->create($event);
         
-        $syncable   = $this->_getContainerWithSyncGrant();
-        $unsyncable = $this->_getContainerWithoutSyncGrant();
-        $supportedFolders = $controller->getAllFolders();
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), Tinebase_DateTime::now());
+        $syncrotonEvent = $controller->toSyncrotonModel($event);
         
-        //$this->assertEquals(1, count($supportedFolders));
-        $this->assertTrue(isset($supportedFolders[$syncable->getId()]));
-        $this->assertFalse(isset($supportedFolders[$unsyncable->getId()]));
+        $this->assertTrue(is_array($syncrotonEvent->categories));
+        $this->assertTrue(in_array('test tag', $syncrotonEvent->categories), 'tag not found in categories: ' . print_r($syncrotonEvent->categories, TRUE));
     }
 }

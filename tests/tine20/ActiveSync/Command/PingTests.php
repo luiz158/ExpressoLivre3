@@ -14,7 +14,7 @@
 require_once dirname(dirname(dirname(__FILE__))) . DIRECTORY_SEPARATOR . 'TestHelper.php';
 
 /**
- * Test class for Syncope_Command_Ping
+ * Test class for Syncroton_Command_Ping
  * 
  * @package     ActiveSync
  */
@@ -31,17 +31,17 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
     protected $_deviceBackend;
     
     /**
-     * @var Syncope_Backend_Folder
+     * @var Syncroton_Backend_Folder
      */
     protected $_folderBackend;
 
     /**
-     * @var Syncope_Backend_SyncState
+     * @var Syncroton_Backend_SyncState
      */
     protected $_syncStateBackend;
     
     /**
-     * @var Syncope_Backend_IContent
+     * @var Syncroton_Backend_IContent
      */
     protected $_contentStateBackend;
     
@@ -65,28 +65,29 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
     {
         Tinebase_TransactionManager::getInstance()->startTransaction(Tinebase_Core::getDb());
         
-        Syncope_Registry::setDatabase(Tinebase_Core::getDb());
-        Syncope_Registry::setTransactionManager(Tinebase_TransactionManager::getInstance());
+        // speed up tests
+        Syncroton_Registry::set(Syncroton_Registry::PING_TIMEOUT, 1);
+        Syncroton_Registry::set(Syncroton_Registry::QUIET_TIME, 1);
         
-        $this->_deviceBackend       = new Syncope_Backend_Device(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_');
-        $this->_folderBackend       = new Syncope_Backend_Folder(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_');
-        $this->_syncStateBackend    = new Syncope_Backend_SyncState(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_');
-        $this->_contentStateBackend = new Syncope_Backend_Content(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_');
+        $this->_setGeoData = Addressbook_Controller_Contact::getInstance()->setGeoDataForContacts(FALSE);
         
-        $this->_device = $this->_deviceBackend->create(
-            ActiveSync_Backend_DeviceTests::getTestDevice()
+        Syncroton_Registry::setDatabase(Tinebase_Core::getDb());
+        Syncroton_Registry::setTransactionManager(Tinebase_TransactionManager::getInstance());
+        
+        Syncroton_Registry::set(Syncroton_Registry::DEVICEBACKEND,       new Syncroton_Backend_Device(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_'));
+        Syncroton_Registry::set(Syncroton_Registry::FOLDERBACKEND,       new Syncroton_Backend_Folder(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_'));
+        Syncroton_Registry::set(Syncroton_Registry::SYNCSTATEBACKEND,    new Syncroton_Backend_SyncState(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_'));
+        Syncroton_Registry::set(Syncroton_Registry::CONTENTSTATEBACKEND, new Syncroton_Backend_Content(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_'));
+        Syncroton_Registry::set('loggerBackend', Tinebase_Core::getLogger());
+        
+        Syncroton_Registry::setContactsDataClass('ActiveSync_Controller_Contacts');
+        Syncroton_Registry::setCalendarDataClass('ActiveSync_Controller_Calendar');
+        Syncroton_Registry::setEmailDataClass('ActiveSync_Controller_Email');
+        Syncroton_Registry::setTasksDataClass('ActiveSync_Controller_Tasks');
+        
+        $this->_device = Syncroton_Registry::getDeviceBackend()->create(
+            ActiveSync_TestCase::getTestDevice()
         );
-        
-        Syncope_Registry::set('deviceBackend',       $this->_deviceBackend);
-        Syncope_Registry::set('folderStateBackend',  $this->_folderBackend);
-        Syncope_Registry::set('syncStateBackend',    $this->_syncStateBackend);
-        Syncope_Registry::set('contentStateBackend', $this->_contentStateBackend);
-        Syncope_Registry::set('loggerBackend',       Tinebase_Core::getLogger());  
-
-        Syncope_Registry::setContactsDataClass('ActiveSync_Controller_Contacts');
-        Syncope_Registry::setCalendarDataClass('ActiveSync_Controller_Calendar');
-        Syncope_Registry::setEmailDataClass('ActiveSync_Controller_Email');
-        Syncope_Registry::setTasksDataClass('ActiveSync_Controller_Tasks');
     }
 
     /**
@@ -98,13 +99,15 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
     protected function tearDown()
     {
         Tinebase_TransactionManager::getInstance()->rollBack();
+        
+        Addressbook_Controller_Contact::getInstance()->setGeoDataForContacts($this->_setGeoData);
     }
     
     /**
      * test sync of existing contacts folder
      */
     public function testPingForContacts()
-    {        
+    {
         $personalContainer = Tinebase_Container::getInstance()->getPersonalContainer(
             Tinebase_Core::getUser(),
             'Addressbook', 
@@ -118,7 +121,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
             <!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
             <FolderSync xmlns="uri:FolderHierarchy"><SyncKey>0</SyncKey></FolderSync>'
         );
-        $folderSync = new Syncope_Command_FolderSync($doc, $this->_device, $this->_device->policykey);
+        $folderSync = new Syncroton_Command_FolderSync($doc, $this->_device, $this->_device->policykey);
         $folderSync->handle();
         $folderSync->getResponse();
         
@@ -130,7 +133,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
             <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase"><Collections><Collection><Class>Contacts</Class><SyncKey>0</SyncKey><CollectionId>' . $personalContainer->getId() . '</CollectionId><DeletesAsMoves/><GetChanges/><WindowSize>100</WindowSize><Options><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize></AirSyncBase:BodyPreference><Conflict>1</Conflict></Options></Collection></Collections></Sync>'
         );
         
-        $sync = new Syncope_Command_Sync($doc, $this->_device, $this->_device->policykey);
+        $sync = new Syncroton_Command_Sync($doc, $this->_device, $this->_device->policykey);
         $sync->handle();
         $syncDoc = $sync->getResponse();
         #$syncDoc->formatOutput = true; echo $syncDoc->saveXML();
@@ -143,7 +146,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
             <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase"><Collections><Collection><Class>Contacts</Class><SyncKey>1</SyncKey><CollectionId>' . $personalContainer->getId() . '</CollectionId><DeletesAsMoves/><GetChanges/><WindowSize>100</WindowSize><Options><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize></AirSyncBase:BodyPreference><Conflict>1</Conflict></Options></Collection></Collections></Sync>'
         );
         
-        $sync = new Syncope_Command_Sync($doc, $this->_device, $this->_device->policykey);
+        $sync = new Syncroton_Command_Sync($doc, $this->_device, $this->_device->policykey);
         $sync->handle();
         $syncDoc = $sync->getResponse();
         #$syncDoc->formatOutput = true; echo $syncDoc->saveXML();
@@ -180,11 +183,11 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
         // and now we can start the ping request
         $doc = new DOMDocument();
         $doc->loadXML('<?xml version="1.0" encoding="utf-8"?>
-                    <!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
-                    <Ping xmlns="uri:Ping"><HeartBeatInterval>10</HeartBeatInterval><Folders><Folder><Id>' . $personalContainer->getId() . '</Id><Class>Contacts</Class></Folder></Folders></Ping>'
+            <!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
+            <Ping xmlns="uri:Ping"><HeartBeatInterval>10</HeartBeatInterval><Folders><Folder><Id>' . $personalContainer->getId() . '</Id><Class>Contacts</Class></Folder></Folders></Ping>'
         );
         
-        $ping = new Syncope_Command_Ping($doc, $this->_device, null);
+        $ping = new Syncroton_Command_Ping($doc, $this->_device, null);
         $ping->handle();
         $responseDoc = $ping->getResponse();
         #$responseDoc->formatOutput = true; echo $responseDoc->saveXML();
@@ -194,7 +197,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
         
         $nodes = $xpath->query('//Ping:Ping/Ping:Status');
         $this->assertEquals(1, $nodes->length, $responseDoc->saveXML());
-        $this->assertEquals(Syncope_Command_Ping::STATUS_CHANGES_FOUND, $nodes->item(0)->nodeValue, $responseDoc->saveXML());
+        $this->assertEquals(Syncroton_Command_Ping::STATUS_CHANGES_FOUND, $nodes->item(0)->nodeValue, $responseDoc->saveXML());
         
         $nodes = $xpath->query('//Ping:Ping/Ping:Folders/Ping:Folder');
         $this->assertEquals(1, $nodes->length, $responseDoc->saveXML());
@@ -205,7 +208,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
      * test sync of existing events folder
      */
     public function testPingForEvents()
-    {        
+    {
         $personalContainer = Tinebase_Container::getInstance()->getPersonalContainer(
             Tinebase_Core::getUser(),
             'Calendar', 
@@ -219,7 +222,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
             <!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
             <FolderSync xmlns="uri:FolderHierarchy"><SyncKey>0</SyncKey></FolderSync>'
         );
-        $folderSync = new Syncope_Command_FolderSync($doc, $this->_device, $this->_device->policykey);
+        $folderSync = new Syncroton_Command_FolderSync($doc, $this->_device, $this->_device->policykey);
         $folderSync->handle();
         $folderSync->getResponse();
         
@@ -231,7 +234,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
             <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase"><Collections><Collection><Class>Calendar</Class><SyncKey>0</SyncKey><CollectionId>' . $personalContainer->getId() . '</CollectionId><DeletesAsMoves/><GetChanges/><WindowSize>100</WindowSize><Options><FilterType>4</FilterType><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize></AirSyncBase:BodyPreference><Conflict>1</Conflict></Options></Collection></Collections></Sync>'
         );
         
-        $sync = new Syncope_Command_Sync($doc, $this->_device, $this->_device->policykey);
+        $sync = new Syncroton_Command_Sync($doc, $this->_device, $this->_device->policykey);
         $sync->handle();
         $syncDoc = $sync->getResponse();
         #$syncDoc->formatOutput = true; echo $syncDoc->saveXML();
@@ -244,7 +247,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
             <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase"><Collections><Collection><Class>Calendar</Class><SyncKey>1</SyncKey><CollectionId>' . $personalContainer->getId() . '</CollectionId><DeletesAsMoves/><GetChanges/><WindowSize>100</WindowSize><Options><FilterType>4</FilterType><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize></AirSyncBase:BodyPreference><Conflict>1</Conflict></Options></Collection></Collections></Sync>'
         );
         
-        $sync = new Syncope_Command_Sync($doc, $this->_device, $this->_device->policykey);
+        $sync = new Syncroton_Command_Sync($doc, $this->_device, $this->_device->policykey);
         $sync->handle();
         $syncDoc = $sync->getResponse();
         #$syncDoc->formatOutput = true; echo $syncDoc->saveXML();
@@ -252,23 +255,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
         sleep(1);
         
         // add a test event
-        $event = new Calendar_Model_Event(array(
-            'uid'           => Tinebase_Record_Abstract::generateUID(),
-            'summary'       => 'SyncTest',
-            'dtstart'       => Tinebase_DateTime::now()->addMonth(1)->toString(Tinebase_Record_Abstract::ISO8601LONG), //'2009-04-25 18:00:00',
-            'dtend'         => Tinebase_DateTime::now()->addMonth(1)->addHour(1)->toString(Tinebase_Record_Abstract::ISO8601LONG), //'2009-04-25 18:30:00',
-            'originator_tz' => 'Europe/Berlin',
-            'container_id'  => $personalContainer->getId(),
-            Tinebase_Model_Grants::GRANT_EDIT     => true,
-            'attendee'      => new Tinebase_Record_RecordSet('Calendar_Model_Attender', array(
-                array(
-                    'user_id' => Tinebase_Core::getUser()->contact_id,
-                    'user_type' => Calendar_Model_Attender::USERTYPE_USER,
-                    'status' => Calendar_Model_Attender::STATUS_ACCEPTED
-                )
-            ))
-        ));
-        
+        $event = ActiveSync_TestCase::getTestEvent($personalContainer);
         $event = Calendar_Controller_Event::getInstance()->create($event);
         
         // and now we can start the ping request
@@ -278,7 +265,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
             <Ping xmlns="uri:Ping"><HeartBeatInterval>10</HeartBeatInterval><Folders><Folder><Id>' . $personalContainer->getId() . '</Id><Class>Calendar</Class></Folder></Folders></Ping>'
         );
         
-        $ping = new Syncope_Command_Ping($doc, $this->_device, null);
+        $ping = new Syncroton_Command_Ping($doc, $this->_device, null);
         $ping->handle();
         $responseDoc = $ping->getResponse();
         #$responseDoc->formatOutput = true; echo $responseDoc->saveXML();
@@ -288,7 +275,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
         
         $nodes = $xpath->query('//Ping:Ping/Ping:Status');
         $this->assertEquals(1, $nodes->length, $responseDoc->saveXML());
-        $this->assertEquals(Syncope_Command_Ping::STATUS_CHANGES_FOUND, $nodes->item(0)->nodeValue, $responseDoc->saveXML());
+        $this->assertEquals(Syncroton_Command_Ping::STATUS_CHANGES_FOUND, $nodes->item(0)->nodeValue, $responseDoc->saveXML());
         
         $nodes = $xpath->query('//Ping:Ping/Ping:Folders/Ping:Folder');
         $this->assertEquals(1, $nodes->length, $responseDoc->saveXML());
@@ -300,7 +287,7 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
      * test sync of existing imap folder
      */
     public function testPingForEmails()
-    {        
+    {
         $imapConfig = Tinebase_Config::getInstance()->get(Tinebase_Config::IMAP);
         if (! $imapConfig || ! isset($imapConfig->useSystemAccount) || $imapConfig->useSystemAccount != TRUE) {
             $this->markTestSkipped('IMAP backend not configured');
@@ -312,12 +299,12 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
         $this->assertGreaterThan(0, count($folders));
         
         foreach ($folders as $folder) {
-            if (strtoupper($folder['displayName']) == 'INBOX') {
+            if (strtoupper($folder->displayName) == 'INBOX') {
                 break;
             }
         }
         
-        $emailController->updateCache($folder['folderId']);
+        $emailController->updateCache($folder->serverId);
         
         // first do a foldersync
         $doc = new DOMDocument();
@@ -325,52 +312,51 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
             <!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
             <FolderSync xmlns="uri:FolderHierarchy"><SyncKey>0</SyncKey></FolderSync>'
         );
-        $folderSync = new Syncope_Command_FolderSync($doc, $this->_device, $this->_device->policykey);
+        $folderSync = new Syncroton_Command_FolderSync($doc, $this->_device, $this->_device->policykey);
         $folderSync->handle();
         $syncDoc = $folderSync->getResponse();
         #$syncDoc->formatOutput = true; echo $syncDoc->saveXML();
-        
         
         // request initial synckey
         $doc = new DOMDocument();
         $doc->loadXML('<?xml version="1.0" encoding="utf-8"?>
             <!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
-            <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase"><Collections><Collection><Class>Email</Class><SyncKey>0</SyncKey><CollectionId>' . $folder['folderId'] . '</CollectionId><DeletesAsMoves/><GetChanges/><WindowSize>100</WindowSize><Options><FilterType>4</FilterType><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize></AirSyncBase:BodyPreference><Conflict>1</Conflict></Options></Collection></Collections></Sync>'
+            <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase"><Collections><Collection><Class>Email</Class><SyncKey>0</SyncKey><CollectionId>' . $folder->serverId . '</CollectionId><DeletesAsMoves/><GetChanges/><WindowSize>100</WindowSize><Options><FilterType>4</FilterType><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize></AirSyncBase:BodyPreference><Conflict>1</Conflict></Options></Collection></Collections></Sync>'
         );
         
-        $sync = new Syncope_Command_Sync($doc, $this->_device, $this->_device->policykey);
+        $sync = new Syncroton_Command_Sync($doc, $this->_device, $this->_device->policykey);
         $sync->handle();
         $syncDoc = $sync->getResponse();
         #$syncDoc->formatOutput = true; echo $syncDoc->saveXML();
-                
         
         // now do the first sync
         $doc = new DOMDocument();
         $doc->loadXML('<?xml version="1.0" encoding="utf-8"?>
             <!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
-            <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase"><Collections><Collection><Class>Email</Class><SyncKey>1</SyncKey><CollectionId>' . $folder['folderId'] . '</CollectionId><DeletesAsMoves/><GetChanges/><WindowSize>100</WindowSize><Options><FilterType>4</FilterType><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize></AirSyncBase:BodyPreference><Conflict>1</Conflict></Options></Collection></Collections></Sync>'
+            <Sync xmlns="uri:AirSync" xmlns:AirSyncBase="uri:AirSyncBase"><Collections><Collection><Class>Email</Class><SyncKey>1</SyncKey><CollectionId>' . $folder->serverId . '</CollectionId><DeletesAsMoves/><GetChanges/><WindowSize>100</WindowSize><Options><FilterType>4</FilterType><AirSyncBase:BodyPreference><AirSyncBase:Type>1</AirSyncBase:Type><AirSyncBase:TruncationSize>5120</AirSyncBase:TruncationSize></AirSyncBase:BodyPreference><Conflict>1</Conflict></Options></Collection></Collections></Sync>'
         );
         
-        $sync = new Syncope_Command_Sync($doc, $this->_device, $this->_device->policykey);
+        $sync = new Syncroton_Command_Sync($doc, $this->_device, $this->_device->policykey);
         $sync->handle();
         $syncDoc = $sync->getResponse();
         #$syncDoc->formatOutput = true; echo $syncDoc->saveXML();
+        
+        sleep(1);
         
         // and now we can start the ping request
         $doc = new DOMDocument();
         $doc->loadXML('<?xml version="1.0" encoding="utf-8"?>
             <!DOCTYPE AirSync PUBLIC "-//AIRSYNC//DTD AirSync//EN" "http://www.microsoft.com/">
-            <Ping xmlns="uri:Ping"><HeartBeatInterval>10</HeartBeatInterval><Folders><Folder><Id>' . $folder['folderId'] . '</Id><Class>Email</Class></Folder></Folders></Ping>'
+            <Ping xmlns="uri:Ping"><HeartBeatInterval>10</HeartBeatInterval><Folders><Folder><Id>' . $folder->serverId . '</Id><Class>Email</Class></Folder></Folders></Ping>'
         );
         
         // add test email message to folder
         $emailTest = new Felamimail_Controller_MessageTest();
         $emailTest->setUp();
         $inbox = $emailTest->getFolder('INBOX');
-        $email = file_get_contents(dirname(__FILE__) . '/../../Felamimail/files/text_plain.eml');
-        Felamimail_Controller_Message::getInstance()->appendMessage($inbox, $email);
-                
-        $ping = new Syncope_Command_Ping($doc, $this->_device, null);
+        $emailTest->messageTestHelper('multipart_alternative.eml', 'multipart/alternative', $inbox);
+        
+        $ping = new Syncroton_Command_Ping($doc, $this->_device, null);
         $ping->handle();
         $responseDoc = $ping->getResponse();
         $responseDoc->formatOutput = true;
@@ -381,13 +367,14 @@ class ActiveSync_Command_PingTests extends PHPUnit_Framework_TestCase
         
         $nodes = $xpath->query('//Ping:Ping/Ping:Status');
         $this->assertEquals(1, $nodes->length, $responseDoc->saveXML());
-        $this->assertEquals(Syncope_Command_Ping::STATUS_CHANGES_FOUND, $nodes->item(0)->nodeValue, $responseDoc->saveXML());
+        $this->assertEquals(Syncroton_Command_Ping::STATUS_CHANGES_FOUND, $nodes->item(0)->nodeValue, $responseDoc->saveXML());
         
         $nodes = $xpath->query('//Ping:Ping/Ping:Folders/Ping:Folder');
         $this->assertEquals(1, $nodes->length, $responseDoc->saveXML());
-        $this->assertEquals($folder['folderId'], $nodes->item(0)->nodeValue, $responseDoc->saveXML());
+        $this->assertEquals($folder->serverId, $nodes->item(0)->nodeValue, $responseDoc->saveXML());
         
-        $message = $emailTest->searchAndCacheMessage('text/plain', $inbox);
-        Felamimail_Controller_Message_Flags::getInstance()->addFlags(array($message), array(Zend_Mail_Storage::FLAG_DELETED));
+        // message needs to be deleted after the test because other tests follow that search for 'text/plain', too
+        $emailTest->tearDown();
+        Felamimail_Controller_Cache_Message::getInstance()->clear($inbox);
     }
 }

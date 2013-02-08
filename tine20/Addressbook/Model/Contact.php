@@ -14,13 +14,49 @@
  * 
  * @package     Addressbook
  * @subpackage  Model
- * @property    account_id    id of associated user
- * @property    email        the email address of the contact
- * @property    n_family
- * @property    n_fileas     display name
- * @property    n_fn        the full name
- * @property    n_given        
- * @property    type        type of contact
+ * @property    account_id                 id of associated user
+ * @property    adr_one_countryname        name of the country the contact lives in
+ * @property    adr_one_locality           locality of the contact
+ * @property    adr_one_postalcode         postalcode belonging to the locality
+ * @property    adr_one_region             region the contact lives in
+ * @property    adr_one_street             street where the contact lives
+ * @property    adr_one_street2            street2 where contact lives
+ * @property    adr_two_countryname        second home/country where the contact lives
+ * @property    adr_two_locality           second locality of the contact
+ * @property    adr_two_postalcode         ostalcode belonging to second locality
+ * @property    adr_two_region             second region the contact lives in
+ * @property    adr_two_street             second street where the contact lives
+ * @property    adr_two_street2            second street2 where the contact lives
+ * @property    assistent                  name of the assistent of the contact
+ * @property    bday                       date of birth of contact
+ * @property    container_id               id of container
+ * @property    email                      the email address of the contact
+ * @property    email_home                 the private email address of the contact
+ * @property    jpegphoto                  photo of the contact
+ * @property    n_family                   surname of the contact
+ * @property    n_fileas                   display surname, name
+ * @property    n_fn                       the full name
+ * @property    n_given                    forename of the contact
+ * @property    n_middle                   middle name of the contact
+ * @property    note                       notes of the contact    
+ * @property    n_prefix
+ * @property    n_suffix
+ * @property    org_name                   name of the company the contact works at
+ * @property    org_unit
+ * @property    role                       type of role of the contact  
+ * @property    tel_assistent              phone number of the assistent
+ * @property    tel_car
+ * @property    tel_cell                   mobile phone number
+ * @property    tel_cell_private           private mobile number
+ * @property    tel_fax                    number for calling the fax
+ * @property    tel_fax_home               private fax number
+ * @property    tel_home                   telephone number of contact's home
+ * @property    tel_pager                  contact's pager number
+ * @property    tel_work                   contact's office phone number
+ * @property    title                      special title of the contact
+ * @property    type                       type of contact
+ * @property    url                        url of the contact
+ * @property    url_home                   private url of the contact
  */
 class Addressbook_Model_Contact extends Tinebase_Record_Abstract
 {
@@ -59,6 +95,20 @@ class Addressbook_Model_Contact extends Tinebase_Record_Abstract
      * @var string
      */
     protected $_application = 'Addressbook';
+    
+    /**
+     * if foreign Id fields should be resolved on search and get from json
+     * should have this format: 
+     *     array('Calendar_Model_Contact' => 'contact_id', ...)
+     * or for more fields:
+     *     array('Calendar_Model_Contact' => array('contact_id', 'customer_id), ...)
+     * (e.g. resolves contact_id with the corresponding Model)
+     * 
+     * @var array
+     */
+    protected static $_resolveForeignIdFields = array(
+        'Tinebase_Model_User' => array('created_by', 'last_modified_by')
+    );
     
     /**
      * list of zend inputfilter
@@ -149,6 +199,7 @@ class Addressbook_Model_Contact extends Tinebase_Record_Abstract
         'is_deleted'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'deleted_time'          => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'deleted_by'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'seq'                   => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => 0),
     // tine 2.0 generic fields
         'tags'                  => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'notes'                 => array(Zend_Filter_Input::ALLOW_EMPTY => true),
@@ -193,7 +244,7 @@ class Addressbook_Model_Contact extends Tinebase_Record_Abstract
     public function __construct($_data = NULL, $_bypassFilters = false, $_convertDates = true)
     {
         // set geofields to NULL if empty
-        $geoFields = array('adr_one_lon', 'adr_one_lat', 'adr_one_lon', 'adr_one_lat');
+        $geoFields = array('adr_one_lon', 'adr_one_lat', 'adr_two_lon', 'adr_two_lat');
         foreach ($geoFields as $geoField) {
             $this->_filters[$geoField]        = new Zend_Filter_Empty(NULL);
         }
@@ -239,6 +290,9 @@ class Addressbook_Model_Contact extends Tinebase_Record_Abstract
         
         if (!empty($_data['n_given'])) {
             $_data['n_fileas'] .= ', ' . $_data['n_given'];
+            
+            // to change n_fileas to "ngiven nfamily" use this line instead of the above
+            //$_data['n_fileas'] = $_data['n_given'] . ' ' . $_data['n_fileas'];
         }
         
         $_data['n_fn'] = (!empty($_data['n_family'])) ? $_data['n_family']
@@ -260,7 +314,7 @@ class Addressbook_Model_Contact extends Tinebase_Record_Abstract
         
         switch ($_name) {
             case 'n_given':
-                $resolved = $this->_resolveAutoValues(array('n_given' => $_value, 'n_family' => $this->__get('n_family'), 'org_name' => $this->__get('org_name')));                
+                $resolved = $this->_resolveAutoValues(array('n_given' => $_value, 'n_family' => $this->__get('n_family'), 'org_name' => $this->__get('org_name')));
                 parent::__set('n_fn', $resolved['n_fn']);
                 parent::__set('n_fileas', $resolved['n_fileas']);
                 break;
@@ -309,7 +363,7 @@ class Addressbook_Model_Contact extends Tinebase_Record_Abstract
         if ($_throwExceptionOnInvalidData && (!$valid || !$parentValid)) {
             
             if(!$valid) {
-                $message = 'either "org_name" or "n_family" must be given!';    
+                $message = 'either "org_name" or "n_family" must be given!';
             }
             
             if($parentException) $message .= ', ' . $parentException->getMessage();
@@ -318,7 +372,7 @@ class Addressbook_Model_Contact extends Tinebase_Record_Abstract
             throw $e;
         }
         
-        return $parentValid && $valid;        
+        return $parentValid && $valid;
     }    
 
     /**

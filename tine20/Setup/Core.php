@@ -24,7 +24,7 @@ class Setup_Core extends Tinebase_Core
      * constant for config registry index
      *
      */
-    const CHECKDB = 'checkDB';    
+    const CHECKDB = 'checkDB';
 
     /**
      * init setup framework
@@ -34,22 +34,21 @@ class Setup_Core extends Tinebase_Core
         Setup_Core::setupConfig();
         
         Setup_Core::setupTempDir();
-                
-        // Server Timezone must be setup before logger, as logger has timehandling!
-        Setup_Core::setupServerTimezone();
-
-        Setup_Core::setupLogger();
-
+        
         //Database Connection must be setup before cache because setupCache uses constant "SQL_TABLE_PREFIX"
         Setup_Core::setupDatabaseConnection();
-
+        
         Setup_Core::setupStreamWrapper();
         
         //Cache must be setup before User Locale because otherwise Zend_Locale tries to setup 
         //its own cache handler which might result in a open_basedir restriction depending on the php.ini settings 
         Setup_Core::setupCache();
-
+        
+        Setup_Core::setupBuildConstants();
+        
         Setup_Core::setupSession();
+        
+        Setup_Core::startSession();
         
         // setup a temporary user locale/timezone. This will be overwritten later but we 
         // need to handle exceptions during initialisation process such as seesion timeout
@@ -67,19 +66,6 @@ class Setup_Core extends Tinebase_Core
      */
     public static function dispatchRequest()
     {
-        // disable magic_quotes_runtime
-        ini_set('magic_quotes_runtime', 0);
-        
-        // display errors we can't handle ourselves
-        error_reporting(E_COMPILE_ERROR | E_CORE_ERROR | E_ERROR | E_PARSE);
-        ini_set('display_errors', 1);
-        
-        ini_set('log_errors', 1);
-        set_error_handler('Tinebase_Core::errorHandler', E_ALL);
-        
-        // set default internal encoding
-        ini_set('iconv.internal_encoding', 'utf-8');
-        
         $server = NULL;
         
         /**************************** JSON API *****************************/
@@ -106,8 +92,8 @@ class Setup_Core extends Tinebase_Core
     /**
      * setups global config
      * 
-     * NOTE a config object will be intanciated regardless of the existance of 
-     *      the conffile!
+     * NOTE a config object will be instantiated regardless of the existance of 
+     *      the config file!
      *
      * @return void
      */
@@ -118,7 +104,7 @@ class Setup_Core extends Tinebase_Core
         } else {
             $config = new Zend_Config(array());
         }
-        self::set(self::CONFIG, $config);  
+        self::set(self::CONFIG, $config);
     }
     
     /**
@@ -155,7 +141,7 @@ class Setup_Core extends Tinebase_Core
      * @return bool
      */
     public static function configFileWritable()
-    {        
+    {
         if (self::configFileExists()) {
             $configFilePath = self::getConfigFilePath();
             return is_writable($configFilePath);
@@ -215,15 +201,15 @@ class Setup_Core extends Tinebase_Core
                         if (version_compare(self::ORACLE_MINIMAL_VERSION, $serverVersion, '<')) {
                             self::set(Setup_Core::CHECKDB, TRUE);
                         } else {
-                            Setup_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
+                            Setup_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
                                 . ' Oracle server version incompatible! ' . $serverVersion
                                 . ' < ' . self::ORACLE_MINIMAL_VERSION
                             );
                         }
-                        
+
                         $dbcheck = TRUE;
-                        break;                        
-                        
+                        break;
+
                     case self::PDO_PGSQL:
                         if (version_compare(self::PGSQL_MINIMAL_VERSION, $serverVersion, '<')) {
                             $dbcheck = TRUE;
@@ -270,19 +256,21 @@ class Setup_Core extends Tinebase_Core
      */
     public static function setupSession()
     {
-        self::startSession(array(
-            'name'              => 'TINE20SETUPSESSID',
-        ), 'tinesetup');
-        
-    	if (isset(self::get(self::SESSION)->setupuser)) {
-            self::set(self::USER, self::get(self::SESSION)->setupuser);
-        }
-
+        self::setSessionOptions(array(
+            'name' => 'TINE20SETUPSESSID'
+        ));
+    }
+    
+    /**
+     * initializes the build constants like buildtype, package information, ...
+     */
+    public static function setupBuildConstants()
+    {
         $config = self::getConfig();
-        define('TINE20_BUILDTYPE', strtoupper($config->get('buildtype', 'DEVELOPMENT')));
-        define('TINE20SETUP_CODENAME', getDevelopmentRevision());
+        define('TINE20_BUILDTYPE',           strtoupper($config->get('buildtype', 'DEVELOPMENT')));
+        define('TINE20SETUP_CODENAME',       getDevelopmentRevision());
         define('TINE20SETUP_PACKAGESTRING', 'none');
-        define('TINE20SETUP_RELEASETIME', 'none');
+        define('TINE20SETUP_RELEASETIME',   'none');
     }
     
     /**

@@ -71,7 +71,6 @@ class Felamimail_Controller_Sieve extends Tinebase_Controller_Abstract
      */
     private function __construct()
     {
-        $this->_currentAccount = Tinebase_Core::getUser();
     }
     
     /**
@@ -79,7 +78,7 @@ class Felamimail_Controller_Sieve extends Tinebase_Controller_Abstract
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -211,10 +210,14 @@ class Felamimail_Controller_Sieve extends Tinebase_Controller_Abstract
      * 
      * @param Felamimail_Model_Sieve_Vacation $_vacation
      * @return Felamimail_Model_Sieve_Vacation
+     * @throws Tinebase_Exception_AccessDenied
      */
     public function setVacation(Felamimail_Model_Sieve_Vacation $_vacation)
     {
         $account = Felamimail_Controller_Account::getInstance()->get($_vacation->getId());
+        if ($account->user_id !== Tinebase_Core::getUser()->getId()) {
+            throw new Tinebase_Exception_AccessDenied('It is not allowed to set the vacation message of another user.');
+        }
         
         $this->_setSieveBackendAndAuthenticate($account);
         $this->_addVacationUserData($_vacation, $account);
@@ -245,21 +248,10 @@ class Felamimail_Controller_Sieve extends Tinebase_Controller_Abstract
      */
     protected function _addVacationUserData(Felamimail_Model_Sieve_Vacation $_vacation, Felamimail_Model_Account $_account)
     {
-        $addresses = array();
         if ($_account->type == Felamimail_Model_Account::TYPE_SYSTEM) {
-            $fullUser = Tinebase_User::getInstance()->getFullUserById($this->_currentAccount->getId());
-            
-            $addresses[] = (! empty($this->_currentAccount->accountEmailAddress)) ? $this->_currentAccount->accountEmailAddress : $_account->email;
-            if ($fullUser->smtpUser && ! empty($fullUser->smtpUser->emailAliases)) {
-                $addresses = array_merge($addresses, $fullUser->smtpUser->emailAliases);
-            }
-            if ($this->_isDbmailSieve() && $fullUser->imapUser && ! empty($fullUser->imapUser->emailUID)) {
-                // dbmail sieve needs dbmail uid (envelope recipient) in addresses
-                // see https://bugs.launchpad.net/ubuntu/+source/libsieve/+bug/883627
-                $addresses[] = $fullUser->imapUser->emailUID;
-            }
+            $addresses = $this->_getSystemAccountVacationAddresses($_account);
         } else {
-            $addresses[] = $_account->email;
+            $addresses = array($_account->email);
         }
         $_vacation->addresses = $addresses;
         
@@ -269,8 +261,48 @@ class Felamimail_Controller_Sieve extends Tinebase_Controller_Abstract
             if (strpos($from, '@') === FALSE) {
                 $from .= ' <' . $_account->email . '>';
             }
-            $_vacation->from = $from;            
+            $_vacation->from = $from;
         }
+    }
+    
+    /**
+     * get vacation addresses from system account
+     * 
+     * @param Felamimail_Model_Account $account
+     * @return array
+     */
+    protected function _getSystemAccountVacationAddresses(Felamimail_Model_Account $account)
+    {
+        $addresses = array();
+        $fullUser = Tinebase_User::getInstance()->getFullUserById(Tinebase_Core::getUser()->getId());
+        
+        $addresses[] = (! empty(Tinebase_Core::getUser()->accountEmailAddress)) ? Tinebase_Core::getUser()->accountEmailAddress : $account->email;
+        if ($fullUser->smtpUser && ! empty($fullUser->smtpUser->emailAliases)) {
+            $addresses = array_merge($addresses, $fullUser->smtpUser->emailAliases);
+        }
+        
+        // append all valid domains if nessesary
+        $systemAccountConfig = Tinebase_Config::getInstance()->get(Tinebase_Config::SMTP, new Tinebase_Config_Struct())->toArray();
+        foreach ($addresses as $idx => $address) {
+            if (! strpos($address, '@')) {
+                $addresses[$idx] = $address . '@' . $systemAccountConfig['primarydomain'];
+                if ($systemAccountConfig['secondarydomains']) {
+                    foreach (explode(',', $systemAccountConfig['secondarydomains']) as $secondarydomain) {
+                        if ($secondarydomain) {
+                            $addresses[] = $address . '@' . trim($secondarydomain);
+                        }
+                    }
+                }
+            }
+        }
+        
+        if ($this->_isDbmailSieve() && $fullUser->imapUser && ! empty($fullUser->imapUser->emailUID)) {
+            // dbmail sieve needs dbmail uid (envelope recipient) in addresses
+            // see https://bugs.launchpad.net/ubuntu/+source/libsieve/+bug/883627
+            $addresses[] = $fullUser->imapUser->emailUID;
+        }
+        
+        return $addresses;
     }
     
     /**
@@ -291,6 +323,10 @@ class Felamimail_Controller_Sieve extends Tinebase_Controller_Abstract
             // cyrus does not support :from
             unset($_vacation->from);
         }
+        
+        if (in_array('date', $capabilities['SIEVE']) && in_array('relational', $capabilities['SIEVE'])) {
+            $_vacation->date_enabled = TRUE;
+        }
     }
     
     /**
@@ -303,7 +339,7 @@ class Felamimail_Controller_Sieve extends Tinebase_Controller_Abstract
         if ($this->_isDbmailSieve()) {
             // dbmail seems to have problems with different subjects and sends vacation responses to the same recipients again and again
             $translate = Tinebase_Translation::getTranslation('Felamimail');
-            $_vacation->subject = sprintf($translate->_('Out of Office reply from %1$s'), $this->_currentAccount->accountFullName);
+            $_vacation->subject = sprintf($translate->_('Out of Office reply from %1$s'), Tinebase_Core::getUser()->accountFullName);
         }
     }
     
@@ -426,7 +462,7 @@ class Felamimail_Controller_Sieve extends Tinebase_Controller_Abstract
             }
             if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . print_r($result->toArray(), TRUE));
         } else {
-            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Sieve script empty or could not parse it.');            
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Sieve script empty or could not parse it.');
         }
         
         return $result;
@@ -499,5 +535,116 @@ class Felamimail_Controller_Sieve extends Tinebase_Controller_Abstract
         }
         
         return $script;
+    }
+    
+    /**
+    * get vacation message defined by template / do substitutions for dates and representative
+    *
+    * @param Felamimail_Model_Sieve_Vacation $vacation
+    * @return string
+    */
+    public function getVacationMessage(Felamimail_Model_Sieve_Vacation $vacation)
+    {
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . print_r($vacation->toArray(), TRUE));
+
+        $message = $this->_getMessageFromTemplateFile($vacation->template_id);
+        $message = $this->_doMessageSubstitutions($vacation, $message);
+        
+        return $message;
+    }
+    
+    /**
+     * get vacation message from template file
+     * 
+     * @param string $templateId
+     * @return string
+     * 
+     * @todo generalize and move to Tinebase_FileSystem / Node controller
+     */
+    protected function _getMessageFromTemplateFile($templateId)
+    {
+        $template = Tinebase_FileSystem::getInstance()->searchNodes(new Tinebase_Model_Tree_Node_Filter(array(
+            array('field' => 'id', 'operator' => 'equals', 'value' => $templateId)
+        )))->getFirstRecord();
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . print_r($template->toArray(), TRUE));
+        
+        $templateContainer = Tinebase_Container::getInstance()->getContainerById(Felamimail_Config::getInstance()->{Felamimail_Config::VACATION_TEMPLATES_CONTAINER_ID});
+        $path = Tinebase_FileSystem::getInstance()->getContainerPath($templateContainer) . '/' . $template->name;
+        
+        $templateHandle = Tinebase_FileSystem::getInstance()->fopen($path, 'r');
+        $message = stream_get_contents($templateHandle);
+        Tinebase_FileSystem::getInstance()->fclose($templateHandle);
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . $message);
+        
+        return $message;
+    }
+    
+    /**
+     * do substitutions in vacation message
+     * 
+     * @param Felamimail_Model_Sieve_Vacation $vacation
+     * @param string $message
+     * @return string
+     * 
+     * @todo get locale from placeholder (i.e. endDate-_LOCALESTRING_)
+     * @todo get field from placeholder (i.e. representation-_FIELDNAME_)
+     * @todo use html templates?
+     * @todo use ZF templates / phplib tpl files?
+     */
+    protected function _doMessageSubstitutions(Felamimail_Model_Sieve_Vacation $vacation, $message)
+    {
+        $timezone = Tinebase_Core::get(Tinebase_Core::USERTIMEZONE);
+        $representatives = ($vacation->contact_ids) ? Addressbook_Controller_Contact::getInstance()->getMultiple($vacation->contact_ids) : array();
+        if ($vacation->contact_ids && count($representatives) > 0) {
+            // sort representatives
+            $representativesArray = array();
+            foreach ($vacation->contact_ids as $id) {
+                $representativesArray[] = $representatives->getById($id);
+            }
+        }
+        try {
+            $ownContact = Addressbook_Controller_Contact::getInstance()->getContactByUserId(Tinebase_Core::getUser()->getId());
+        } catch (Exception $e) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::WARN)) Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ . ' ' . $e);
+            $ownContact = NULL;
+        }
+
+        $search = array(
+            '{startDate-en_US}',
+            '{endDate-en_US}',
+            '{startDate-de_DE}',
+            '{endDate-de_DE}',
+            '{representation-n_fn-1}',
+            '{representation-n_fn-2}',
+            '{representation-email-1}',
+            '{representation-email-2}',
+            '{representation-tel_work-1}',
+            '{representation-tel_work-2}',
+            '{owncontact-n_fn}',
+            '{signature}',
+        );
+        $replace = array(
+            Tinebase_Translation::dateToStringInTzAndLocaleFormat($vacation->start_date, $timezone, new Zend_Locale('en_US'), 'date'),
+            Tinebase_Translation::dateToStringInTzAndLocaleFormat($vacation->end_date, $timezone, new Zend_Locale('en_US'), 'date'),
+            Tinebase_Translation::dateToStringInTzAndLocaleFormat($vacation->start_date, $timezone, new Zend_Locale('de_DE'), 'date'),
+            Tinebase_Translation::dateToStringInTzAndLocaleFormat($vacation->end_date, $timezone, new Zend_Locale('de_DE'), 'date'),
+            (isset($representativesArray[0])) ? $representativesArray[0]->n_fn : 'unknown person',
+            (isset($representativesArray[1])) ? $representativesArray[1]->n_fn : 'unknown person',
+            (isset($representativesArray[0])) ? $representativesArray[0]->email : 'unknown email',
+            (isset($representativesArray[1])) ? $representativesArray[1]->email : 'unknown email',
+            (isset($representativesArray[0])) ? $representativesArray[0]->tel_work : 'unknown phone',
+            (isset($representativesArray[1])) ? $representativesArray[1]->tel_work : 'unknown phone',
+            ($ownContact) ? $ownContact->n_fn : '',
+            ($vacation->signature) ? Felamimail_Model_Message::convertHTMLToPlainTextWithQuotes(
+                preg_replace("/\\r|\\n/", '', $vacation->signature)) : '',
+        );
+        
+        $result = str_replace($search, $replace, $message);
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . $result);
+        
+        return $result;
     }
 }

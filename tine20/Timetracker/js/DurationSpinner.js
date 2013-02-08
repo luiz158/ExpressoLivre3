@@ -17,17 +17,24 @@ Ext.ns('Tine.Timetracker');
  */
 Tine.Timetracker.DurationSpinner = Ext.extend(Ext.ux.form.Spinner,  {
     
+    /**
+     * Set to empty value if value equals 0
+     * @cfg emptyOnZero
+     */
+    emptyOnZero: null,
+    
     initComponent: function() {
         this.preventMark = false;
         this.strategy = new Ext.ux.form.Spinner.TimeStrategy({
             incrementValue : 15
         });
-        
         this.format = this.strategy.format;
     },
     
     setValue: function(value) {
-        if(! value.toString().match(/:/)){
+        if(! value || value == '00:00') {
+            value = this.emptyOnZero ? '' : '00:00';
+        } else if(! value.toString().match(/:/)) {
             var time = new Date(0);
             var hours = Math.floor(value / 60);
             var minutes = value - hours * 60;
@@ -37,7 +44,7 @@ Tine.Timetracker.DurationSpinner = Ext.extend(Ext.ux.form.Spinner,  {
             
             value = Ext.util.Format.date(time, this.format);
         }
-
+        
         Tine.Timetracker.DurationSpinner.superclass.setValue.call(this, value);
     },
     
@@ -51,7 +58,7 @@ Tine.Timetracker.DurationSpinner = Ext.extend(Ext.ux.form.Spinner,  {
         value = value.replace(',', '.');
         
         if(value && typeof value == 'string') {
-        	if (value.search(/:/) != -1) {
+            if (value.search(/:/) != -1) {
                 var parts = value.split(':');
                 parts[0] = parts[0].length == 1 ? '0' + parts[0] : parts[0];
                 parts[1] = parts[1].length == 1 ? '0' + parts[1] : parts[1];
@@ -64,16 +71,16 @@ Tine.Timetracker.DurationSpinner = Ext.extend(Ext.ux.form.Spinner,  {
                 } else {
                     value = time.getHours() * 60 + time.getMinutes();
                 }
-        	} else if (value > 0) {
+            } else if (value > 0) {
                 if (value < 24) {
                     value = value * 60;
                 }
-        	} else {
+            } else {
                 this.markInvalid(_('Not a valid time'));
                 return;
             }
         }
-        this.setValue(value);        
+        this.setValue(value);
         return value;
     }
 });

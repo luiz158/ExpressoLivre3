@@ -36,7 +36,7 @@ function convertToBytes($_value)
     } else {
         if (preg_match("/M/", $_value)) {
             $value = substr($_value, 0, strpos($_value, 'M'));
-            $factor = 1024 * 1024;   
+            $factor = 1024 * 1024;
         } elseif (preg_match("/K/", $_value)) {
             $value = substr($_value, 0, strpos($_value, 'K'));
             $factor = 1024;
@@ -46,7 +46,7 @@ function convertToBytes($_value)
         } else {
             throw new Exception('Argument type not supported:' . gettype($_value));
         }
-        $bytes = intval($value) * $factor;  
+        $bytes = intval($value) * $factor;
     }
     
     return $bytes;
@@ -146,7 +146,7 @@ function removeDir($_dir)
  */
 function replaceSpecialChars($_input)
 {
-    $search  = array('ä',  'ü',  'ö',  'ß',  'é', 'è', 'ê', 'ó' ,'ô', 'á', 'ź', 'Ä',  'Ü',  'Ö',  'É', 'È', 'Ê', 'Ó' ,'Ô', 'Á', 'Ź'); 
+    $search  = array('ä',  'ü',  'ö',  'ß',  'é', 'è', 'ê', 'ó' ,'ô', 'á', 'ź', 'Ä',  'Ü',  'Ö',  'É', 'È', 'Ê', 'Ó' ,'Ô', 'Á', 'Ź');
     $replace = array('ae', 'ue', 'oe', 'ss', 'e', 'e', 'e', 'o', 'o', 'a', 'z', 'Ae', 'Ue', 'Oe', 'E', 'E', 'E', 'O', 'O', 'a', 'z');
                 
     $output = str_replace($search, $replace, $_input);
@@ -173,4 +173,53 @@ function in_array_case($_arr, $_str)
         }
     }
     return false;
+}
+
+/**
+ * try to convert string to utf8 using mb_convert_encoding
+ * 
+ * @param string $string
+ * @param string $encodingTo (default: utf-8)
+ * @return string
+ */
+function mbConvertTo($string, $encodingTo = 'utf-8')
+{
+    if (! extension_loaded('mbstring')) {
+        return $string;
+    }
+    // try to fix bad encodings
+    $encoding = mb_detect_encoding($string, array('utf-8', 'iso-8859-1', 'windows-1252', 'iso-8859-15'));
+    if ($encoding !== FALSE) {
+        $string = @mb_convert_encoding($string, $encodingTo, $encoding);
+    }
+    
+    return $string;
+}
+
+/**
+ * converts all linebreaks to unix linebreaks
+ *
+ * @param string $string
+ * @return string
+ */
+function normalizeLineBreaks($string)
+{
+    if (is_string($string)) {
+        $result = str_replace(array("\r\n", "\r"), "\n", $string);
+    } else {
+        $result = $string;
+    }
+    
+    return $result;
+}
+
+/**
+ * get clone to be used with right hand side operator
+ *
+ * @param  Object $obj
+ * @return Object
+ */
+function getClone($obj)
+{
+    return clone $obj;
 }

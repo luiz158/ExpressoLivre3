@@ -19,9 +19,9 @@ Ext.ns('Tine.widgets', 'Tine.widgets.tags');
  */
 Tine.widgets.tags.TagPanel = Ext.extend(Ext.Panel, {
     /**
-     * @cfg {String} app Application which uses this panel
+     * @cfg {Tine.Tinebase.Application} app Application which uses this panel
      */
-    app: '',
+    app: null,
     /**
      * @cfg {String} recordId Id of record this panel is displayed for
      */
@@ -55,6 +55,8 @@ Tine.widgets.tags.TagPanel = Ext.extend(Ext.Panel, {
      */
     initComponent: function(){
         this.title =  _('Tags');
+        this.app = Ext.isString(this.app) ? Tine.Tinebase.appMgr.get(this.app) : this.app;
+        
         // init recordTagsStore
         this.tags = [];
         this.recordTagsStore = new Ext.data.JsonStore({
@@ -72,14 +74,25 @@ Tine.widgets.tags.TagPanel = Ext.extend(Ext.Panel, {
             baseParams: {
                 method: 'Tinebase.searchTags',
                 filter: {
-                    application: this.app,
+                    application: this.app.appName,
                     grant: 'use'
                 },
                 paging : {}
             }
         });
         
-        this.initSearchField();     
+        this.searchField = new Tine.widgets.tags.TagCombo({
+            app: this.app,
+            onlyUsableTags: true,
+            disableClearer: true
+        });
+        this.searchField.on('select', function(searchField, selectedTag){
+            if(this.recordTagsStore.getById(selectedTag.id) === undefined) {
+                this.recordTagsStore.add(selectedTag);
+            }
+            searchField.blur();
+            searchField.reset();
+        },this);
         
         this.bottomBar = new Ext.Container({
             layout: 'column',
@@ -105,31 +118,6 @@ Tine.widgets.tags.TagPanel = Ext.extend(Ext.Panel, {
             ]
         
         });
-        /*
-        this.bottomBar = new Ext.Toolbar({
-            style: 'border: 0px;',
-            items:[
-                this.searchField,
-                new Ext.Action({
-                    text: '',
-                    width: 16,
-                    iconCls: 'action_add',
-                    tooltip: _('Add a new personal tag'),
-                    scope: this,
-                    handler: function() {
-                        Ext.Msg.prompt(_('Add New Personal Tag'),
-                                       _('Please note: You create a personal tag. Only you can see it!') + ' <br />' + _('Enter tag name:'), 
-                            function(btn, text) {
-                                if (btn == 'ok'){
-                                    this.onTagAdd(text);
-                                }
-                            }, 
-                        this, false, this.searchField.lastQuery);
-                    }
-                })
-            ]
-        });
-        */
         
         var tagTpl = new Ext.XTemplate(
             '<tpl for=".">',
@@ -146,7 +134,7 @@ Tine.widgets.tags.TagPanel = Ext.extend(Ext.Panel, {
                 '</div>',
             '</tpl>' ,{
                 encode: function(value) {
-                    return Ext.util.Format.htmlEncode(value);
+                    return Tine.Tinebase.common.doubleEncode(value);
                 }
             }
         );
@@ -224,7 +212,7 @@ Tine.widgets.tags.TagPanel = Ext.extend(Ext.Panel, {
                                         }, this, 30, tag.get('description'));
                                     }
                                 }),
-                                new Ext.Action({     
+                                new Ext.Action({
                                     text: _('Change Color'),
                                     iconCls: 'action_changecolor',
                                     scope: this,
@@ -287,8 +275,8 @@ Tine.widgets.tags.TagPanel = Ext.extend(Ext.Panel, {
                                                 }
                                                 Ext.MessageBox.hide();
                                             },
-                                            failure: function ( result, request) { 
-                                                Ext.MessageBox.alert(_('Failed'), _('Could not delete Tag(s).')); 
+                                            failure: function ( result, request) {
+                                                Ext.MessageBox.alert(_('Failed'), _('Could not delete Tag(s).'));
                                             },
                                             scope: this 
                                         });
@@ -318,39 +306,13 @@ Tine.widgets.tags.TagPanel = Ext.extend(Ext.Panel, {
             ]
         }];
         
-        this.on('added', Tine.widgets.dialog.EditDialog.prototype.addToDisableOnEditMultiple, this);
-        
+        Tine.widgets.dialog.MultipleEditDialogPlugin.prototype.registerSkipItem(this);
         Tine.widgets.tags.TagPanel.superclass.initComponent.call(this);
     },
     
     getFormField: function() {
         return this.formField.items;
     },
-    
-    /**
-     * @private
-     */
-    onRender: function(ct, position) {
-        Tine.widgets.tags.TagPanel.superclass.onRender.call(this, ct, position);
-        //this.dataView.el.on('keypress', function(){console.log('arg')});
-        //this.body.on('keydown', this.onKeyDown, this);
-        //this.relayEvents(this.body, ['keypress']);
-        //this.on('keypress', function(){console.log('arg')});
-    },
-    /**
-     * @private
-     *
-    onResize : function(w,h){
-        Tine.widgets.tags.TagPanel.superclass.onResize.call(this, w, h);
-        // maximize search field and let space for add button
-        if (this.searchField.rendered) {
-            
-            w = this.getSize().width - 48;
-            this.searchField.setWidth(w);
-            this.searchField.syncSize();
-        }
-    },*/
-    
     
     /**
      * @private
@@ -406,7 +368,7 @@ Tine.widgets.tags.TagPanel = Ext.extend(Ext.Panel, {
                             this.el.unmask();
                         },
                         failure: function ( result, request) {
-                            Ext.MessageBox.alert(_('Failed'), _('Could not create tag.')); 
+                            Ext.MessageBox.alert(_('Failed'), _('Could not create tag.'));
                             this.el.unmask();
                         },
                         scope: this 
@@ -439,104 +401,13 @@ Tine.widgets.tags.TagPanel = Ext.extend(Ext.Panel, {
                     this.el.unmask();
                 },
                 failure: function ( result, request) {
-                    Ext.MessageBox.alert(_('Failed'), _('Could not update tag.')); 
+                    Ext.MessageBox.alert(_('Failed'), _('Could not update tag.'));
                     this.el.unmask();
                 },
                 scope: this 
             });
         }
-    },
-    
-    /**
-     * @private
-     */
-    initSearchField: function() {
-        var tpl = new Ext.XTemplate(
-            '<tpl for="."><div class="x-combo-list-item" ext:qtip="', 
-                '{[this.encode(values.name)]}', 
-                '<tpl if="type == \'personal\' ">&nbsp;<i>(' + _('personal') + ')</i></tpl>',
-                '</i>&nbsp;[{occurrence}]',
-                '<tpl if="description != null && description.length &gt; 1"><hr>{[this.encode(values.description)]}</tpl>">',
-                
-                '{[this.encode(values.name)]} <tpl if="type == \'personal\' "><i>(' + _('personal') + ')</i></tpl>',
-            '</div></tpl>',{
-                encode: function(value) {
-                    return Ext.util.Format.htmlEncode(value);
-                }
-            }
-        );
-        
-        this.searchField = new Ext.form.ComboBox({
-            store: this.availableTagsStore,
-            mode: 'local',
-            //width: 170,
-            enableKeyEvents: true,
-            displayField:'name',
-            typeAhead: true,
-            emptyText: _('Enter tag name'),
-            loadingText: _('Searching...'),
-            typeAheadDelay: 10,
-            minChars: 1,
-            hideTrigger:false,
-            triggerAction: 'all',
-            forceSelection: true,
-            tpl: tpl
-            //expand: function(){}
-        });
-        
-        // load data once
-        this.searchField.on('focus', function(searchField){
-            if (! searchField.store.lastOptions) {
-                // hack to supress selecting the first item from the freshly
-                // retrieved store
-                searchField.hasFocus = false;
-                this.availableTagsStore.load({
-                    scope: this,
-                    callback: function() {
-                        searchField.hasFocus = true;
-                    }
-                });
-            }
-        }, this);
-        
-        this.searchField.on('select', function(searchField, selectedTag){
-            if(this.recordTagsStore.getById(selectedTag.id) === undefined) {
-                this.recordTagsStore.add(selectedTag);
-            }
-            searchField.emptyText = '';
-            searchField.clearValue();
-        },this);
-        
-        /*
-        // filter invalid
-        this.searchField.on('beforequery', function(qe) {
-            var query = qe.query;
-            if (this.searchField.store.find('name', query) < 0) {
-                console.log(query);
-            }
-            //var val = searchField.el.dom.value;
-        }, this);
-        */
-        /*
-        this.searchField.on('specialkey', function(searchField, e){
-             if(e.getKey() == e.ENTER){
-                var value = searchField.getValue();
-                
-                }
-                searchField.emptyText = '';
-                searchField.clearValue();
-             }
-        }, this);
-        */
-        
-        // workaround extjs bug:
-        this.searchField.on('blur', function(searchField){
-            searchField.emptyText = _('Enter tag name');
-            searchField.clearValue();
-        },this);
     }
-    
-
 });
 
 /**

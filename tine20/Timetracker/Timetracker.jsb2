@@ -36,6 +36,14 @@
           "path": "js/"
         },
         {
+          "text": "TimeAccountBilledFilterModel.js",
+          "path": "js/"
+        },
+        {
+          "text": "TimeAccountContractFilterModel.js",
+          "path": "js/"
+        },
+        {
           "text": "TimeaccountGridPanel.js",
           "path": "js/"
         },

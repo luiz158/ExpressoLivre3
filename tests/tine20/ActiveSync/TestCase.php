@@ -63,26 +63,14 @@ abstract class ActiveSync_TestCase extends PHPUnit_Framework_TestCase
     protected $_testEmptyXML;
     
     /**
-     * Runs the test methods of this class.
-     *
-     * @access public
-     * @static
-     */
-    public static function main()
-    {
-        $suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 ActiveSync Controller Calendar Tests');
-        PHPUnit_TextUI_TestRunner::run($suite);
-    }
-    
-    /**
      * (non-PHPdoc)
      * @see PHPUnit_Framework_TestCase::setUp()
      */
     protected function setUp()
-    {       
+    {
         Tinebase_TransactionManager::getInstance()->startTransaction(Tinebase_Core::getDb());
         
-        $this->_testUser          = Tinebase_Core::getUser();        
+        $this->_testUser          = Tinebase_Core::getUser();
         $this->_specialFolderName = strtolower($this->_applicationName) . '-root';
         
         $this->objects['container'] = array();
@@ -90,6 +78,17 @@ abstract class ActiveSync_TestCase extends PHPUnit_Framework_TestCase
         
         $this->objects['tasks']   = array();
         $this->objects['events']   = array();
+
+        Syncroton_Registry::set(Syncroton_Registry::DEVICEBACKEND,       new Syncroton_Backend_Device(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_'));
+        Syncroton_Registry::set(Syncroton_Registry::FOLDERBACKEND,       new Syncroton_Backend_Folder(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_'));
+        Syncroton_Registry::set(Syncroton_Registry::SYNCSTATEBACKEND,    new Syncroton_Backend_SyncState(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_'));
+        Syncroton_Registry::set(Syncroton_Registry::CONTENTSTATEBACKEND, new Syncroton_Backend_Content(Tinebase_Core::getDb(), SQL_TABLE_PREFIX . 'acsync_'));
+        Syncroton_Registry::set('loggerBackend',                         Tinebase_Core::getLogger());
+        
+        Syncroton_Registry::setContactsDataClass('ActiveSync_Controller_Contacts');
+        Syncroton_Registry::setCalendarDataClass('ActiveSync_Controller_Calendar');
+        Syncroton_Registry::setEmailDataClass('ActiveSync_Controller_Email');
+        Syncroton_Registry::setTasksDataClass('ActiveSync_Controller_Tasks');
     }
 
     /**
@@ -101,116 +100,154 @@ abstract class ActiveSync_TestCase extends PHPUnit_Framework_TestCase
         Tinebase_TransactionManager::getInstance()->rollBack();
     }
     
-    
     /**
-     * validate getFolders for all devices except IPhone
+     *
+     * @return Syncroton_Model_IFolder
      */
-    public function testGetFoldersPalm()
+    public function testCreateFolder()
     {
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), new Tinebase_DateTime(null, null, 'de_DE'));
         
-        $folders = $controller->getAllFolders();
+        $syncrotonFolder = $controller->createFolder(new Syncroton_Model_Folder(array(
+            'parentId' => 0, 
+            'displayName' => 'TestFolder'
+        )));
+    
+        $this->assertTrue(!empty($syncrotonFolder->serverId));
         
-        $this->assertArrayHasKey($this->_specialFolderName, $folders, "key {$this->_specialFolderName} not found in " . print_r($folders, true));
+        return $syncrotonFolder;
+    }
+    
+    public function testUpdateFolder()
+    {
+        $this->markTestIncomplete();
+    
+        $syncrotonFolder = $this->testCreateFolder();
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), new Tinebase_DateTime(null, null, 'de_DE'));
+    
+        $controller->updateFolder($syncrotonFolder);
+    }
+    
+    public function testDeleteFolder()
+    {
+        $this->markTestIncomplete();
+    
+        $syncrotonFolder = $this->testCreateFolder();
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), new Tinebase_DateTime(null, null, 'de_DE'));
+    
+        $controller->deleteFolder($syncrotonFolder);
+    }
+    
+    public function testGetAllFolders()
+    {
+        $syncrotonFolder = $this->testCreateFolder();
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), new Tinebase_DateTime(null, null, 'de_DE'));
+    
+        $allSyncrotonFolders = $controller->getAllFolders();
+        
+        $this->assertArrayHasKey($syncrotonFolder->serverId, $allSyncrotonFolders);
+        $this->assertArrayNotHasKey($this->_specialFolderName, $allSyncrotonFolders);
+        $this->assertTrue($allSyncrotonFolders[$syncrotonFolder->serverId] instanceof Syncroton_Model_Folder);
+        $this->assertEquals($syncrotonFolder->serverId, $allSyncrotonFolders[$syncrotonFolder->serverId]->serverId, 'serverId mismatch');
+        $this->assertEquals($syncrotonFolder->parentId, $allSyncrotonFolders[$syncrotonFolder->serverId]->parentId, 'parentId mismatch');
+        $this->assertEquals($syncrotonFolder->displayName, $allSyncrotonFolders[$syncrotonFolder->serverId]->displayName);
+        $this->assertTrue(!empty($allSyncrotonFolders[$syncrotonFolder->serverId]->type));
+    }
+    
+    public function testGetAllFoldersPalm()
+    {
+        $syncrotonFolder = $this->testCreateFolder();
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_WEBOS), new Tinebase_DateTime(null, null, 'de_DE'));
+    
+        $allSyncrotonFolders = $controller->getAllFolders();
+        
+        $this->assertArrayHasKey($this->_specialFolderName, $allSyncrotonFolders, "key {$this->_specialFolderName} not found in " . print_r($allSyncrotonFolders, true));
     }
     
     /**
      * test search tasks
      */
-    public function testGetFolder()
+    #public function testGetFolder()
+    #{
+    #    // create at least one folder with sync grants
+    #    $syncAbleFolder    = $this->_getContainerWithSyncGrant();
+    #    
+    #    $controller = $this->_getController($this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE));
+    #    
+    #    $folder = $controller->getFolder($syncAbleFolder);
+    #    
+    #    //var_dump($folder);
+    #    
+    #    $this->assertArrayHasKey($syncAbleFolder->getId(), $folder);
+    #}
+    
+    public function testDeleteEntry()
     {
-        // create at least one folder with sync grants
-        $syncAbleFolder    = $this->_getContainerWithSyncGrant();
-        
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_IPHONE));
-        
-        $folder = $controller->getFolder($syncAbleFolder);
-        
-        //var_dump($folder);
-        
-        $this->assertArrayHasKey($syncAbleFolder->getId(), $folder);
+        $syncrotonFolder = $this->testCreateFolder();
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), new Tinebase_DateTime(null, null, 'de_DE'));
+    
+        list($serverId, $syncrotonContact) = $this->testCreateEntry($syncrotonFolder);
+    
+        $controller->deleteEntry($syncrotonFolder->serverId, $serverId, null);
+    
+        $this->setExpectedException('Syncroton_Exception_NotFound');
+    
+        $syncrotonContact = $controller->getEntry(new Syncroton_Model_SyncCollection(array('collectionId' => $syncrotonFolder->serverId)), $serverId);
     }
     
-    /**
-     * test search tasks
-     */
-    public function testGetSpecialFolder()
+    public function testGetInvalidEntry()
     {
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_IPHONE));
-        
-        $folder = $controller->getFolder($this->_specialFolderName);
-        
-        //var_dump($folder);
-        
-        $this->assertArrayHasKey($this->_specialFolderName, $folder);
+        $syncrotonFolder = $this->testCreateFolder();
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), new Tinebase_DateTime(null, null, 'de_DE'));
+    
+        $this->setExpectedException('Syncroton_Exception_NotFound');
+    
+        $syncrotonContact = $controller->getEntry(new Syncroton_Model_SyncCollection(array('collectionId' => $syncrotonFolder->serverId)), 'jdszfegd63gfrk');
     }
     
-    /**
-     * validate getFolders for IPhones
-     */
-    public function testGetFoldersIPhone()
+    public function testGetChangedEntries()
     {
-        // create at least one folder with sync grants
-        $syncAbleFolder    = $this->_getContainerWithSyncGrant();
+        $syncrotonFolder = $this->testCreateFolder();
+    
+        list($serverId, $syncrotonContact) = $this->testUpdateEntry($syncrotonFolder);
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_IPHONE), new Tinebase_DateTime(null, null, 'de_DE'));
+    
+        $changedEntries = $controller->getChangedEntries($syncrotonFolder->serverId, new DateTime('2000-01-01'));
         
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_IPHONE));
-        
-        $folders = $controller->getAllFolders();
-        
-        foreach($folders as $folder) {
-            $this->assertTrue($this->_testUser->hasGrant($folder['folderId'], Tinebase_Model_Grants::GRANT_SYNC));
-        }
-        
-        $this->assertArrayNotHasKey($this->_specialFolderName, $folders, "key {$this->_specialFolderName} found in " . print_r($folders, true));
-        $this->assertGreaterThanOrEqual(1, count($folders));
+        $this->assertContains($serverId, $changedEntries);
     }
-
+    
+    public function testGetChangedEntriesAndroid()
+    {
+        $syncrotonFolder = $this->testCreateFolder();
+    
+        list($serverId, $syncrotonContact) = $this->testUpdateEntry($syncrotonFolder);
+    
+        $controller = Syncroton_Data_Factory::factory($this->_class, $this->_getDevice(Syncroton_Model_Device::TYPE_ANDROID), new Tinebase_DateTime(null, null, 'de_DE'));
+    
+        $changedEntries = $controller->getChangedEntries($this->_specialFolderName, new DateTime('2000-01-01'));
+    
+        $this->assertContains($serverId, $changedEntries);
+    }
+    
     /**
      * test convert from XML to Tine 2.0 model
      * 
      */
-    abstract public function testConvertToTine20Model();
+    abstract public function testCreateEntry($syncrotonFolder = null);
     
     /**
      * test xml generation for sync to client
      */
-    abstract public function testAppendXml();
+    abstract public function testUpdateEntry($syncrotonFolder = null);
         
-    /**
-     * @return Tinebase_Record_Abstract
-     */
-    public function testAddEntryToBackend()
-    {
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
-        
-        $xml = simplexml_import_dom($this->_getInputDOMDocument());
-        $recordId = $controller->createEntry($this->_getContainerWithSyncGrant()->getId(), $xml->Collections->Collection->Commands->Change[0]->ApplicationData);
-
-        $this->assertTrue(!empty($recordId));
-        
-        return $recordId;
-    }
-    
-    /**
-     * test get list all record ids
-     */
-    public function testGetServerEntries()
-    {
-        $controller = $this->_getController($this->_getDevice(Syncope_Model_Device::TYPE_WEBOS));
-        
-        $xml = simplexml_import_dom($this->_getInputDOMDocument());
-        $record = $controller->createEntry($this->_getContainerWithSyncGrant()->getId(), $xml->Collections->Collection->Commands->Change[0]->ApplicationData);
-        
-        $this->_validateGetServerEntries($record);        
-    }
-    
-    abstract protected function _validateGetServerEntries($_recordId);
-    
-    /**
-     * test search records
-     */
-    abstract public function testSearch();
-    
     /**
      * create container with sync grant
      * 
@@ -222,6 +259,12 @@ abstract class ActiveSync_TestCase extends PHPUnit_Framework_TestCase
             return $this->objects['container']['withSyncGrant'];
         }
         
+        switch ($this->_applicationName) {
+            case 'Calendar':    $recordClass = 'Calendar_Model_Event'; break;
+            case 'Addressbook': $recordClass = 'Addressbook_Model_Contact'; break;
+            case 'Tasks':       $recordClass = 'Tasks_Model_Task'; break;
+            default: throw new Exception('handle this model!');
+        }
         try {
             $containerWithSyncGrant = Tinebase_Container::getInstance()->getContainerByName(
                 $this->_applicationName, 
@@ -235,7 +278,8 @@ abstract class ActiveSync_TestCase extends PHPUnit_Framework_TestCase
                 'type'              => Tinebase_Model_Container::TYPE_PERSONAL,
                 'owner_id'          => Tinebase_Core::getUser(),
                 'backend'           => 'Sql',
-                'application_id'    => Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName)->getId()
+                'application_id'    => Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName)->getId(),
+                'model'             => $recordClass
             ));
             $containerWithSyncGrant = Tinebase_Container::getInstance()->addContainer($containerWithSyncGrant);
         }
@@ -275,7 +319,7 @@ abstract class ActiveSync_TestCase extends PHPUnit_Framework_TestCase
                 //Tinebase_Model_Grants::GRANT_SYNC      => true,
                 // NOTE: Admin Grant implies all other grants
                 //Tinebase_Model_Grants::GRANT_ADMIN     => true,
-            );            
+            );
             $grants = new Tinebase_Record_RecordSet('Tinebase_Model_Grants', array($creatorGrants));
             
             $containerWithoutSyncGrant = new Tinebase_Model_Container(array(
@@ -307,8 +351,8 @@ abstract class ActiveSync_TestCase extends PHPUnit_Framework_TestCase
             return $this->objects['devices'][$_deviceType];
         }
         
-        $this->objects['devices'][$_deviceType] = ActiveSync_Controller_Device::getInstance()->create(
-            ActiveSync_Backend_DeviceTests::getTestDevice($_deviceType)
+        $this->objects['devices'][$_deviceType] = Syncroton_Registry::getDeviceBackend()->create( 
+            ActiveSync_TestCase::getTestDevice($_deviceType)
         );
 
         return $this->objects['devices'][$_deviceType];
@@ -322,39 +366,107 @@ abstract class ActiveSync_TestCase extends PHPUnit_Framework_TestCase
     protected function _getController(ActiveSync_Model_Device $_device)
     {
         if ($this->_controller === null) {
-            $this->_controller = ActiveSync_Controller::dataFactory($this->_class, $_device, new Tinebase_DateTime(null, null, 'de_DE'));
+            $this->_controller = Syncroton_Data_Factory::factory($this->_class, $_device, new Tinebase_DateTime(null, null, 'de_DE'));
         } 
         
         return $this->_controller;
     }
     
     /**
+     * returns a test event
      * 
-     * @return DOMDocument
+     * @param Tinebase_Model_Container $personalContainer
+     * @return Calendar_Model_Event
      */
-    protected function _getInputDOMDocument($xml = NULL)
+    public static function getTestEvent($personalContainer = NULL)
     {
-        $dom = new DOMDocument();
-        $dom->formatOutput = false;
-        $dom->encoding     = 'utf-8';
-        $dom->loadXML($xml ? $xml : $this->_testXMLInput);
-        #$dom->formatOutput = true; echo $dom->saveXML(); $dom->formatOutput = false;
+        $personalContainer = ($personalContainer) ? $personalContainer : Tinebase_Container::getInstance()->getPersonalContainer(
+            Tinebase_Core::getUser(),
+            'Calendar', 
+            Tinebase_Core::getUser(),
+            Tinebase_Model_Grants::GRANT_EDIT
+        )->getFirstRecord();
         
-        return $dom;
+        return new Calendar_Model_Event(array(
+            'uid'           => Tinebase_Record_Abstract::generateUID(),
+            'summary'       => 'SyncTest',
+            'dtstart'       => Tinebase_DateTime::now()->addMonth(1)->toString(Tinebase_Record_Abstract::ISO8601LONG), //'2009-04-25 18:00:00',
+            'dtend'         => Tinebase_DateTime::now()->addMonth(1)->addHour(1)->toString(Tinebase_Record_Abstract::ISO8601LONG), //'2009-04-25 18:30:00',
+            'originator_tz' => 'Europe/Berlin',
+            'container_id'  => $personalContainer->getId(),
+            Tinebase_Model_Grants::GRANT_EDIT     => true,
+            'attendee'      => new Tinebase_Record_RecordSet('Calendar_Model_Attender', array(
+                array(
+                    'user_id' => Tinebase_Core::getUser()->contact_id,
+                    'user_type' => Calendar_Model_Attender::USERTYPE_USER,
+                    'status' => Calendar_Model_Attender::STATUS_ACCEPTED
+                )
+            ))
+        ));
     }
     
     /**
-     * 
-     * @return DOMDocument
+     *
+     * @return Syncroton_Model_Device
      */
-    protected function _getOutputDOMDocument()
+    public static function getTestDevice($_type = null)
     {
-        $dom = new DOMDocument();
-        $dom->formatOutput = false;
-        $dom->encoding     = 'utf-8';
-        $dom->loadXML($this->_testXMLOutput);
-        #$dom->formatOutput = true; echo $dom->saveXML(); $dom->formatOutput = false;
-        
-        return $dom;
+        switch($_type) {
+            case Syncroton_Model_Device::TYPE_ANDROID:
+                $device = new Syncroton_Model_Device(array(
+                    'deviceid'   => 'android-abcd',
+                    'devicetype' => Syncroton_Model_Device::TYPE_ANDROID,
+                    'policykey'  => null,
+                    'policyId'   => null,
+                    'ownerId'    => Tinebase_Core::getUser()->getId(),
+                    'useragent'  => 'blabla',
+                    'acsversion' => '12.0',
+                    'remotewipe' => 0
+                ));
+                break;
+    
+            case Syncroton_Model_Device::TYPE_WEBOS:
+                $device = new Syncroton_Model_Device(array(
+                    'deviceid'   => 'webos-abcd',
+                    'devicetype' => Syncroton_Model_Device::TYPE_ANDROID,
+                    'policykey'  => null,
+                    'policyId'   => null,
+                    'ownerId'    => Tinebase_Core::getUser()->getId(),
+                    'useragent'  => 'blabla',
+                    'acsversion' => '12.0',
+                    'remotewipe' => 0
+                ));
+                break;
+                
+            case Syncroton_Model_Device::TYPE_SMASUNGGALAXYS2:
+                $device = new Syncroton_Model_Device(array(
+                    'deviceid'   => Tinebase_Record_Abstract::generateUID(64),
+                    'devicetype' => 'SAMSUNGGTI9100',
+                    'policy_id'  => null,
+                    'policykey'  => null,
+                    'owner_id'   => Tinebase_Core::getUser()->getId(),
+                    'useragent'  => 'SAMSUNG-GT-I9100/100.20304',
+                    'acsversion' => '12.1',
+                    'remotewipe' => 0
+                ));
+                break;
+                
+            case Syncroton_Model_Device::TYPE_IPHONE:
+            default:
+                $device = new Syncroton_Model_Device(array(
+                    'deviceid'   => 'iphone-abcd',
+                    'devicetype' => Syncroton_Model_Device::TYPE_IPHONE,
+                    'policykey'  => null,
+                    'policyId'   => null,
+                    'ownerId'    => Tinebase_Core::getUser()->getId(),
+                    'useragent'  => 'blabla',
+                    'acsversion' => '12.1',
+                    'remotewipe' => 0
+                ));
+                break;
+        }
+    
+        return $device;
     }
+    
 }

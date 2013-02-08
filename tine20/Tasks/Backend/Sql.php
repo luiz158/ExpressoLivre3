@@ -47,6 +47,13 @@ class Tasks_Backend_Sql extends Tinebase_Backend_Sql_Abstract
     protected $_modlogActive = TRUE;
 
     /**
+     * default column(s) for count
+     *
+     * @var string
+     */
+    protected $_defaultCountCol = 'id';
+
+    /**
      * For some said reason, Zend_Db doesn't support table prefixes. Thus each 
      * table calss needs to implement it its own.
      * 
@@ -138,7 +145,7 @@ class Tasks_Backend_Sql extends Tinebase_Backend_Sql_Abstract
         foreach (array('contact') as $table) {
             $TableObject = $this->_getTableInstance($table);
             $deletedRows += $TableObject->delete(
-                $this->_db->quoteInto('task_id = ?', $_parentTaskId)
+                $this->_db->quoteInto($this->_db->quoteIdentifier('task_id') .' = ?', $_parentTaskId)
             );
         }
         return $deletedRows;
@@ -152,7 +159,7 @@ class Tasks_Backend_Sql extends Tinebase_Backend_Sql_Abstract
      */
     protected function _seperateTaskData($_task)
     {
-    	$_task->convertDates = true;
+        $_task->convertDates = true;
         $taskArray = $_task->toArray();
         $TableDescr = $this->_getTableInstance('tasks')->info();
         $taskparts['tasks'] = array_intersect_key($taskArray, array_flip($TableDescr['cols']));

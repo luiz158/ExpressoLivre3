@@ -1,19 +1,19 @@
+# 
+# Translators:
 msgid ""
 msgstr ""
-"Project-Id-Version: Tine 2.0 - Timetracker\n"
-"Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: \n"
-"PO-Revision-Date: 2012-02-28 18:38+0000\n"
-"Last-Translator: Cornelius Weiss <c.weiss@metaways.de>\n"
-"Language-Team: Tine 2.0 Translators\n"
-"Language: \n"
+"Project-Id-Version: Tine 2.0\n"
+"POT-Creation-Date: 2008-05-17 22:12+0100\n"
+"PO-Revision-Date: 2012-11-28 11:49+0000\n"
+"Last-Translator: pschuele <p.schuele@metaways.de>\n"
+"Language-Team: Czech (http://www.transifex.com/projects/p/tine20/language/cs/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Language: cs\n"
 "Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
-"X-Launchpad-Export-Date: 2012-03-02 09:32+0000\n"
-"X-Generator: Launchpad (build 14886)\n"
-"X-Poedit-Language: Czech\n"
+"X-Poedit-Country: GB\n"
+"X-Poedit-Language: en\n"
 "X-Poedit-SourceCharset: utf-8\n"
 
 #: Acl/Rights.php:105
@@ -36,278 +36,307 @@ msgstr ""
 msgid "Create or update shared timetracker favorites"
 msgstr "Vytvořit nebo aktualizovat sdílené oblíbené položky sledování času"
 
-#: js/DurationSlider.js:94
-msgid "{0}"
-msgstr "{0}"
+#: Model/Timeaccount.php:43 js/TimeaccountEditDialog.js:117
+msgid "Cost Center"
+msgstr ""
 
-#: js/DurationSpinner.js:62 js/DurationSpinner.js:72
-msgid "Not a valid time"
-msgstr "Neplatný čas"
+#: Setup/setup.xml:4
+msgid "Timetracker"
+msgstr "Sledování času"
 
-#: js/Models.js:45 js/TimesheetEditDialog.js:122
-msgid "Timesheet"
-msgid_plural "Timesheets"
-msgstr[0] "Pracovní výkaz"
-msgstr[1] "Pracovní výkazy"
-msgstr[2] "Pracovních výkazů"
+#: Setup/setup.xml:81 js/TimeaccountEditDialog.js:90
+#: js/TimeAccountBilledFilterModel.js:47
+msgid "not yet billed"
+msgstr "zatím neúčtovaný"
 
-#: js/Models.js:49
-msgid "timesheets list"
-msgid_plural "timesheets lists"
-msgstr[0] "seznam pracovních výkazů"
-msgstr[1] "seznamy pracovních výkazů"
-msgstr[2] "seznamů pracovních výkazů"
+#: Setup/setup.xml:82 js/TimeaccountEditDialog.js:91
+#: js/TimeAccountBilledFilterModel.js:48
+msgid "to bill"
+msgstr "k účtování"
 
-#: js/Models.js:84 js/Models.js:155
-msgid "Quick search"
-msgstr "Rychlé hledání"
+#: Setup/setup.xml:83 js/TimeaccountEditDialog.js:92
+#: js/TimeAccountBilledFilterModel.js:49
+msgid "billed"
+msgstr "účtovaný"
 
-#: js/Models.js:85 js/TimesheetEditDialog.js:186 js/TimesheetGridPanel.js:110
-msgid "Account"
-msgstr "Účet"
+#: Setup/Update/Release5.php:81 Setup/Initialize.php:112
+msgid "Timeaccounts to bill"
+msgstr ""
 
-#: js/Models.js:86 js/TimesheetEditDialog.js:157 js/TimesheetGridPanel.js:96
-msgid "Date"
-msgstr "Datum"
+#: Setup/Update/Release5.php:95 Setup/Initialize.php:126
+msgid "Timeaccounts not yet billed"
+msgstr ""
 
-#: js/Models.js:87 js/Models.js:158 js/TimeaccountEditDialog.js:92
-#: js/TimeaccountEditDialog.js:168 js/TimesheetEditDialog.js:170
-#: js/TimesheetGridPanel.js:104 js/TimesheetGridPanel.js:252
-msgid "Description"
-msgstr "Popis"
+#: Setup/Update/Release5.php:109 Setup/Initialize.php:141
+msgid "Timeaccounts already billed"
+msgstr ""
 
-#: js/Models.js:88 js/TimesheetEditDialog.js:191 js/TimesheetGridPanel.js:105
-#: js/TimesheetGridPanel.js:391
-msgid "Billable"
-msgstr "Lze účtovat"
+#: Setup/Initialize.php:33
+msgid "My Timesheets today"
+msgstr ""
 
-#: js/Models.js:89 js/TimesheetEditDialog.js:197 js/TimesheetGridPanel.js:107
-#: js/TimesheetGridPanel.js:396
-msgid "Cleared"
-msgstr "Zaplaceno"
+#: Setup/Initialize.php:47
+msgid "My Timesheets this week"
+msgstr ""
 
-#: js/Models.js:131 js/TimeaccountEditDialog.js:66
-#: js/TimesheetEditDialog.js:139 js/TimesheetGridPanel.js:100
+#: Setup/Initialize.php:61
+msgid "My Timesheets last week"
+msgstr ""
+
+#: Setup/Initialize.php:75
+msgid "My Timesheets this month"
+msgstr ""
+
+#: Setup/Initialize.php:89
+msgid "My Timesheets last month"
+msgstr ""
+
+#: Preference.php:64
+msgid "Timesheets ODS export configuration"
+msgstr "Konfigurace exportu pracovních výkazů do ODS"
+
+#: Preference.php:65
+msgid "Use this configuration for the timesheet ODS export."
+msgstr "Použít tuto konfiguraci pro export pracovních výkazů do ODS."
+
+#: Preference.php:116
+msgid "default"
+msgstr "výchozí"
+
+#: js/TimeaccountEditDialog.js:62
+msgid "Unit"
+msgstr "Jednotka"
+
+#: js/TimeaccountEditDialog.js:66
+msgid "Unit Price"
+msgstr "Jednotková cena"
+
+#: js/TimeaccountEditDialog.js:71 js/TimeaccountGridPanel.js:112
+msgid "Budget"
+msgstr "Rozpočet"
+
+#: js/TimeaccountEditDialog.js:74 js/TimeaccountGridPanel.js:129
+#: js/Models.js:171
+msgid "Status"
+msgstr "Stav"
+
+#: js/TimeaccountEditDialog.js:80 js/TimeAccountStatusFilterModel.js:46
+#: js/TimeaccountGridPanel.js:134 js/Models.js:149
+msgid "closed"
+msgstr "uzavřený"
+
+#: js/TimeaccountEditDialog.js:80 js/TimeAccountStatusFilterModel.js:46
+#: js/TimeaccountGridPanel.js:133
+msgid "open"
+msgstr "otevřený"
+
+#: js/TimeaccountEditDialog.js:82 js/TimeaccountGridPanel.js:106
+#: js/Models.js:170
+msgid "Billed"
+msgstr "Účtovaný"
+
+#: js/TimeaccountEditDialog.js:96
+msgid "not cleared yet..."
+msgstr "dosud nezúčtováno..."
+
+#: js/TimeaccountEditDialog.js:97 js/TimesheetEditDialog.js:210
+msgid "Cleared In"
+msgstr "Zaplaceno v"
+
+#: js/TimeaccountEditDialog.js:101 js/TimeaccountGridPanel.js:124
+#: js/Models.js:176
+msgid "Booking deadline"
+msgstr "Nejzazší termín rezervace"
+
+#: js/TimeaccountEditDialog.js:109
+msgid "none"
+msgstr "žádný"
+
+#: js/TimeaccountEditDialog.js:110
+msgid "last week"
+msgstr "minulý týden"
+
+#: js/TimeaccountEditDialog.js:130
+msgid "Timesheets are billable"
+msgstr "Pracovní výkazy lze účtovat"
+
+#: js/TimeaccountEditDialog.js:145 js/TimesheetEditDialog.js:144
+#: js/Models.js:141
 msgid "Time Account"
 msgid_plural "Time Accounts"
 msgstr[0] "Časový fond"
 msgstr[1] "Časové fondy"
 msgstr[2] "Časových fondů"
 
-#: js/Models.js:135
-msgid "timeaccount list"
-msgid_plural "timeaccount lists"
-msgstr[0] "seznam časových fondů"
-msgstr[1] "seznamy časových fondů"
-msgstr[2] "seznamů časových fondů"
-
-#: js/Models.js:139 js/TimeaccountEditDialog.js:115
-msgid "closed"
-msgstr "uzavřený"
-
-#: js/Models.js:156 js/TimeaccountEditDialog.js:82
-#: js/TimeaccountGridPanel.js:94
+#: js/TimeaccountEditDialog.js:161 js/TimeaccountGridPanel.js:96
+#: js/Models.js:167
 msgid "Number"
 msgstr "Číslo"
 
-#: js/Models.js:157 js/TimeaccountEditDialog.js:87
-#: js/TimeaccountGridPanel.js:99
+#: js/TimeaccountEditDialog.js:166 js/TimeaccountGridPanel.js:101
+#: js/Models.js:168
 msgid "Title"
 msgstr "Název"
 
-#: js/Models.js:159
-msgid "Created By"
-msgstr "Vytvořil(a)"
+#: js/TimeaccountEditDialog.js:171 js/TimeaccountEditDialog.js:190
+#: js/TimesheetEditDialog.js:175 js/TimesheetGridPanel.js:104
+#: js/TimesheetGridPanel.js:252 js/Models.js:90 js/Models.js:169
+msgid "Description"
+msgstr "Popis"
 
-#: js/Models.js:160 js/TimeaccountEditDialog.js:109
-#: js/TimeaccountGridPanel.js:104
-msgid "Status"
-msgstr "Stav"
-
-#: js/Models.js:161 js/TimeaccountEditDialog.js:136
-#: js/TimeaccountGridPanel.js:122
-msgid "Booking deadline"
-msgstr "Nejzazší termín rezervace"
-
-#: js/TimeaccountEditDialog.js:97
-msgid "Unit"
-msgstr "Jednotka"
-
-#: js/TimeaccountEditDialog.js:101
-msgid "Unit Price"
-msgstr "Jednotková cena"
-
-#: js/TimeaccountEditDialog.js:106 js/TimeaccountGridPanel.js:110
-msgid "Budget"
-msgstr "Rozpočet"
-
-#: js/TimeaccountEditDialog.js:115
-msgid "open"
-msgstr "otevřený"
-
-#: js/TimeaccountEditDialog.js:117
-msgid "Billed"
-msgstr "Účtovaný"
-
-#: js/TimeaccountEditDialog.js:125 js/TimeAccountStatusFilterModel.js:47
-#: Setup/setup.xml:81
-msgid "not yet billed"
-msgstr "zatím neúčtovaný"
-
-#: js/TimeaccountEditDialog.js:126 js/TimeAccountStatusFilterModel.js:48
-#: Setup/setup.xml:82
-msgid "to bill"
-msgstr "k účtování"
-
-#: js/TimeaccountEditDialog.js:127 js/TimeAccountStatusFilterModel.js:49
-#: Setup/setup.xml:83
-msgid "billed"
-msgstr "účtovaný"
-
-#: js/TimeaccountEditDialog.js:131
-msgid "not cleared yet..."
-msgstr "dosud nezúčtováno..."
-
-#: js/TimeaccountEditDialog.js:132 js/TimesheetEditDialog.js:207
-msgid "Cleared In"
-msgstr "Zaplaceno v"
-
-#: js/TimeaccountEditDialog.js:144
-msgid "none"
-msgstr "žádný"
-
-#: js/TimeaccountEditDialog.js:145
-msgid "last week"
-msgstr "minulý týden"
-
-#: js/TimeaccountEditDialog.js:149
-msgid "Timesheets are billable"
-msgstr "Pracovní výkazy lze účtovat"
-
-#: js/TimeaccountEditDialog.js:182
+#: js/TimeaccountEditDialog.js:204
 msgid "Enter description"
 msgstr "Zadejte popis"
 
-#: js/TimeaccountEditDialog.js:198
+#: js/TimeaccountEditDialog.js:220
 msgid "Access"
 msgstr "Přístup"
 
-#: js/TimeaccountEditDialog.js:221
+#: js/TimeaccountEditDialog.js:243
 msgid "Book Own"
 msgstr "Zakládat vlastní"
 
-#: js/TimeaccountEditDialog.js:223
+#: js/TimeaccountEditDialog.js:245
 msgid "The grant to add Timesheets to this Timeaccount"
 msgstr "Oprávnění přidávat pracovní výkazy k tomuto časovému fondu"
 
-#: js/TimeaccountEditDialog.js:227
+#: js/TimeaccountEditDialog.js:249
 msgid "View All"
 msgstr "Prohlížet vše"
 
-#: js/TimeaccountEditDialog.js:228
+#: js/TimeaccountEditDialog.js:250
 msgid "The grant to view Timesheets of other users"
 msgstr "Oprávnění prohlížet pracovní výkazy ostatních uživatelů"
 
-#: js/TimeaccountEditDialog.js:233
+#: js/TimeaccountEditDialog.js:255
 msgid "Book All"
 msgstr "Zakládat vše"
 
-#: js/TimeaccountEditDialog.js:234
+#: js/TimeaccountEditDialog.js:256
 msgid "The grant to add Timesheets for other users"
 msgstr "Oprávnění přidávat pracovní výkazy ostatním uživatelům"
 
-#: js/TimeaccountEditDialog.js:239
+#: js/TimeaccountEditDialog.js:261
 msgid "Manage Clearing"
 msgstr "Spravovat platby"
 
-#: js/TimeaccountEditDialog.js:240
+#: js/TimeaccountEditDialog.js:262
 msgid "The grant to manage clearing of Timesheets"
 msgstr "Oprávnění spravovat vyúčtování pracovních výkazů"
 
-#: js/TimeaccountEditDialog.js:245 js/TimeaccountGridPanel.js:143
+#: js/TimeaccountEditDialog.js:267 js/TimeaccountGridPanel.js:156
 msgid "Export"
 msgstr "Exportovat"
 
-#: js/TimeaccountEditDialog.js:246
+#: js/TimeaccountEditDialog.js:268
 msgid "The grant to export Timesheets of Timeaccount"
 msgstr "Oprávnění exportovat pracovní výkazy časového fondu"
 
-#: js/TimeaccountEditDialog.js:251
+#: js/TimeaccountEditDialog.js:273
 msgid "Manage All"
 msgstr "Spravovat vše"
 
-#: js/TimeaccountEditDialog.js:252
+#: js/TimeaccountEditDialog.js:274
 msgid "Includes all other grants"
 msgstr "Zahrnuje všechna ostatní oprávnění"
 
-#: js/TimeaccountEditDialog.js:260
+#: js/TimeaccountEditDialog.js:282
 msgid "Permissions"
 msgstr "Oprávnění"
 
-#: js/TimeaccountGridPanel.js:91 js/TimesheetGridPanel.js:94
-msgid "Tags"
-msgstr "Štítky"
+#: js/TimesheetEditDialog.js:127 js/Models.js:48
+msgid "Timesheet"
+msgid_plural "Timesheets"
+msgstr[0] "Pracovní výkaz"
+msgstr[1] "Pracovní výkazy"
+msgstr[2] "Pracovních výkazů"
 
-#: js/TimeaccountGridPanel.js:116 js/TimesheetGridPanel.js:109
-#: js/TimesheetGridPanel.js:401
-msgid "Cleared in"
-msgstr "Zaplaceno v"
+#: js/TimesheetEditDialog.js:145
+msgid "Select Time Account..."
+msgstr "Vyberte časový fond..."
 
-#: js/TimeaccountGridPanel.js:152 js/TimesheetGridPanel.js:326
-msgid "Export as ODS"
-msgstr "Exportovat do ODS"
+#: js/TimesheetEditDialog.js:159 js/TimesheetGridPanel.js:112
+msgid "Duration"
+msgstr "Trvání"
 
-#: js/TimeaccountGridPanel.js:159 js/TimesheetGridPanel.js:333
-msgid "Export as CSV"
-msgstr "Exportovat do CSV"
+#: js/TimesheetEditDialog.js:164 js/TimesheetGridPanel.js:96 js/Models.js:89
+msgid "Date"
+msgstr "Datum"
 
-#: js/TimeaccountGridPanel.js:170 js/TimeaccountPickerCombo.js:44
+#: js/TimesheetEditDialog.js:169
+msgid "Start"
+msgstr "Začátek"
+
+#: js/TimesheetEditDialog.js:170
+msgid "not set"
+msgstr "není nastaveno"
+
+#: js/TimesheetEditDialog.js:176
+msgid "Enter description..."
+msgstr "Zadejte popis..."
+
+#: js/TimesheetEditDialog.js:189 js/TimesheetGridPanel.js:110 js/Models.js:88
+msgid "Account"
+msgstr "Účet"
+
+#: js/TimesheetEditDialog.js:194 js/TimesheetGridPanel.js:105
+#: js/TimesheetGridPanel.js:393 js/Models.js:91
+msgid "Billable"
+msgstr "Lze účtovat"
+
+#: js/TimesheetEditDialog.js:200 js/TimesheetGridPanel.js:107
+#: js/TimesheetGridPanel.js:398 js/Models.js:92
+msgid "Cleared"
+msgstr "Zaplaceno"
+
+#: js/TimesheetEditDialog.js:258
+msgid "Failed"
+msgstr "Nezdařilo se"
+
+#: js/TimesheetEditDialog.js:259
+msgid "Could not save {0}."
+msgstr "Nepodařilo se uložit {0}."
+
+#: js/TimesheetEditDialog.js:260
+msgid "Booking deadline for this Timeaccount has been exceeded."
+msgstr "Nejzazší termín rezervace tohoto časového fondu byl překročen."
+
+#: js/DurationSpinner.js:69 js/DurationSpinner.js:79
+msgid "Not a valid time"
+msgstr "Neplatný čas"
+
+#: js/TimeaccountPickerCombo.js:46
 msgid "Show closed"
 msgstr "Zobrazit uzavřené"
+
+#: js/Timetracker.js:25
+msgid "New Timesheet"
+msgstr ""
 
 #: js/TimeAccountStatusFilterModel.js:24
 msgid "Time Account - Status"
 msgstr "Stav časového fondu"
 
-#: js/TimesheetEditDialog.js:140
-msgid "Select Time Account..."
-msgstr "Vyberte časový fond..."
-
-#: js/TimesheetEditDialog.js:151 js/TimesheetGridPanel.js:112
-msgid "Duration"
-msgstr "Trvání"
-
-#: js/TimesheetEditDialog.js:163
-msgid "Start"
-msgstr "Začátek"
-
-#: js/TimesheetEditDialog.js:164
-msgid "not set"
-msgstr "není nastaveno"
-
-#: js/TimesheetEditDialog.js:171
-msgid "Enter description..."
-msgstr "Zadejte popis..."
-
-#: js/TimesheetEditDialog.js:255
-msgid "Failed"
-msgstr "Nezdařilo se"
-
-#: js/TimesheetEditDialog.js:256
-msgid "Could not save {0}."
-msgstr "Nepodařilo se uložit {0}."
-
-#: js/TimesheetEditDialog.js:257
-msgid "Booking deadline for this Timeaccount has been exceeded."
-msgstr "Nejzazší termín rezervace tohoto časového fondu byl překročen."
+#: js/TimesheetGridPanel.js:94 js/TimeaccountGridPanel.js:93
+msgid "Tags"
+msgstr "Štítky"
 
 #: js/TimesheetGridPanel.js:98
 msgid "Start time"
 msgstr "Počáteční čas"
 
+#: js/TimesheetGridPanel.js:100
+msgid "Time Account (Number - Title)"
+msgstr ""
+
 #: js/TimesheetGridPanel.js:102
 msgid "Time Account closed"
 msgstr "Časový fond uzavřen"
+
+#: js/TimesheetGridPanel.js:109 js/TimesheetGridPanel.js:403
+#: js/TimeaccountGridPanel.js:118
+msgid "Cleared in"
+msgstr "Zaplaceno v"
 
 #: js/TimesheetGridPanel.js:165
 msgid "timeframe"
@@ -337,142 +366,76 @@ msgstr "Čas účtovatelných výkazů"
 msgid "Detail"
 msgstr "Detail"
 
-#: js/TimesheetGridPanel.js:317
+#: js/TimesheetGridPanel.js:319
 msgid "Export Timesheets"
 msgstr ""
 
-#: js/TimesheetGridPanel.js:340
+#: js/TimesheetGridPanel.js:328 js/TimeaccountGridPanel.js:165
+msgid "Export as ODS"
+msgstr "Exportovat do ODS"
+
+#: js/TimesheetGridPanel.js:335 js/TimeaccountGridPanel.js:172
+msgid "Export as CSV"
+msgstr "Exportovat do CSV"
+
+#: js/TimesheetGridPanel.js:342
 msgid "Export as ..."
 msgstr ""
 
-#: js/TimesheetGridPanel.js:383
+#: js/TimesheetGridPanel.js:385
 msgid "Mass Update"
 msgstr "Hromadná aktualizace"
 
-#: js/TimesheetGridPanel.js:389
+#: js/TimesheetGridPanel.js:391
 msgid "Update field:"
 msgstr "Aktualizovat pole:"
 
-#: js/Timetracker.js:25
-msgid "New Timesheet"
+#: js/TimeAccountBilledFilterModel.js:24
+msgid "Time Account - Billed"
 msgstr ""
 
-#: Preference.php:64
-msgid "Timesheets ODS export configuration"
-msgstr "Konfigurace exportu pracovních výkazů do ODS"
+#: js/DurationSlider.js:94
+msgid "{0}"
+msgstr "{0}"
 
-#: Preference.php:65
-msgid "Use this configuration for the timesheet ODS export."
-msgstr "Použít tuto konfiguraci pro export pracovních výkazů do ODS."
-
-#: Preference.php:116
-msgid "default"
-msgstr "výchozí"
-
-#: Setup/Initialize.php:33
-msgid "My Timesheets today"
+#: js/TimeAccountContractFilterModel.js:30
+msgid "Contract"
 msgstr ""
 
-#: Setup/Initialize.php:47
-msgid "My Timesheets this week"
+#: js/TimeAccountContractFilterModel.js:32
+msgid "without contract"
 msgstr ""
 
-#: Setup/Initialize.php:61
-msgid "My Timesheets last week"
-msgstr ""
+#: js/Models.js:52
+msgid "timesheets list"
+msgid_plural "timesheets lists"
+msgstr[0] "seznam pracovních výkazů"
+msgstr[1] "seznamy pracovních výkazů"
+msgstr[2] "seznamů pracovních výkazů"
 
-#: Setup/Initialize.php:75
-msgid "My Timesheets this month"
-msgstr ""
+#: js/Models.js:87 js/Models.js:166
+msgid "Quick search"
+msgstr "Rychlé hledání"
 
-#: Setup/Initialize.php:89
-msgid "My Timesheets last month"
-msgstr ""
-
-#: Setup/Initialize.php:112 Setup/Update/Release5.php:81
-msgid "Timeaccounts to bill"
-msgstr ""
-
-#: Setup/Initialize.php:126 Setup/Update/Release5.php:95
-msgid "Timeaccounts not yet billed"
-msgstr ""
-
-#: Setup/Initialize.php:141 Setup/Update/Release5.php:109
-msgid "Timeaccounts already billed"
-msgstr ""
-
-#: Setup/setup.xml:4
-msgid "Timetracker"
-msgstr "Sledování času"
-
-msgid "Update {0} records"
-msgstr "Aktualizovat {0} záznamů"
-
-msgid "Cancel"
-msgstr "Storno"
-
-msgid "Ok"
-msgstr "OK"
-
-msgid "Success"
-msgstr "Podařilo se"
-
-msgid "Updated {0} records"
-msgstr "Zaktualizováno {0} záznamů"
-
-msgid "Add, edit and delete timeaccounts"
-msgstr "Přidat, editovat a smazat časové fondy"
-
-msgid "manage shared timetracker favorites"
-msgstr "Spravovat sdílené oblíbené položky sledování času"
-
-msgid "Creation Time"
-msgstr "Vytvořeno"
-
+#: js/Models.js:93 js/Models.js:172
 msgid "Last Modified Time"
-msgstr "Naposledy změněno"
+msgstr ""
 
-msgid "Total Sum"
-msgstr "Celkový součet"
+#: js/Models.js:94 js/Models.js:173
+msgid "Last Modified By"
+msgstr ""
 
-msgid "Not billable"
-msgstr "Nelze účtovat"
+#: js/Models.js:95 js/Models.js:174
+msgid "Creation Time"
+msgstr ""
 
-msgid "Total"
-msgstr "Celkem"
+#: js/Models.js:96 js/Models.js:175
+msgid "Created By"
+msgstr "Vytvořil(a)"
 
-msgid "Timeaccount Number"
-msgstr "Číslo časového fondu"
-
-msgid "Timeaccount"
-msgstr "Časový fond"
-
-msgid "Staff Member"
-msgstr "Člen týmu"
-
-msgid "Open"
-msgstr "Otevřený"
-
-msgid "Filter"
-msgstr "Filtr"
-
-msgid "Times could be added"
-msgstr "Časy mohou být přidány"
-
-msgid "Timesheets"
-msgstr "Pracovní výkazy"
-
-msgid "All Timesheets"
-msgstr "Všechny pracovní výkazy"
-
-msgid "Timeaccounts"
-msgstr "Časové fondy"
-
-msgid "All Timeaccounts"
-msgstr "Všechny časové fondy"
-
-#~ msgid "Billed in ..."
-#~ msgstr "Účtováno v..."
-
-#~ msgid "Searching..."
-#~ msgstr "Hledám..."
+#: js/Models.js:145
+msgid "timeaccount list"
+msgid_plural "timeaccount lists"
+msgstr[0] "seznam časových fondů"
+msgstr[1] "seznamy časových fondů"
+msgstr[2] "seznamů časových fondů"

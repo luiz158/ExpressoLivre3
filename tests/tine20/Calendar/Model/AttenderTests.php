@@ -13,10 +13,6 @@
  */
 require_once dirname(dirname(dirname(__FILE__))) . DIRECTORY_SEPARATOR . 'TestHelper.php';
 
-if (!defined('PHPUnit_MAIN_METHOD')) {
-    define('PHPUnit_MAIN_METHOD', 'Calendar_Model_AttenderTests::main');
-}
-
 /**
  * Test class for Calendar_Model_Attender
  * 
@@ -36,9 +32,9 @@ class Calendar_Model_AttenderTests extends Calendar_TestCase
         
         foreach($this->_testEmailContacts as $email) {
             $contactIdsToDelete = Addressbook_Controller_Contact::getInstance()->search(new Addressbook_Model_ContactFilter(array(
-        	    array('field' => 'containerType', 'operator' => 'equals', 'value' => 'all'),
+                array('field' => 'containerType', 'operator' => 'equals', 'value' => 'all'),
                 array('field' => 'email',      'operator'  => 'equals', 'value' => $email)
-        	)), null, false, true);
+            )), null, false, true);
             
             Addressbook_Controller_Contact::getInstance()->delete($contactIdsToDelete);
         }
@@ -49,8 +45,8 @@ class Calendar_Model_AttenderTests extends Calendar_TestCase
      */
     public function testEmailsToAttendee()
     {
-    	$event = $this->_getEvent();
-    	
+        $event = $this->_getEvent();
+        
         $persistentEvent = Calendar_Controller_Event::getInstance()->create($event);
         
         $sclever = Tinebase_User::getInstance()->getUserByLoginName('sclever', 'Tinebase_Model_FullUser');
@@ -61,9 +57,9 @@ class Calendar_Model_AttenderTests extends Calendar_TestCase
         
         $newAttendees = array(
             array(
-            	'userType'    => Calendar_Model_Attender::USERTYPE_USER,
+                'userType'    => Calendar_Model_Attender::USERTYPE_USER,
                 'firstName'   => $this->_testUser->accountFirstName,
-        		'lastName'    => $this->_testUser->accountLastName,
+                'lastName'    => $this->_testUser->accountLastName,
                 'partStat'    => Calendar_Model_Attender::STATUS_ACCEPTED,
                 'role'        => Calendar_Model_Attender::ROLE_REQUIRED,
                 'email'       => $this->_testUser->accountEmailAddress
@@ -76,9 +72,9 @@ class Calendar_Model_AttenderTests extends Calendar_TestCase
                 'email'       => $sclever->accountEmailAddress
             ),
             array(
-            	'userType'    => Calendar_Model_Attender::USERTYPE_USER,
+                'userType'    => Calendar_Model_Attender::USERTYPE_USER,
                 'firstName'   => 'Lars',
-        		'lastName'    => 'Kneschke',
+                'lastName'    => 'Kneschke',
                 'partStat'    => Calendar_Model_Attender::STATUS_TENTATIVE,
                 'role'        => Calendar_Model_Attender::ROLE_REQUIRED,
                 'email'       => $newEmail
@@ -98,17 +94,17 @@ class Calendar_Model_AttenderTests extends Calendar_TestCase
      */
     public function testEmailsToAttendeeWithGroups()
     {
-    	$event = $this->_getEvent();
-    	
+        $event = $this->_getEvent();
+        
         $persistentEvent = Calendar_Controller_Event::getInstance()->create($event);
         
         $primaryGroup = Tinebase_Group::getInstance()->getGroupById(Tinebase_Core::getUser()->accountPrimaryGroup);
         
         $newAttendees = array(
             array(
-            	'userType'    => Calendar_Model_Attender::USERTYPE_USER,
+                'userType'    => Calendar_Model_Attender::USERTYPE_USER,
                 'firstName'   => $this->_testUser->accountFirstName,
-        		'lastName'    => $this->_testUser->accountLastName,
+                'lastName'    => $this->_testUser->accountLastName,
                 'partStat'    => Calendar_Model_Attender::STATUS_TENTATIVE,
                 'role'        => Calendar_Model_Attender::ROLE_REQUIRED,
                 'email'       => $this->_testUser->accountEmailAddress
@@ -134,26 +130,70 @@ class Calendar_Model_AttenderTests extends Calendar_TestCase
         
         foreach ($attendees as $attendee) {
             $newAttendees[] = array(
-            	'userType'    => $attendee->user_type == 'group' ? Calendar_Model_Attender::USERTYPE_GROUP : Calendar_Model_Attender::USERTYPE_USER,
-            	'partStat'    => Calendar_Model_Attender::STATUS_TENTATIVE,
-            	'role'        => Calendar_Model_Attender::ROLE_REQUIRED,
-            	'email'       => $attendee->user_type == 'group' ? $attendee->user_id->getId() : $attendee->user_id->email,
-            	'displayName' => $attendee->user_type == 'group' ? $attendee->user_id->name : $attendee->user_id->n_fileas
-            ); 
+                'userType'    => $attendee->user_type == 'group' ? Calendar_Model_Attender::USERTYPE_GROUP : Calendar_Model_Attender::USERTYPE_USER,
+                'partStat'    => Calendar_Model_Attender::STATUS_TENTATIVE,
+                'role'        => Calendar_Model_Attender::ROLE_REQUIRED,
+                'email'       => $attendee->user_type == 'group' ? $attendee->user_id->getId() : $attendee->user_id->email,
+                'displayName' => $attendee->user_type == 'group' ? $attendee->user_id->name : $attendee->user_id->n_fileas
+            );
         }
         
         Calendar_Model_Attender::emailsToAttendee($persistentEvent, $newAttendees, TRUE);
         
         $persistentEvent = Calendar_Controller_Event::getInstance()->update($persistentEvent);
         
-        //var_dump($persistentEvent->attendee->toArray());
+//         print_r($persistentEvent->attendee->toArray());
         
         // there must be more than 2 attendees the user, the group + the groupmembers
         $this->assertGreaterThan(2, count($persistentEvent->attendee));
+        
+        // current account must not be a groupmember
+        $this->assertFalse(!! Calendar_Model_Attender::getAttendee($persistentEvent->attendee, new Calendar_Model_Attender(array(
+            'user_type'    => Calendar_Model_Attender::USERTYPE_GROUPMEMBER,
+            'user_id'      => $this->_testUser->contact_id
+        ))), 'found user as groupmember');
+        
+        $this->assertEquals(Calendar_Model_Attender::STATUS_TENTATIVE, Calendar_Model_Attender::getOwnAttender($persistentEvent->attendee)->status);
     }
-}
     
-
-if (PHPUnit_MAIN_METHOD == 'Calendar_Model_AttenderTests::main') {
-    Calendar_Model_AttenderTests::main();
+    public function testEmailsToAttendeeWithMissingMail()
+    {
+        $contact = new Addressbook_Model_Contact(array(
+            'org_name'   => 'unittestorg',
+            'email'      => '',
+            'email_home' => '',
+        ));
+        $persistentContact = Addressbook_Controller_Contact::getInstance()->create($contact, FALSE);
+        
+        $event = $this->_getEvent();
+        $event->attendee->addRecord(new Calendar_Model_Attender(array(
+            'user_type'    => Calendar_Model_Attender::USERTYPE_USER,
+            'user_id'      => $persistentContact->getId(),
+            'role'         => Calendar_Model_Attender::ROLE_REQUIRED,
+        )));
+        
+        $persistentEvent = Calendar_Controller_Event::getInstance()->create($event);
+        
+        $clientAttendee = array();
+        foreach($persistentEvent->attendee as $attendee) {
+            $clientAttendee[] = array(
+                'userType'  => Calendar_Model_Attender::USERTYPE_USER,
+                'email'     => $attendee->getEmail(),
+                'role'      => $attendee->role,
+            );
+        }
+        
+        Calendar_Model_Attender::emailsToAttendee($persistentEvent, $clientAttendee, TRUE);
+        
+        $userIds = $persistentEvent->attendee->user_id;
+        foreach($userIds as $idx => $id) {
+            if ($id instanceof Tinebase_Record_Abstract) {
+                $userIds[$idx] = $id->getId();
+            }
+        }
+        $this->assertEquals(3, count($userIds));
+        $this->assertTrue(in_array($this->_testUserContact->getId(), $userIds), 'testaccount missing');
+        $this->assertTrue(in_array($this->_personasContacts['sclever']->getId(), $userIds), 'sclever missing');
+        $this->assertTrue(in_array($persistentContact->getId(), $userIds), 'unittestorg missing');
+    }
 }

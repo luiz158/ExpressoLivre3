@@ -3,7 +3,7 @@
  * 
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2011-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  */
  
 /*global Ext, Tine*/
@@ -42,7 +42,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
      * definition properties for cusomfield
      * @type {Array}
      */
-    definitionFields: ['label', 'type', 'value_search', 'length'],
+    definitionFields: ['label', 'type', 'value_search', 'length', 'required'],
     
     /**
      * ui properties for customfield
@@ -85,7 +85,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
             
             // load specific values for fields with store
             if (this.record.get('definition')[this.fieldType + 'Config']) {
-            	this[this.fieldType + 'Config'] = this.record.get('definition')[this.fieldType + 'Config'];
+                this[this.fieldType + 'Config'] = this.record.get('definition')[this.fieldType + 'Config'];
             }
         }
     },    
@@ -106,7 +106,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
         Ext.each(this.definitionFields, function (name) {
             var field = this.getForm().findField(name);
             
-            if (! field.disabled && (name !== 'value_search' || (name === 'value_search' && field.getValue() == 1))) { 
+            if (! field.disabled && (name !== 'value_search' || (name === 'value_search' && field.getValue() == 1))) {
                 this.record.data.definition[name] = field.getValue();
             }
         }, this);
@@ -132,7 +132,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
      * @param {Ext.EventObject} event
      * @param {Boolean} closeWindow
      */
-    onApplyChanges: function (button, event, closeWindow) {
+    onApplyChanges: function () {
         if (this.fieldsWithStore.indexOf(this.fieldType) !== -1 && ! this[this.fieldType + 'Config']) {
             Ext.Msg.alert(_('Errors'), this.app.i18n._('Please configure store for this field type'));
             return;
@@ -160,23 +160,23 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
      * Set field with store config
      */ 
     onStoreWindowOK: function () {
-    	if (this[this.fieldType + 'Store'].isValid()) {
-	        this[this.fieldType + 'Config'] = {
-	            value: {
-	                records: this[this.fieldType + 'Store'].getValue()      
-	            }
-	        };
-	        
-	        // set default if defined for keyField
-	        if (this.fieldType === 'keyField') {
-		        var defaultRecIdx = this[this.fieldType + 'Store'].store.findExact('default', true);
-		        if (defaultRecIdx !== -1) {
-		            this[this.fieldType + 'Config'].value['default'] = this[this.fieldType + 'Store'].store.getAt(defaultRecIdx).get('id');
-		        }
-	        }
-	         
-	        this.onStoreWindowClose();
-    	}
+        if (this[this.fieldType + 'Store'].isValid()) {
+            this[this.fieldType + 'Config'] = {
+                value: {
+                    records: this[this.fieldType + 'Store'].getValue()      
+                }
+            };
+            
+            // set default if defined for keyField
+            if (this.fieldType === 'keyField') {
+                var defaultRecIdx = this[this.fieldType + 'Store'].store.findExact('default', true);
+                if (defaultRecIdx !== -1) {
+                    this[this.fieldType + 'Config'].value['default'] = this[this.fieldType + 'Store'].store.getAt(defaultRecIdx).get('id');
+                }
+            }
+             
+            this.onStoreWindowClose();
+        }
     },
     
     /**
@@ -199,7 +199,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
             appName     = Ext.isString(application) ? application : application.get('name'),
             app         = Tine.Tinebase.appMgr.get(appName),
             trans       = app && app.i18n ? app.i18n : Tine.Tinebase.translation,
-            appModels   = Tine[appName].Model; 
+            appModels   = Tine[appName].Model;
         
         if (appModels) {
             for (var model in appModels) {
@@ -228,7 +228,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
      * 
      * @returns {Tine.widgets.grid.QuickaddGridPanel}
      */
-    initKeyFieldStore: function () {      
+    initKeyFieldStore: function () {
         Tine.log.info('Initialize keyField store config');
         
         var self = this,
@@ -269,7 +269,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                                     r.set('default', false);
                                     r.commit(true);
                                 }
-                            }, this);   
+                            }, this);
                         }                       
                     }
                 }
@@ -278,7 +278,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
             getColumnModel: function () {
                 return new Ext.grid.ColumnModel([
                 defaultCheck,
-                { 
+                {
                     id: 'id', 
                     header: self.app.i18n._('ID'), 
                     dataIndex: 'id', 
@@ -287,7 +287,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                     quickaddField: new Ext.form.TextField({
                         emptyText: self.app.i18n._('Add a New ID...')
                     })
-                }, { 
+                }, {
                     id: 'value', 
                     header: self.app.i18n._('Value'), 
                     dataIndex: 'value', 
@@ -322,7 +322,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                 Tine.widgets.grid.QuickaddGridPanel.prototype.onNewentry.apply(this, arguments);
             },
             setValue: function (data) {
-            	this.setStoreFromArray(data);
+                this.setStoreFromArray(data);
             },
             getValue: function () {
                 var data = [];
@@ -336,7 +336,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                 return data;
             },
             isValid: function () {
-            	return true;
+                return true;
             }
         });
         
@@ -391,7 +391,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                 listeners: {
                     scope: this,
                     'select': function (combo, rec) {
-                    	// load combo with found models for selected application
+                        // load combo with found models for selected application
                         this[this.fieldType + 'Store'].items.get(1).store.loadData(this.getApplicationModels(rec, false));
                     }
                 }
@@ -411,29 +411,29 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                 allowBlank: false
             }],
             setValue: function (data) {
-            	var parts = data.split('.'), // e.g Tine.Admin.Model.Group
-            		app   = Tine.Tinebase.appMgr.get(parts[1]);
-            	
-            	// set value for application combo
-            	this.items.get(0).setValue(app.id);
-            	
-            	// load records based on application combo and set value
-            	this.items.get(1).store.loadData(self.getApplicationModels(app.appName, false));
-            	this.items.get(1).setValue(data);
-            	
+                var parts = data.split('.'), // e.g Tine.Admin.Model.Group
+                    app   = Tine.Tinebase.appMgr.get(parts[1]);
+                
+                // set value for application combo
+                this.items.get(0).setValue(app.id);
+                
+                // load records based on application combo and set value
+                this.items.get(1).store.loadData(self.getApplicationModels(app.appName, false));
+                this.items.get(1).setValue(data);
+                
             },
             getValue: function () {
-            	return this.items.get(1).getValue();
+                return this.items.get(1).getValue();
             },
             isValid: function () {
-            	try {
-            		var model = eval(this.items.get(1).getValue());
-            	} catch (e) {
-            		Ext.Msg.alert(_('Errors'), self.app.i18n._('Given record class not found'));
-            		return false;
-            	}
-            	
-            	return true;
+                try {
+                    var model = eval(this.items.get(1).getValue());
+                } catch (e) {
+                    Ext.Msg.alert(_('Errors'), self.app.i18n._('Given record class not found'));
+                    return false;
+                }
+                
+                return true;
             }
         });
         
@@ -456,6 +456,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
      */
     showStoreWindow: function () {
         this.storeWindow = Tine.WindowFactory.getWindow({
+            modal: true, // this needs to be modal atm, popup does not work due to issues with this in tineInit.js
             width: 500,
             height: 320,
             border: false,
@@ -607,6 +608,10 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                     fieldLabel: this.app.i18n._('Length'),
                     name: 'length',
                     disabled: this.record.id == 0 || this.record.get('definition').type !== 'string'
+                }, {
+                    xtype: 'checkbox',
+                    fieldLabel: this.app.i18n._('Required'),
+                    name: 'required'
                 }]
             }, {
                 xtype: 'fieldset',
@@ -629,7 +634,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                 xtype: 'hidden',
                 name: 'value_search',
                 value: 0
-            }]            
+            }]
         };
     },
     
@@ -641,7 +646,7 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
     isValid: function() {
         var result = Tine.Admin.UserEditDialog.superclass.isValid.call(this);
 
-        if (this.customFieldExists()) {
+        if (! this.record.id && this.customFieldExists()) {
             result = false;
             this.getForm().markInvalid([{
                 id: 'name',
@@ -685,8 +690,8 @@ Tine.Admin.CustomfieldEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
  */
 Tine.Admin.CustomfieldEditDialog.openWindow = function (config) {
     var window = Tine.WindowFactory.getWindow({
-        width: 450,
-        height: 450,
+        width: 500,
+        height: 500,
         name: Tine.Admin.CustomfieldEditDialog.prototype.windowNamePrefix + Ext.id(),
         contentPanelConstructor: 'Tine.Admin.CustomfieldEditDialog',
         contentPanelConstructorConfig: config

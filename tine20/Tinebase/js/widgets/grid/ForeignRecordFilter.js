@@ -68,7 +68,7 @@ Tine.widgets.grid.ForeignRecordFilter = Ext.extend(Tine.widgets.grid.FilterModel
     /**
      * @cfg {String} startDefinitionText untranslated start definition button text
      */
-    startDefinitionText: 'Start defintion', // _('Start defintion')
+    startDefinitionText: 'Start definition', // _('Start definition')
     
     /**
      * @property this filterModel is the generic filterRow
@@ -77,9 +77,12 @@ Tine.widgets.grid.ForeignRecordFilter = Ext.extend(Tine.widgets.grid.FilterModel
     isGeneric: false,
     
     field: 'foreignRecord',
-//    isForeignFilter: true,
-//    filterValueWidth: 200,
     
+    /**
+     * ignore this php models (filter is not shown)
+     * @cfg {Array}
+     */
+    ignoreRelatedModels: null,
     
     /**
      * @private
@@ -88,6 +91,9 @@ Tine.widgets.grid.ForeignRecordFilter = Ext.extend(Tine.widgets.grid.FilterModel
         if (this.foreignRecordClass) {
             this.foreignRecordClass = Tine.Tinebase.data.RecordMgr.get(this.foreignRecordClass);
         }
+        
+        // TODO: remove this when files can be searched
+        this.ignoreRelatedModels = this.ignoreRelatedModels ? this.ignoreRelatedModels.push('Filemanager_Model_Node') : ['Filemanager_Model_Node'];
         
         if (this.ownField) {
             this.field = this.ownField;
@@ -108,20 +114,15 @@ Tine.widgets.grid.ForeignRecordFilter = Ext.extend(Tine.widgets.grid.FilterModel
         
         // linkType relations automatic list
         if (this.ownRecordClass.hasField('relations')) {
-            Tine.Tinebase.data.RecordMgr.eachKey(function(key, record) {
-                if (record.hasField('relations') && Ext.isFunction(record.getFilterModel)) {
-                    var appName = record.getMeta('appName'),
-                        recordsName = record.getMeta('recordsName'),
-                        app = Tine.Tinebase.appMgr.get(appName),
-                        label = app ? app.i18n._hidden(recordsName) : recordsName;
-                    
-                    if (Tine.Tinebase.common.hasRight('run', appName)) {
-                        operators.push({operator: {linkType: 'relation', foreignRecordClass: record}, label: label});
-                    }
+            var operators = [];
+            Ext.each(Tine.widgets.relation.Manager.get(this.app, this.ownRecordClass, this.ignoreRelatedModels), function(relation) {
+                if (Tine.Tinebase.common.hasRight('run', relation.relatedApp)) {
+                    // TODO: leave label as it is?
+                    var label = relation.text.replace(/ \(.+\)/,'');
+                    operators.push({operator: {linkType: 'relation', foreignRecordClass: Tine.Tinebase.common.resolveModel(relation.relatedModel, relation.relatedApp)}, label: label});
                 }
             }, this);
         }
-
         // get operators from registry
         Ext.each(Tine.widgets.grid.ForeignRecordFilter.OperatorRegistry.get(this.ownRecordClass), function(def) {
             // translate label
@@ -155,7 +156,7 @@ Tine.widgets.grid.ForeignRecordFilter = Ext.extend(Tine.widgets.grid.FilterModel
         var foreignApp = Tine.Tinebase.appMgr.get(this.foreignRecordClass.getMeta('appName')),
             i18n;
         if (foreignApp) {
-            i18n = foreignApp.i18n;            
+            i18n = foreignApp.i18n;
         } else {
             i18n = new Locale.Gettext();
             i18n.textdomain('Tinebase');
@@ -189,7 +190,7 @@ Tine.widgets.grid.ForeignRecordFilter = Ext.extend(Tine.widgets.grid.FilterModel
     /**
      * get related record value data
      * 
-     * NOTE: generic filters have their foreign record defintion in the values
+     * NOTE: generic filters have their foreign record definition in the values
      */
     getRelatedRecordValue: function(filter) {
         var filters = filter.toolbar ? filter.toolbar.getValue() : [],
@@ -354,11 +355,11 @@ Tine.widgets.grid.ForeignRecordFilter = Ext.extend(Tine.widgets.grid.FilterModel
             if (Ext.isFunction(this.getSubFilters)) {
                 filterModels = filterModels.concat(this.getSubFilters());
             }
-            
+
             filter.toolbar = new Tine.widgets.grid.FilterToolbar({
                 recordClass: foreignRecordClass,
                 filterModels: filterModels,
-                defaultFilter: 'query'
+                defaultFilter: foreignRecordClass.getMeta('defaultFilter') ? foreignRecordClass.getMeta('defaultFilter') : 'query'
             });
             
             ftb.addFilterSheet(filter.toolbar);
@@ -421,7 +422,7 @@ Tine.widgets.grid.ForeignRecordFilter = Ext.extend(Tine.widgets.grid.FilterModel
         
 //        var origSetValue = operator.setValue.createDelegate(operator);
 //        operator.setValue = function(value) {
-//            origSetValue(value == 'AND' ? 'definedBy' : value); 
+//            origSetValue(value == 'AND' ? 'definedBy' : value);
 //        }
         
         return operator;

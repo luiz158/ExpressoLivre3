@@ -5,7 +5,7 @@
  * @package     Calendar
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2009-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  */
 
@@ -37,7 +37,7 @@ class Calendar_Model_EventFilter extends Tinebase_Model_Filter_FilterGroup
      * @var array filter model fieldName => definition
      */
     protected $_filterModel = array(
-        'id'                    => array('filter' => 'Tinebase_Model_Filter_Id'),
+        'id'                    => array('filter' => 'Tinebase_Model_Filter_Id', 'options' => array('modelName' => 'Calendar_Model_Event')),
         'uid'                   => array('filter' => 'Tinebase_Model_Filter_Text'),
         'container_id'          => array('filter' => 'Calendar_Model_CalendarFilter', 'options' => array('applicationName' => 'Calendar')),
         'query'                 => array('filter' => 'Tinebase_Model_Filter_Query', 'options' => array('fields' => array('summary', 'description', 'location'))),
@@ -45,7 +45,7 @@ class Calendar_Model_EventFilter extends Tinebase_Model_Filter_FilterGroup
         'attender'              => array('filter' => 'Calendar_Model_AttenderFilter'),
         'attender_status'       => array('filter' => 'Calendar_Model_AttenderStatusFilter'),
         'attender_role'         => array('filter' => 'Calendar_Model_AttenderRoleFilter'),
-        'organizer'             => array('filter' => 'Addressbook_Model_ContactIdFilter'),
+        'organizer'             => array('filter' => 'Addressbook_Model_ContactIdFilter', 'options' => array('modelName' => 'Addressbook_Model_Contact')),
         //'class'               => array('filter' => 'Tinebase_Model_Filter_Text'),
         //'status'              => array('filter' => 'Tinebase_Model_Filter_Text'),
         'tag'                   => array('filter' => 'Tinebase_Model_Filter_Tag', 'options' => array(

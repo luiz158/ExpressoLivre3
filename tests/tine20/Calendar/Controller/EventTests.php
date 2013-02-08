@@ -32,7 +32,7 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
     
     public function setUp()
     {
-    	parent::setUp();
+        parent::setUp();
         $this->_controller = Calendar_Controller_Event::getInstance();
 
     }
@@ -93,10 +93,13 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         
         $persistentEvent = $this->_controller->create($event);
         
-        foreach($persistentEvent->attendee as $attender) {
+        foreach ($persistentEvent->attendee as $attender) {
             $attender->status = Calendar_Model_Attender::STATUS_DECLINED;
             $this->_controller->attenderStatusUpdate($persistentEvent, $attender, $attender->status_authkey);
         }
+        
+        
+        $persistentEvent->last_modified_time = $this->_controller->get($persistentEvent->getId())->last_modified_time;
         
         // update time
         $persistentEvent->dtstart->addHour(2);
@@ -155,9 +158,12 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         $this->assertEquals(1, count($updatedEvent->attendee));
         
         $updatedEvent->attendee->getFirstRecord()->role = Calendar_Model_Attender::ROLE_OPTIONAL;
+        $updatedEvent->attendee->getFirstRecord()->transp = Calendar_Model_Event::TRANSP_TRANSP;
+        
         $secondUpdatedEvent = $this->_controller->update($updatedEvent);
         $this->assertEquals(1, count($secondUpdatedEvent->attendee));
         $this->assertEquals(Calendar_Model_Attender::ROLE_OPTIONAL, $secondUpdatedEvent->attendee->getFirstRecord()->role);
+        $this->assertEquals(Calendar_Model_Event::TRANSP_TRANSP, $secondUpdatedEvent->attendee->getFirstRecord()->transp);
     }
     
     public function testAttendeeFilter()
@@ -264,7 +270,7 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
     public function testSearchFreeTime() {
         $persistentEvent = $this->testGetFreeBusyInfo();
         
-        $this->_controller->searchFreeTime($persistentEvent->dtstart->setHour(6), $persistentEvent->dtend->setHour(22), $persistentEvent->attendee); 
+        $this->_controller->searchFreeTime($persistentEvent->dtstart->setHour(6), $persistentEvent->dtend->setHour(22), $persistentEvent->attendee);
     }
     
     /**
@@ -274,7 +280,7 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         $testCal = Tinebase_Container::getInstance()->addContainer(new Tinebase_Model_Container(array(
             'name'           => 'PHPUnit test calendar',
             'type'           => Tinebase_Model_Container::TYPE_PERSONAL,
-        	'owner_id'       => Tinebase_Core::getUser(),
+            'owner_id'       => Tinebase_Core::getUser(),
             'backend'        => $this->_backend->getType(),
             'application_id' => Tinebase_Application::getInstance()->getApplicationByName('Calendar')->getId()
         ), true));
@@ -320,7 +326,7 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         
         try {
             $exectionRaised = FALSE;
-        	$this->_controller->create($conflictEvent, TRUE);
+            $this->_controller->create($conflictEvent, TRUE);
         } catch (Calendar_Exception_AttendeeBusy $busyException) {
             $fbData = $busyException->toArray();
             $this->assertGreaterThanOrEqual(2, count($fbData['freebusyinfo']));
@@ -390,6 +396,20 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         $this->_controller->create($nonConflictEvent, TRUE);
     }
     
+    public function testCreateNoConflictParallelAtendeeTrasparentEvent()
+    {
+        $event = $this->_getEvent();
+        $event->attendee = $this->_getAttendee();
+        unset ($event->attendee[1]); // no group here
+        $event->attendee->transp = Calendar_Model_Event::TRANSP_TRANSP;
+        $persistentEvent = $this->_controller->create($event);
+        
+        $nonConflictEvent = $this->_getEvent();
+        $nonConflictEvent->attendee = $this->_getAttendee();
+        
+        $this->_controller->create($nonConflictEvent, TRUE);
+    }
+    
     public function testUpdateWithConflictNoTimechange()
     {
         $persitentConflictEvent = $this->testCreateEventWithConfict();
@@ -408,7 +428,7 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
             'user_id'   => $defaultUserGroup->getId(),
             'user_type' => Calendar_Model_Attender::USERTYPE_GROUP,
             'role'      => Calendar_Model_Attender::ROLE_REQUIRED
-        )));        
+        )));
         
         $this->setExpectedException('Calendar_Exception_AttendeeBusy');
         $this->_controller->update($persitentConflictEvent, TRUE);
@@ -570,6 +590,10 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         $this->assertEquals(0, count($pwulf), 'invalid test condition, pwulf should not be member or admin group');
         
         Admin_Controller_Group::getInstance()->addGroupMember($defaultAdminGroup->getId(), $this->_personasContacts['pwulf']->account_id);
+        if (isset(Tinebase_Core::getConfig()->actionqueue)) {
+            Tinebase_ActionQueue::getInstance()->processQueue(10000);
+        }
+        
         $loadedEvent = $this->_controller->get($persistentEvent->getId());
         // assert pwulf is in
         $pwulf = $loadedEvent->attendee
@@ -579,6 +603,10 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         
         
         Admin_Controller_Group::getInstance()->removeGroupMember($defaultAdminGroup->getId(), $this->_personasContacts['pwulf']->account_id);
+        if (isset(Tinebase_Core::getConfig()->actionqueue)) {
+            Tinebase_ActionQueue::getInstance()->processQueue(10000);
+        }
+        
         $loadedEvent = $this->_controller->get($persistentEvent->getId());
         // assert pwulf is missing
         $pwulf = $loadedEvent->attendee
@@ -590,6 +618,9 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         $group = Admin_Controller_Group::getInstance()->get($defaultAdminGroup->getId());
         $group->members = array_merge(Admin_Controller_Group::getInstance()->getGroupMembers($defaultAdminGroup->getId()), array(array_value('pwulf', Zend_Registry::get('personas'))->getId()));
         Admin_Controller_Group::getInstance()->update($group);
+        if (isset(Tinebase_Core::getConfig()->actionqueue)) {
+            Tinebase_ActionQueue::getInstance()->processQueue(10000);
+        }
         
         // assert pwulf is in
         $loadedEvent = $this->_controller->get($persistentEvent->getId());
@@ -600,7 +631,9 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         
         $group->members = array_diff(Admin_Controller_Group::getInstance()->getGroupMembers($defaultAdminGroup->getId()), array(array_value('pwulf', Zend_Registry::get('personas'))->getId()));
         Admin_Controller_Group::getInstance()->update($group);
-        
+        if (isset(Tinebase_Core::getConfig()->actionqueue)) {
+            Tinebase_ActionQueue::getInstance()->processQueue(10000);
+        }
         // assert pwulf is missing
         $loadedEvent = $this->_controller->get($persistentEvent->getId());
         $pwulf = $loadedEvent->attendee
@@ -648,23 +681,112 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
             'accountFirstName'      => 'PHPUnit',
             'accountEmailAddress'   => 'phpunit@metaways.de'
         )), Zend_Registry::get('testConfig')->password, Zend_Registry::get('testConfig')->password);
+        if (isset(Tinebase_Core::getConfig()->actionqueue)) {
+            Tinebase_ActionQueue::getInstance()->processQueue(10000);
+        }
         
         // check if this user was added to event
         $loadedEvent = $this->_controller->get($persistentEvent->getId());
         $user = $loadedEvent->attendee
             ->filter('user_type', Calendar_Model_Attender::USERTYPE_GROUPMEMBER)
             ->filter('user_id', $newUser->contact_id);
-        $this->assertEquals(1, count($user), 'added user is not attender of event, but should be');
+        $this->assertEquals(1, count($user), 'added user is not attender of event, but should be. user: ' . print_r($newUser->toArray(), TRUE));
         
         // cleanup user
         Admin_Controller_User::getInstance()->delete($newUser->getId());
+        if (isset(Tinebase_Core::getConfig()->actionqueue)) {
+            Tinebase_ActionQueue::getInstance()->processQueue(10000);
+        }
         
         // check if user was removed from event
         $loadedEvent = $this->_controller->get($persistentEvent->getId());
         $user = $loadedEvent->attendee
             ->filter('user_type', Calendar_Model_Attender::USERTYPE_GROUPMEMBER)
             ->filter('user_id', $newUser->contact_id);
-        $this->assertEquals(0, count($user), 'added user is attender of event, but should be');
+        $this->assertEquals(0, count($user), 'added user is attender of event, but should be (after deleting user)');
+    }
+    
+    /**
+     * testAttendeeGroupMembersRecurringAddUser
+     * 
+     * FIXME 0007352: fix Calendar_Controller_EventTests::testAttendeeGroupMembersRecurringAddUser
+     */
+    public function testAttendeeGroupMembersRecurringAddUser()
+    {
+        $this->markTestIncomplete('test fails sometimes / needs fixing');
+        
+        try {
+            // cleanup if exists
+            $cleanupUser = Tinebase_User::getInstance()->getFullUserByLoginName('testAttendeeGroupMembersAddUser');
+            Tinebase_User::getInstance()->deleteUser($cleanupUser);
+        } catch (Exception $e) {
+            // do nothing
+        }
+        
+        $defaultGroup = Tinebase_Group::getInstance()->getDefaultGroup();
+        
+        // create event and invite admin group
+        $event = $this->_getEvent();
+        $event->rrule = 'FREQ=DAILY;INTERVAL=1';
+        
+        $event->attendee = $this->_getAttendee();
+        $event->attendee[1] = new Calendar_Model_Attender(array(
+            'user_id'   => $defaultGroup->getId(),
+            'user_type' => Calendar_Model_Attender::USERTYPE_GROUP,
+            'role'      => Calendar_Model_Attender::ROLE_REQUIRED
+        ));
+        $persistentEvent = $this->_controller->create($event);
+        
+        // create a new user
+        $newUser = Admin_Controller_User::getInstance()->create(new Tinebase_Model_FullUser(array(
+            'accountLoginName'      => 'testAttendeeGroupMembersAddUser',
+            'accountStatus'         => 'enabled',
+            'accountExpires'        => NULL,
+            'accountPrimaryGroup'   => $defaultGroup->getId(),
+            'accountLastName'       => 'Tine 2.0',
+            'accountFirstName'      => 'PHPUnit',
+            'accountEmailAddress'   => 'phpunit@metaways.de'
+        )), Zend_Registry::get('testConfig')->password, Zend_Registry::get('testConfig')->password);
+        if (isset(Tinebase_Core::getConfig()->actionqueue)) {
+            Tinebase_ActionQueue::getInstance()->processQueue(10000);
+        }
+        
+        $events = $this->_backend->search(new Calendar_Model_EventFilter(array(
+            array('field' => 'container_id', 'operator' => 'in', 'value' => $this->_testCalendars->getId()),
+        )), new Tinebase_Model_Pagination(array()));
+        
+        $oldSeries = $events->filter('rrule_until', '/.+/', TRUE)->getFirstRecord();
+        $newSeries = $events->filter('rrule_until', '/^$/', TRUE)->getFirstRecord();
+        
+        $this->assertEquals(2, $events->count(), 'recur event must be splitted '. print_r($events->toArray(), TRUE));
+        // check if this user was added to event
+        $loadedEvent = $this->_controller->get($persistentEvent->getId());
+        $user = $oldSeries->attendee
+            ->filter('user_type', Calendar_Model_Attender::USERTYPE_GROUPMEMBER)
+            ->filter('user_id', $newUser->contact_id);
+        $this->assertEquals(0, count($user), 'added user is attender of old event, but should not be');
+        $user = $newSeries->attendee
+            ->filter('user_type', Calendar_Model_Attender::USERTYPE_GROUPMEMBER)
+            ->filter('user_id', $newUser->contact_id);
+        $this->assertEquals(1, count($user), 'added user is not attender of new event, but should be');
+        
+        // cleanup user
+        Admin_Controller_User::getInstance()->delete($newUser->getId());
+        if (isset(Tinebase_Core::getConfig()->actionqueue)) {
+            Tinebase_ActionQueue::getInstance()->processQueue(10000);
+        }
+        
+        $events = $this->_backend->search(new Calendar_Model_EventFilter(array(
+            array('field' => 'container_id', 'operator' => 'in', 'value' => $this->_testCalendars->getId()),
+        )), new Tinebase_Model_Pagination(array()));
+        
+        $newSeries = $events->filter('rrule_until', '/^$/', TRUE)->getFirstRecord();
+        
+        // check if this user was deleted from event
+        $user = $newSeries->attendee
+            ->filter('user_type', Calendar_Model_Attender::USERTYPE_GROUPMEMBER)
+            ->filter('user_id', $newUser->contact_id);
+        $this->assertEquals(0, count($user), 'deleted user is attender of new event, but should not be');
     }
     
     public function testRruleUntil()
@@ -710,7 +832,6 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         $this->assertEquals('2009-04-30 13:30:00', Calendar_Model_Rrule::getRruleFromString($updatedEvent->rrule)->until->get(Tinebase_Record_Abstract::ISO8601LONG), 'until in rrule must not be changed');
         $this->assertEquals('2009-04-30 13:30:00', $updatedEvent->rrule_until->get(Tinebase_Record_Abstract::ISO8601LONG), 'rrule_until must not be changed');
         
-        sleep(1); // wait for modlog
         $updatedEvent->dtstart->subHour(5);
         $updatedEvent->dtend->subHour(5);
         $secondUpdatedEvent = $this->_controller->update($updatedEvent);
@@ -719,6 +840,9 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         $this->assertEquals('2009-04-08 13:00:00', substr($secondUpdatedException->recurid, -19), 'failed to update persistent exception (sub)');
     }
     
+    /**
+     * testUpdateRecurDtstartOverDst
+     */
     public function testUpdateRecurDtstartOverDst()
     {
         // note: 2009-03-29 Europe/Berlin switched to DST
@@ -747,6 +871,8 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         $exceptionBeforeDstBoundary = clone $recurSet[1]; // 28. 
         $persistentExceptionBeforeDstBoundary = $this->_controller->createRecurException($exceptionBeforeDstBoundary);
         
+        $updatedBaseEvent = $this->_controller->getRecurBaseEvent($recurSet[5]);
+        $recurSet[5]->last_modified_time = $updatedBaseEvent->last_modified_time;
         $exceptionAfterDstBoundary = clone $recurSet[5]; // 02.
         $persistentExceptionAfterDstBoundary = $this->_controller->createRecurException($exceptionAfterDstBoundary);
         
@@ -755,6 +881,8 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         $from->addDay(5); //31
         $until->addDay(5); //08
         
+        $currentPersistentEvent = $this->_controller->get($persistentEvent);
+        $persistentEvent->seq = 2; // satisfy modlog
         $updatedPersistenEvent = $this->_controller->update($persistentEvent);
         
         $persistentEvents = $this->_controller->search(new Calendar_Model_EventFilter(array(
@@ -762,7 +890,6 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
             array('field' => 'uid', 'operator' => 'equals', 'value' => $persistentEvent->uid)
         )));
         
-        //print_r($persistentEvents->toArray());
         // we don't 'see' the persistent exception from 28/
         $this->assertEquals(2, count($persistentEvents));
                 
@@ -979,7 +1106,6 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
         $baseEvent = $this->_controller->getRecurBaseEvent($persistentException);
         $this->_controller->getAlarms($baseEvent);
         
-        
         $exceptions = $this->_controller->getRecurExceptions($persistentException);
         $nextOccurance = Calendar_Model_Rrule::computeNextOccurrence($baseEvent, $exceptions, Tinebase_DateTime::now());
         
@@ -1029,9 +1155,9 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
      *
      * @return Calendar_Model_Event
      */
-    protected function _getEvent()
+    protected function _getEvent($_now=FALSE)
     {
-        return new Calendar_Model_Event(array(
+        $event = new Calendar_Model_Event(array(
             'summary'     => 'Mittagspause',
             'dtstart'     => '2009-04-06 13:00:00',
             'dtend'       => '2009-04-06 13:30:00',
@@ -1040,6 +1166,13 @@ class Calendar_Controller_EventTests extends Calendar_TestCase
             'container_id' => $this->_testCalendar->getId(),
             Tinebase_Model_Grants::GRANT_EDIT    => true,
         ));
+        
+        if ($_now) {
+            $event->dtstart = Tinebase_DateTime::now();
+            $event->dtend = Tinebase_DateTime::now()->addMinute(15);
+        }
+        
+        return $event;
     }
     
     /**

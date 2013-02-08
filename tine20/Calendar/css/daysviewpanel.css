@@ -21,14 +21,14 @@
 
 .cal-daysviewpanel-header-offset {
     position: relative;
-    margin-left:45px;
-    margin-right:15px;
     /*right:0;*/
     top:0;
 }
 
 .cal-daysviewpanel-daysheader {
     height: 24px;
+    margin-left:45px;
+    margin-right:15px;
     cursor:default;
     padding:1px 0 0;
 }
@@ -57,8 +57,14 @@
     height: 23px;
 }
 
+.cal-daysviewpanel-wholedayheader-scroller {
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
+
 .cal-daysviewpanel-wholedayheader {
     position: relative;
+    margin-left:45px;
 }
 /********************************* Body *********************************/
 .cal-daysviewpanel-body-inner {
@@ -388,6 +394,12 @@
     white-space: normal;
 }
 
+.cal-daysviewpanel-event-tags {
+    position: absolute;
+    right: 1px;
+    bottom: 4px;
+}
+
 .cal-daysviewpanel-event-active {
     border-width: 2px;
 }
@@ -421,12 +433,14 @@
 }
 
 .cal-daysviewpanel-wholedayevent-body {
-	position: absolute;
-    width: 100%;
     top: 1px;
     cursor: move;
     padding: 0px 4px;
     white-space: normal;
+}
+
+.cal-daysviewpanel-wholedayevent-tags {
+    padding: 1px 2px 0 3px;
 }
 
 .cal-daysviewpanel-event-cropleft {

@@ -69,8 +69,9 @@ class Tinebase_Model_Filter_Query extends Tinebase_Model_Filter_Abstract
                  foreach ($queries as $query) {
                      $whereParts = array();
                      foreach ($this->_options['fields'] as $qField) {
-                         $whereParts[] = $db->quoteIdentifier($_backend->getTableName() . '.' . $qField) . ' ' . Tinebase_Backend_Sql_Command::getLike($db) . ' ?';
-                     }                        
+                         $whereParts[] = $db->quoteIdentifier($_backend->getTableName()
+                             . '.' . $qField) . ' ' . Tinebase_Backend_Sql_Command::factory($db)->getLike() . ' ?';
+                     }
                      $whereClause = '';
                      if (!empty($whereParts)) {
                          $whereClause = implode(' OR ', $whereParts);
@@ -95,6 +96,5 @@ class Tinebase_Model_Filter_Query extends Tinebase_Model_Filter_Abstract
              default:
                  throw new Tinebase_Exception_InvalidArgument('Operator not defined: ' . $this->_operator);
          }
-         Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' SQL filter: ' . $_select->assemble());
      }
 }

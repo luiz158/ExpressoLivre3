@@ -350,6 +350,8 @@ Ext.extend(Tine.widgets.grid.FilterToolbar, Ext.Panel, {
         filter.formFields.field = new Ext.form.ComboBox({
             filter: filter,
             width: this.filterFieldWidth,
+            minListWidth: 240, // will be ignored if width is heigher
+            resizable: true,
             id: 'tw-ftb-frow-fieldcombo-' + filter.id,
             mode: 'local',
             lazyInit: false,
@@ -365,7 +367,19 @@ Ext.extend(Tine.widgets.grid.FilterToolbar, Ext.Panel, {
             validator: this.validateFilter.createDelegate(this),
             tpl: '<tpl for="."><div class="x-combo-list-item tw-ftb-field-{field}">{label}</div></tpl>'
         });
+        filter.formFields.field.setValue = filter.formFields.field.setValue.createInterceptor(function() {
+            // NOTE: as this.fieldStore is a shared store we need to clear the filter before we use it,
+            //       otherwise the record (e.g. query) might not be in the store
+            this.fieldStore.clearFilter();
+        }, this);
+        
         filter.formFields.field.on('select', function(combo, newRecord, newKey) {
+            if (combo.value != combo.filter.get('field')) {
+                this.onFieldChange(combo.filter, combo.value);
+            }
+        }, this);
+        
+        filter.formFields.field.on('blur', function(combo) {
             if (combo.value != combo.filter.get('field')) {
                 this.onFieldChange(combo.filter, combo.value);
             }
@@ -402,6 +416,7 @@ Ext.extend(Tine.widgets.grid.FilterToolbar, Ext.Panel, {
      * @private
      */
     arrangeButtons: function() {
+
         var numFilters = this.filterStore.getCount();
         var firstId = this.filterStore.getAt(0).id;
         var lastId = this.filterStore.getAt(numFilters-1).id;
@@ -478,7 +493,7 @@ Ext.extend(Tine.widgets.grid.FilterToolbar, Ext.Panel, {
      */
     onFiltertrigger: function() {
         if (! this.supressEvents) {
-            this.onFilterChange();            
+            this.onFilterChange();
         }
     },
     
@@ -552,7 +567,7 @@ Ext.extend(Tine.widgets.grid.FilterToolbar, Ext.Panel, {
             this.doLayout();
         }, this);
         
-        if (this.rowPrefix === null) { 
+        if (this.rowPrefix === null) {
             this.rowPrefix = _('Show');
         }
         
@@ -649,7 +664,7 @@ Ext.extend(Tine.widgets.grid.FilterToolbar, Ext.Panel, {
     },
     
     createFilterModel: function(config) {
-        if (config.isFilterModel) {
+        if (config && config.isFilterModel) {
             return config;
         }
         
@@ -739,10 +754,10 @@ Ext.extend(Tine.widgets.grid.FilterToolbar, Ext.Panel, {
             var firstFilter = this.addFilter();
             
             // save buttons somewhere
-        	for (action in this.actions) {
-	            this.actions[action].hide();
-	            this.bwrap.insertFirst(action == 'startSearch' ? this.searchButtonWrap : this.actions[action].getEl());
-	        }
+            for (action in this.actions) {
+                this.actions[action].hide();
+                this.bwrap.insertFirst(action == 'startSearch' ? this.searchButtonWrap : this.actions[action].getEl());
+            }
         }
         fRow.remove();
         

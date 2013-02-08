@@ -128,14 +128,24 @@ class Zend_Db_Adapter_Oracle extends Zend_Db_Adapter_Abstract
             throw new Zend_Db_Adapter_Oracle_Exception('The OCI8 extension is required for this adapter but the extension is not loaded');
         }
 
+        // if set host, port and dbname create string connection or use tnsnames.ora name or string connection
+        if (! empty($this->_config['host']) && ! empty($this->_config['port']) && ! empty($this->_config['dbname'])) {
+            if ($this->_config['isSID']) {
+                $this->_config['dbname']="(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=".$this->_config['host'].")(PORT=".$this->_config['port'].")))(CONNECT_DATA=(SID=\"".$this->_config['dbname']."\")))";
+            } else {
+                $this->_config['dbname']="(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=".$this->_config['host'].")(PORT=".$this->_config['port'].")))(CONNECT_DATA=(SERVICE_NAME=\"".$this->_config['dbname']."\")))";
+            }
+        }
+
         $connectionFuncName = ($this->_config['persistent'] == true) ? 'oci_pconnect' : 'oci_connect';
+        $connectionDatabase = (($this->_config['host'] == 'localhost' || $this->_config['host'] == '127.0.0.1') ? $this->_config['dbname'] : $this->_config['host'].'/'.$this->_config['dbname']);
         
         $this->_connection = @$connectionFuncName(
                 $this->_config['username'],
                 $this->_config['password'],
-                $this->_config['host'].'/'.$this->_config['dbname'],
+                $connectionDatabase,
                 $this->_config['charset']);
-
+                
         // check the connection
         if (!$this->_connection) {
             /**
@@ -144,6 +154,13 @@ class Zend_Db_Adapter_Oracle extends Zend_Db_Adapter_Abstract
             require_once 'Zend/Db/Adapter/Oracle/Exception.php';
             throw new Zend_Db_Adapter_Oracle_Exception(oci_error());
         }
+        $rs = oci_parse($this->_connection, "ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ',.'");
+        oci_execute($rs, OCI_DEFAULT);
+        $rs = oci_parse($this->_connection, "ALTER SESSION SET NLS_SORT=BINARY_CI;");
+        oci_execute($rs, OCI_DEFAULT);
+        $rs = oci_parse($this->_connection, "ALTER SESSION SET NLS_COMP=LINGUISTIC;");
+        oci_execute($rs, OCI_DEFAULT);
+
     }
 
     /**
@@ -262,14 +279,14 @@ class Zend_Db_Adapter_Oracle extends Zend_Db_Adapter_Abstract
      */
     public function lastSequenceId($sequenceName)
     {
-    	try {
-	        $this->_connect();
-	        $sql = 'SELECT '.$this->quoteIdentifier($sequenceName, true).'.CURRVAL FROM dual';
-	        $value = $this->fetchOne($sql);
-	        return $value;
-    	} catch(Exception $e) {
-    		return NULL;
-    	}
+        try {
+            $this->_connect();
+            $sql = 'SELECT '.$this->quoteIdentifier($sequenceName, true).'.CURRVAL FROM dual';
+            $value = $this->fetchOne($sql);
+            return $value;
+        } catch(Exception $e) {
+            return NULL;
+        }
     }
 
     /**
@@ -309,8 +326,8 @@ class Zend_Db_Adapter_Oracle extends Zend_Db_Adapter_Abstract
     {
         if ($tableName !== null) {
             $sequenceName = $tableName;
-            $sequenceName = substr($sequenceName,0,22);
-            $sequenceName .= '_seq';
+            $sequenceName = substr($sequenceName,0,25);
+            $sequenceName .= '_s';
             return $this->lastSequenceId($sequenceName);
         }
 
@@ -362,109 +379,96 @@ class Zend_Db_Adapter_Oracle extends Zend_Db_Adapter_Abstract
      */
     public function describeTable($tableName, $schemaName = null)
     {
-    	// MOD FILIP cache mod
-    	$cache = Tinebase_Core::get('cache');
-        $cacheId = convertCacheId('describeTable' . $tableName);
-        $desc = $cache->load($cacheId);
+        $version = $this->getServerVersion();
+        if (($version === null) || version_compare($version, '9.0.0', '>=')) {
+            $sql = "SELECT TC.TABLE_NAME, TC.OWNER, TC.COLUMN_NAME, TC.DATA_TYPE,
+                    TC.DATA_DEFAULT, TC.NULLABLE, TC.COLUMN_ID, TC.DATA_LENGTH,
+                    TC.DATA_SCALE, TC.DATA_PRECISION, C.CONSTRAINT_TYPE, CC.POSITION, TC.CHAR_LENGTH
+                FROM ALL_TAB_COLUMNS TC
+                LEFT JOIN (ALL_CONS_COLUMNS CC JOIN ALL_CONSTRAINTS C
+                  ON (CC.CONSTRAINT_NAME = C.CONSTRAINT_NAME AND CC.TABLE_NAME = C.TABLE_NAME AND CC.OWNER = C.OWNER AND C.CONSTRAINT_TYPE = 'P'))
+                  ON TC.TABLE_NAME = CC.TABLE_NAME AND TC.COLUMN_NAME = CC.COLUMN_NAME
+                WHERE UPPER(TC.TABLE_NAME) = UPPER(:TBNAME)";
+            $bind[':TBNAME'] = $tableName;
+            if ($schemaName) {
+                $sql .= ' AND UPPER(TC.OWNER) = UPPER(:SCNAME)';
+                $bind[':SCNAME'] = $schemaName;
+            }
+            $sql .= ' ORDER BY TC.COLUMN_ID';
+        } else {
+            $subSql="SELECT AC.OWNER, AC.TABLE_NAME, ACC.COLUMN_NAME, AC.CONSTRAINT_TYPE, ACC.POSITION
+                from ALL_CONSTRAINTS AC, ALL_CONS_COLUMNS ACC
+                  WHERE ACC.CONSTRAINT_NAME = AC.CONSTRAINT_NAME
+                    AND ACC.TABLE_NAME = AC.TABLE_NAME
+                    AND ACC.OWNER = AC.OWNER
+                    AND AC.CONSTRAINT_TYPE = 'P'
+                    AND UPPER(AC.TABLE_NAME) = UPPER(:TBNAME)";
+            $bind[':TBNAME'] = $tableName;
+            if ($schemaName) {
+                $subSql .= ' AND UPPER(ACC.OWNER) = UPPER(:SCNAME)';
+                $bind[':SCNAME'] = $schemaName;
+            }
+            $sql="SELECT TC.TABLE_NAME, TC.OWNER, TC.COLUMN_NAME, TC.DATA_TYPE,
+                    TC.DATA_DEFAULT, TC.NULLABLE, TC.COLUMN_ID, TC.DATA_LENGTH, 
+                    TC.DATA_SCALE, TC.DATA_PRECISION, CC.CONSTRAINT_TYPE, CC.POSITION, TC.CHAR_LENGTH
+                FROM ALL_TAB_COLUMNS TC, ($subSql) CC
+                WHERE UPPER(TC.TABLE_NAME) = UPPER(:TBNAME)
+                  AND TC.OWNER = CC.OWNER(+) AND TC.TABLE_NAME = CC.TABLE_NAME(+) AND TC.COLUMN_NAME = CC.COLUMN_NAME(+)";
+            if ($schemaName) {
+                $sql .= ' AND UPPER(TC.OWNER) = UPPER(:SCNAME)';
+            }
+            $sql .= ' ORDER BY TC.COLUMN_ID';
+        }
 
-        if (! $desc) {
-            $desc = array();
-			Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' CacheTable '. $tableName);
-			
-	        $version = $this->getServerVersion();
-	        if (($version === null) || version_compare($version, '9.0.0', '>=')) {
-	            $sql = "SELECT TC.TABLE_NAME, TC.OWNER, TC.COLUMN_NAME, TC.DATA_TYPE,
-	                    TC.DATA_DEFAULT, TC.NULLABLE, TC.COLUMN_ID, TC.DATA_LENGTH,
-	                    TC.DATA_SCALE, TC.DATA_PRECISION, C.CONSTRAINT_TYPE, CC.POSITION, TC.CHAR_LENGTH
-	                FROM ALL_TAB_COLUMNS TC
-	                LEFT JOIN (ALL_CONS_COLUMNS CC JOIN ALL_CONSTRAINTS C
-	                    ON (CC.CONSTRAINT_NAME = C.CONSTRAINT_NAME AND CC.TABLE_NAME = C.TABLE_NAME AND C.CONSTRAINT_TYPE = 'P'))
-	                  ON TC.TABLE_NAME = CC.TABLE_NAME AND TC.COLUMN_NAME = CC.COLUMN_NAME
-	                WHERE UPPER(TC.TABLE_NAME) = UPPER(:TBNAME)";
-	            $bind[':TBNAME'] = $tableName;
-	            if ($schemaName) {
-	                $sql .= ' AND UPPER(TC.OWNER) = UPPER(:SCNAME)';
-	                $bind[':SCNAME'] = $schemaName;
-	            }
-	            $sql .= ' ORDER BY TC.COLUMN_ID';
-	        } else {
-	            $subSql="SELECT AC.OWNER, AC.TABLE_NAME, ACC.COLUMN_NAME, AC.CONSTRAINT_TYPE, ACC.POSITION
-	                from ALL_CONSTRAINTS AC, ALL_CONS_COLUMNS ACC
-	                  WHERE ACC.CONSTRAINT_NAME = AC.CONSTRAINT_NAME
-	                    AND ACC.TABLE_NAME = AC.TABLE_NAME
-	                    AND ACC.OWNER = AC.OWNER
-	                    AND AC.CONSTRAINT_TYPE = 'P'
-	                    AND UPPER(AC.TABLE_NAME) = UPPER(:TBNAME)";
-	            $bind[':TBNAME'] = $tableName;
-	            if ($schemaName) {
-	                $subSql .= ' AND UPPER(ACC.OWNER) = UPPER(:SCNAME)';
-	                $bind[':SCNAME'] = $schemaName;
-	            }
-	            $sql="SELECT TC.TABLE_NAME, TC.OWNER, TC.COLUMN_NAME, TC.DATA_TYPE,
-	                    TC.DATA_DEFAULT, TC.NULLABLE, TC.COLUMN_ID, TC.DATA_LENGTH, 
-	                    TC.DATA_SCALE, TC.DATA_PRECISION, CC.CONSTRAINT_TYPE, CC.POSITION, TC.CHAR_LENGTH
-	                FROM ALL_TAB_COLUMNS TC, ($subSql) CC
-	                WHERE UPPER(TC.TABLE_NAME) = UPPER(:TBNAME)
-	                  AND TC.OWNER = CC.OWNER(+) AND TC.TABLE_NAME = CC.TABLE_NAME(+) AND TC.COLUMN_NAME = CC.COLUMN_NAME(+)";
-	            if ($schemaName) {
-	                $sql .= ' AND UPPER(TC.OWNER) = UPPER(:SCNAME)';
-	            }
-	            $sql .= ' ORDER BY TC.COLUMN_ID';
-	        }
-	
-	        $stmt = $this->query($sql, $bind);
-	
-	        /**
-	         * Use FETCH_NUM so we are not dependent on the CASE attribute of the PDO connection
-	         */
-	        $result = $stmt->fetchAll(Zend_Db::FETCH_NUM);
-	
-	        $table_name      = 0;
-	        $owner           = 1;
-	        $column_name     = 2;
-	        $data_type       = 3;
-	        $data_default    = 4;
-	        $nullable        = 5;
-	        $column_id       = 6;
-	        $data_length     = 7;
-	        $data_scale      = 8;
-	        $data_precision  = 9;
-	        $constraint_type = 10;
-	        $position        = 11;
-		    $char_length     = 12;
-	
-	        $desc = array();
-	        foreach ($result as $key => $row) {
-	            list ($primary, $primaryPosition, $identity) = array(false, null, false);
-	            if ($row[$constraint_type] == 'P') {
-	                $primary = true;
-	                $primaryPosition = $row[$position];
-	                /**
-	                 * Oracle does not support auto-increment keys.
-	                 */
-	                $identity = false;
-	            }
-	            $desc[$this->foldCase($row[$column_name])] = array(
-	                'SCHEMA_NAME'      => $this->foldCase($row[$owner]),
-	                'TABLE_NAME'       => $this->foldCase($row[$table_name]),
-	                'COLUMN_NAME'      => $this->foldCase($row[$column_name]),
-	                'COLUMN_POSITION'  => $row[$column_id],
-	                'DATA_TYPE'        => $row[$data_type],
-	                'DEFAULT'          => $row[$data_default],
-	                'NULLABLE'         => (bool) ($row[$nullable] == 'Y'),
-	                //'LENGTH'           => $row[$data_length], 
-		    	    'LENGTH'           => $row[$char_length], 				
-	                'SCALE'            => $row[$data_scale],
-	                'PRECISION'        => $row[$data_precision],
-	                'UNSIGNED'         => null, // @todo
-	                'PRIMARY'          => $primary,
-	                'PRIMARY_POSITION' => $primaryPosition,
-	                'IDENTITY'         => $identity
-	            );
-	        }
-	        
-		// Save to cache	        
-            $cache->save($desc, $cacheId, array('describetableoracle'));
+        $stmt = $this->query($sql, $bind);
+
+        /**
+         * Use FETCH_NUM so we are not dependent on the CASE attribute of the PDO connection
+         */
+        $result = $stmt->fetchAll(Zend_Db::FETCH_NUM);
+
+        $table_name      = 0;
+        $owner           = 1;
+        $column_name     = 2;
+        $data_type       = 3;
+        $data_default    = 4;
+        $nullable        = 5;
+        $column_id       = 6;
+        $data_length     = 7;
+        $data_scale      = 8;
+        $data_precision  = 9;
+        $constraint_type = 10;
+        $position        = 11;
+        $char_length     = 12;
+
+        $desc = array();
+        foreach ($result as $key => $row) {
+            list ($primary, $primaryPosition, $identity) = array(false, null, false);
+            if ($row[$constraint_type] == 'P') {
+                $primary = true;
+                $primaryPosition = $row[$position];
+                /**
+                 * Oracle does not support auto-increment keys.
+                 */
+                $identity = false;
+            }
+            $desc[$this->foldCase($row[$column_name])] = array(
+                'SCHEMA_NAME'      => $this->foldCase($row[$owner]),
+                'TABLE_NAME'       => $this->foldCase($row[$table_name]),
+                'COLUMN_NAME'      => $this->foldCase($row[$column_name]),
+                'COLUMN_POSITION'  => $row[$column_id],
+                'DATA_TYPE'        => $row[$data_type],
+                'DEFAULT'          => $row[$data_default],
+                'NULLABLE'         => (bool) ($row[$nullable] == 'Y'),
+                //'LENGTH'           => $row[$data_length], 
+                'LENGTH'           => $row[$char_length],                 
+                'SCALE'            => $row[$data_scale],
+                'PRECISION'        => $row[$data_precision],
+                'UNSIGNED'         => null, // @todo
+                'PRIMARY'          => $primary,
+                'PRIMARY_POSITION' => $primaryPosition,
+                'IDENTITY'         => $identity
+            );
         }
         return $desc;
     }
@@ -477,8 +481,7 @@ class Zend_Db_Adapter_Oracle extends Zend_Db_Adapter_Abstract
     protected function _beginTransaction()
     {
         $this->_setExecuteMode(OCI_DEFAULT);
-        
-        $this->_transactionOpen = true;  
+        $this->_transactionOpen = true;
     }
 
     /**
@@ -489,8 +492,8 @@ class Zend_Db_Adapter_Oracle extends Zend_Db_Adapter_Abstract
      */
     protected function _commit()
     {
-    	$this->_transactionOpen = false;
-    	
+        $this->_transactionOpen = false;
+        
         if (!oci_commit($this->_connection)) {
             /**
              * @see Zend_Db_Adapter_Oracle_Exception
@@ -509,8 +512,8 @@ class Zend_Db_Adapter_Oracle extends Zend_Db_Adapter_Abstract
      */
     protected function _rollBack()
     {
-    	$this->_transactionOpen = false;
-    	
+        $this->_transactionOpen = false;
+        
         if (!oci_rollback($this->_connection)) {
             /**
              * @see Zend_Db_Adapter_Oracle_Exception
@@ -789,7 +792,7 @@ class Zend_Db_Adapter_Oracle extends Zend_Db_Adapter_Abstract
      * @param  mixed  $bind An array of data to bind to the placeholders.
      * @return array
      */
-    protected function _positionalToNamedParameters($sql, array $bind)
+    protected function _positionalToNamedParameters($sql, $bind)
     {
         if ($sql instanceof Zend_Db_Select) {
             if (empty($bind)) {
@@ -801,23 +804,25 @@ class Zend_Db_Adapter_Oracle extends Zend_Db_Adapter_Abstract
         
         $keyCounter = 0;
         $quotedQuestionMarksCounter = 0;
-        foreach ($bind as $key => $value)
-        {
-            if (is_int($key)) {
-                unset($bind[$key]);
-                $bind[$this->_namedParamPrefix . $keyCounter] = $value;
-                
-                $position = 0;
-                while (false !== ($position = strpos($sql, '?', $quotedQuestionMarksCounter))) {
-                    if ($this->_isQuoted($sql, $position)) {
-                        $quotedQuestionMarksCounter++;
-                    } else {
-                        break;                      
+        if (is_array($bind)) {
+            foreach ($bind as $key => $value)
+            {
+                if (is_int($key)) {
+                    unset($bind[$key]);
+                    $bind[$this->_namedParamPrefix . $keyCounter] = $value;
+
+                    $position = 0;
+                    while (false !== ($position = strpos($sql, '?', $quotedQuestionMarksCounter))) {
+                        if ($this->_isQuoted($sql, $position)) {
+                            $quotedQuestionMarksCounter++;
+                        } else {
+                            break;
+                        }
                     }
+                    $sql = substr_replace($sql, ':' . $this->_namedParamPrefix . $keyCounter, $position, 1);
+
+                    $keyCounter++;
                 }
-                $sql = substr_replace($sql, ':' . $this->_namedParamPrefix . $keyCounter, $position, 1);
-                
-                $keyCounter++;
             }
         }
 

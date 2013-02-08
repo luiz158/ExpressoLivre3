@@ -5,7 +5,7 @@
  * @package     Tinebase
  * @subpackage  Tags
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2008-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2008-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Cornelius Weiss <c.weiss@metaways.de>
  *
  * @todo        this should implement Tinebase_Backend_Sql_Interface or use standard sql backend + refactor this
@@ -26,7 +26,12 @@ class Tinebase_Tags
      * @var Zend_Db_Adapter_Pdo_Mysql
      */
     protected $_db;
-
+    
+    /**
+     * @var Tinebase_Backend_Sql_Command_Interface
+     */
+    protected $_dbCommand;
+    
     /**
      * don't clone. Use the singleton.
      */
@@ -62,7 +67,8 @@ class Tinebase_Tags
      */
     private function __construct()
     {
-        $this->_db = Tinebase_Core::getDb();
+        $this->_db        = Tinebase_Core::getDb();
+        $this->_dbCommand = Tinebase_Backend_Sql_Command::factory($this->_db);
     }
 
     /**
@@ -73,12 +79,17 @@ class Tinebase_Tags
      * @param  Tinebase_Model_Pagination  $_paging
      * @return Tinebase_Record_RecordSet  Set of Tinebase_Model_Tag
      */
-    public function searchTags($_filter, $_paging)
+    public function searchTags($_filter, $_paging = NULL)
     {
         $select = $_filter->getSelect();
         
         Tinebase_Model_TagRight::applyAclSql($select, $_filter->grant);
-        $_paging->appendPaginationSql($select);
+        
+        if ($_paging !== NULL) {
+            $_paging->appendPaginationSql($select);
+        }
+        
+        Tinebase_Backend_Sql_Abstract::traitGroup($select);
         
         return new Tinebase_Record_RecordSet('Tinebase_Model_Tag', $this->_db->fetchAssoc($select));
     }
@@ -95,10 +106,14 @@ class Tinebase_Tags
         $controller = Tinebase_Core::getApplicationInstance($_filter->getApplicationName(), $_filter->getModelName());
         $recordIds = $controller->search($_filter, NULL, FALSE, TRUE);
         
-        if (! empty($recordIds)) { 
+        if (! empty($recordIds)) {
             $app = Tinebase_Application::getInstance()->getApplicationByName($_filter->getApplicationName());
+            
             $select = $this->_getSelect($recordIds, $app->getId());
             Tinebase_Model_TagRight::applyAclSql($select);
+            
+            Tinebase_Backend_Sql_Abstract::traitGroup($select);
+            
             $tags = $this->_db->fetchAll($select);
             $tagData = $this->_getDistinctTagsAndComputeOccurrence($tags);
         } else {
@@ -141,7 +156,9 @@ class Tinebase_Tags
     {
         $select = $_filter->getSelect();
         Tinebase_Model_TagRight::applyAclSql($select, $_filter->grant);
-
+        
+        Tinebase_Backend_Sql_Abstract::traitGroup($select);
+        
         $tags = new Tinebase_Record_RecordSet('Tinebase_Model_Tag', $this->_db->fetchAssoc($select));
         return count($tags);
     }
@@ -184,26 +201,37 @@ class Tinebase_Tags
     public function getTagsById($_id, $_right = Tinebase_Model_TagRight::VIEW_RIGHT, $_ignoreAcl = false)
     {
         $tags = new Tinebase_Record_RecordSet('Tinebase_Model_Tag');
-
-        if (!empty($_id)) {
+        
+        if (is_string($_id)) {
+            $ids = array($_id);
+        } else if ($_id instanceof Tinebase_Record_RecordSet) {
+            $ids = $_id->getArrayOfIds();
+        } else if (is_array($_id)) {
+            $ids = $_id;
+        } else {
+            throw new Tinebase_Exception_InvalidArgument('Expected string|array|Tinebase_Record_RecordSet of tags');
+        }
+        
+        if (! empty($ids)) {
             $select = $this->_db->select()
-                ->from(SQL_TABLE_PREFIX . 'tags')
+                ->from(array('tags' => SQL_TABLE_PREFIX . 'tags'))
                 ->where($this->_db->quoteIdentifier('is_deleted') . ' = 0')
-                ->where($this->_db->quoteInto($this->_db->quoteIdentifier('id') . ' IN (?)', $_id));
+                ->where($this->_db->quoteInto($this->_db->quoteIdentifier('id') . ' IN (?)', $ids));
             if ($_ignoreAcl !== true) {
                 Tinebase_Model_TagRight::applyAclSql($select, $_right);
             }
 
-            //if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $select->__toString());
+            Tinebase_Backend_Sql_Abstract::traitGroup($select);
+            
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . $select->__toString());
 
             foreach ($this->_db->fetchAssoc($select) as $tagArray){
                 $tags->addRecord(new Tinebase_Model_Tag($tagArray, true));
             }
-        }
-        if (count($tags) === 0 && ! empty($_id)) {
-            //if (is_string($_id)) {
-            //    throw new Tinebase_Exception_NotFound("Tag $_id not found or insufficient rights.");
-            Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' Tag(s) not found: ' . print_r($_id, true));
+            if (count($tags) !== count($ids)) {
+                $missingIds = array_diff($ids, $tags->getArrayOfIds());
+                Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' Tag(s) not found or insufficient rights: ' . print_r($missingIds, true));
+            }
         }
         return $tags;
     }
@@ -223,13 +251,16 @@ class Tinebase_Tags
     public function getTagByName($_name, $_right = Tinebase_Model_TagRight::VIEW_RIGHT, $_application = NULL, $_ignoreAcl = false)
     {
         $select = $this->_db->select()
-        ->from(SQL_TABLE_PREFIX . 'tags')
-        ->where($this->_db->quoteIdentifier('is_deleted') . ' = 0')
-        ->where($this->_db->quoteInto($this->_db->quoteIdentifier('name') . ' = (?)', $_name));
+            ->from(array('tags' => SQL_TABLE_PREFIX . 'tags'))
+            ->where($this->_db->quoteIdentifier('is_deleted') . ' = 0')
+            ->where($this->_db->quoteInto($this->_db->quoteIdentifier('name') . ' = (?)', $_name));
+        
         if ($_ignoreAcl !== true) {
             Tinebase_Model_TagRight::applyAclSql($select, $_right);
         }
 
+        Tinebase_Backend_Sql_Abstract::traitGroup($select);
+        
         $stmt = $this->_db->query($select);
         $queryResult = $stmt->fetch();
         $stmt->closeCursor();
@@ -372,26 +403,30 @@ class Tinebase_Tags
     }
 
     /**
-     * Deletes (set stated deleted) tags identified by their identifiers
+     * Deletes (set state "deleted") tags identified by their ids
      *
-     * @param  string|array id(s) to delete
+     * @param  string|array $ids to delete
+     * @param  boolean $ignoreAcl
      * @throws  Tinebase_Exception_AccessDenied
      */
-    public function deleteTags($_ids)
+    public function deleteTags($ids, $ignoreAcl = FALSE)
     {
-        $tags = $this->getTagsById($_ids);
-        if (count($tags) != count((array)$_ids)) {
+        $tags = $this->getTagsById($ids, Tinebase_Model_TagRight::VIEW_RIGHT, $ignoreAcl);
+        if (count($tags) != count((array)$ids)) {
             throw new Tinebase_Exception_AccessDenied('You are not allowed to delete the tag(s).');
         }
 
-        $currentAccountId = Tinebase_Core::getUser()->getId();
-        $manageSharedTagsRight = Tinebase_Acl_Roles::getInstance()->hasRight('Admin', $currentAccountId, Admin_Acl_Rights::MANAGE_SHARED_TAGS);
-        foreach ($tags as $tag) {
-            if ( ($tag->type == Tinebase_Model_Tag::TYPE_PERSONAL && $tag->owner == $currentAccountId) ||
-            ($tag->type == Tinebase_Model_Tag::TYPE_SHARED && $manageSharedTagsRight) ) {
-                continue;
-            } else {
-                throw new Tinebase_Exception_AccessDenied('You are not allowed to delete this tags');
+        $currentAccountId = (is_object(Tinebase_Core::getUser())) ? Tinebase_Core::getUser()->getId() : 'setupuser';
+        
+        if (! $ignoreAcl) {
+            $manageSharedTagsRight = Tinebase_Acl_Roles::getInstance()->hasRight('Admin', $currentAccountId, Admin_Acl_Rights::MANAGE_SHARED_TAGS);
+            foreach ($tags as $tag) {
+                if ( ($tag->type == Tinebase_Model_Tag::TYPE_PERSONAL && $tag->owner == $currentAccountId) ||
+                ($tag->type == Tinebase_Model_Tag::TYPE_SHARED && $manageSharedTagsRight) ) {
+                    continue;
+                } else {
+                    throw new Tinebase_Exception_AccessDenied('You are not allowed to delete this tags');
+                }
             }
         }
         
@@ -421,6 +456,9 @@ class Tinebase_Tags
         if (!empty($recordId)) {
             $select = $this->_getSelect($recordId, Tinebase_Application::getInstance()->getApplicationByName($_record->getApplication())->getId());
             Tinebase_Model_TagRight::applyAclSql($select, $_right, $this->_db->quoteIdentifier('tagging.tag_id'));
+            
+            Tinebase_Backend_Sql_Abstract::traitGroup($select);
+            
             foreach ($this->_db->fetchAssoc($select) as $tagArray){
                 $tags->addRecord(new Tinebase_Model_Tag($tagArray, true));
             }
@@ -461,9 +499,9 @@ class Tinebase_Tags
         $select = $this->_getSelect($recordIds, $appId);
         $select->group(array('tagging.tag_id', 'tagging.record_id'));
         Tinebase_Model_TagRight::applyAclSql($select, $_right, $this->_db->quoteIdentifier('tagging.tag_id'));
-        
-        Tinebase_Backend_Sql_Abstract::traitGroup($this->_db, SQL_TABLE_PREFIX, $select);
 
+        Tinebase_Backend_Sql_Abstract::traitGroup($select);
+        
         $queryResult = $this->_db->fetchAll($select);
         //if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . print_r($queryResult, TRUE));
 
@@ -515,9 +553,9 @@ class Tinebase_Tags
                 'application_id' => $appId,
                 'record_id'      => $recordId,
             // backend property not supported by record yet
-                'record_backend_id' => ''
+                'record_backend_id' => ' '
             ));
-            $this->_addOccurrence($tagId, +1);
+            $this->_addOccurrence($tagId, 1);
         }
         foreach ($toDetach as $tagId) {
             $this->_db->delete(SQL_TABLE_PREFIX . 'tagging', array(
@@ -525,7 +563,7 @@ class Tinebase_Tags
                 $this->_db->quoteInto($this->_db->quoteIdentifier('application_id'). ' = ?', $appId), 
                 $this->_db->quoteInto($this->_db->quoteIdentifier('record_id'). ' = ?',      $recordId), 
             ));
-            $this->_addOccurrence($tagId, -1);
+            $this->_deleteOccurrence($tagId, 1);
         }
     }
 
@@ -535,6 +573,8 @@ class Tinebase_Tags
      * @param Tinebase_Model_Filter_FilterGroup $_filter
      * @param mixed                             $_tag       string|array|Tinebase_Model_Tag with existing and non-existing tag
      * @return Tinebase_Model_Tag
+     * 
+     * @todo maybe this could be done in a more generic way (in Tinebase_Controller_Record_Abstract)
      */
     public function attachTagToMultipleRecords($_filter, $_tag)
     {
@@ -567,6 +607,8 @@ class Tinebase_Tags
             ->where($this->_db->quoteIdentifier('application_id') . ' = ?', $appId)
             ->where($this->_db->quoteIdentifier('tag_id') . ' = ? ', $tagId);
 
+        Tinebase_Backend_Sql_Abstract::traitGroup($select);
+        
         foreach ($this->_db->fetchAssoc($select) as $tagArray) {
             $alreadyAttachedIds[] = $tagArray['record_id'];
         }
@@ -574,26 +616,37 @@ class Tinebase_Tags
         $toAttachIds = array_diff($recordIds, $alreadyAttachedIds);
         
         Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Attaching 1 Tag to ' . count($toAttachIds) . ' records.');
-        foreach ($toAttachIds as $recordId) {
-            $this->_db->insert(SQL_TABLE_PREFIX . 'tagging', array(
-                'tag_id'         => $tagId,
-                'application_id' => $appId,
-                'record_id'      => $recordId,
-            // backend property not supported by record yet
-                'record_backend_id' => ''
-                )
+        
+        try {
+            $transactionId = Tinebase_TransactionManager::getInstance()->startTransaction($this->_db);
+            
+            foreach ($toAttachIds as $recordId) {
+                $this->_db->insert(SQL_TABLE_PREFIX . 'tagging', array(
+                    'tag_id'         => $tagId,
+                    'application_id' => $appId,
+                    'record_id'      => $recordId,
+                // backend property not supported by record yet
+                    'record_backend_id' => ''
+                    )
+                );
+            }
+            
+            $controller->concurrencyManagementAndModlogMultiple(
+                $toAttachIds, 
+                array('tags' => array()), 
+                array('tags' => array($tag->toArray()))
             );
+            
+            $this->_addOccurrence($tagId, count($toAttachIds));
+            
+            Tinebase_TransactionManager::getInstance()->commitTransaction($transactionId);
+        } catch (Exception $e) {
+            Tinebase_TransactionManager::getInstance()->rollBack();
+            Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__ . ' ' . print_r($e->getMessage(), true));
+            throw $e;
         }
         
-        $controller->concurrencyManagementAndModlogMultiple(
-            $toAttachIds, 
-            array('tags' => array()), 
-            array('tags' => array($tag->toArray()))
-        );
-        
-        $this->_addOccurrence($tagId, count($toAttachIds));
-        
-        return $tags->getFirstRecord();
+        return $this->get($tagId);
     }
 
     /**
@@ -602,6 +655,8 @@ class Tinebase_Tags
      * @param Tinebase_Model_Filter_FilterGroup $_filter
      * @param mixed                             $_tag       string|array|Tinebase_Model_Tag with existing and non-existing tag
      * @return void
+     * 
+     * @todo maybe this could be done in a more generic way (in Tinebase_Controller_Record_Abstract)
      */
     public function detachTagsFromMultipleRecords($_filter, $_tag)
     {
@@ -609,58 +664,78 @@ class Tinebase_Tags
         $appId = Tinebase_Application::getInstance()->getApplicationByName($appName)->getId();
         $controller = Tinebase_Core::getApplicationInstance($appName, $modelName);
         
-        if(!is_array($_tag)) $_tag = array($_tag);
-
-        foreach($_tag as $dirtyTagId) {
-            $tag = $this->getTagsById($dirtyTagId, Tinebase_Model_TagRight::USE_RIGHT)->getFirstRecord();
-
-            if (empty($tag)) {
-                Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' No use right for tag, detaching not possible.');
-                return;
+        // only get records user has update rights to
+        $controller->checkFilterACL($_filter, 'update');
+        $recordIds = $controller->search($_filter, NULL, FALSE, TRUE);
+        
+        foreach ((array) $_tag as $dirtyTagId) {
+            try {
+                $transactionId = Tinebase_TransactionManager::getInstance()->startTransaction($this->_db);
+                $this->_detachSingleTag($recordIds, $dirtyTagId, $appId, $controller);
+                Tinebase_TransactionManager::getInstance()->commitTransaction($transactionId);
+            } catch (Exception $e) {
+                Tinebase_TransactionManager::getInstance()->rollBack();
+                Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__ . ' ' . print_r($e->getMessage(), true));
+                throw $e;
             }
-            $tagId = $tag->getId();
-
-            // only get records user has update rights to
-            $controller->checkFilterACL($_filter, 'update');
-
-            $recordIds = $controller->search($_filter, NULL, FALSE, TRUE);
-            $recordIdList = '\'' . implode('\',\'',$recordIds) . '\'';
-
-            $attachedIds = array();
-            $select = $this->_db->select()
-                ->from(array('tagging' => SQL_TABLE_PREFIX . 'tagging'), 'record_id')
-                ->where($this->_db->quoteIdentifier('application_id') . ' = ?', $appId)
-                ->where($this->_db->quoteIdentifier('tag_id') . ' = ? ', $tagId)
-                ->where($this->_db->quoteIdentifier('record_id').' IN ( ' . $recordIdList . ' ) ');
-
-            foreach ($this->_db->fetchAssoc($select) as $tagArray){
-                $attachedIds[] = $tagArray['record_id'];
-            }
-
-            if (empty($attachedIds)) {
-                Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' There are no records we could detach the tag(s) from');
-                return;
-            }
-
-            Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Detaching 1 Tag from ' . count($attachedIds) . ' records.');
-            foreach ($attachedIds as $recordId) {
-                $this->_db->delete(SQL_TABLE_PREFIX . 'tagging', 'tag_id=\'' . $tagId . '\' AND record_id=\'' . $recordId. '\' AND application_id=\'' . $appId . '\'');
-            }
-
-            $controller->concurrencyManagementAndModlogMultiple(
-                $attachedIds,
-                array('tags' => array($tag->toArray())),
-                array('tags' => array())
-            );
-            
-            $this->_deleteOccurrence($tagId, count($attachedIds));
         }
     }
+    
+    /**
+     * detach a single tag from records
+     * 
+     * @param array $recordIds
+     * @param string $dirtyTagId
+     * @param string $appId
+     * @param Tinebase_Controller_Record_Abstract $controller
+     */
+    protected function _detachSingleTag($recordIds, $dirtyTagId, $appId, $controller)
+    {
+        $tag = $this->getTagsById($dirtyTagId, Tinebase_Model_TagRight::USE_RIGHT)->getFirstRecord();
+        
+        if (empty($tag)) {
+            Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' No use right for tag, detaching not possible.');
+            return;
+        }
+        $tagId = $tag->getId();
+        
+        $attachedIds = array();
+        $select = $this->_db->select()
+            ->from(array('tagging' => SQL_TABLE_PREFIX . 'tagging'), 'record_id')
+            ->where($this->_db->quoteIdentifier('application_id') . ' = ?', $appId)
+            ->where($this->_db->quoteIdentifier('tag_id') . ' = ? ', $tagId)
+            ->where($this->_db->quoteInto($this->_db->quoteIdentifier('record_id').' IN (?)', $recordIds));
 
+        Tinebase_Backend_Sql_Abstract::traitGroup($select);
+        
+        foreach ($this->_db->fetchAssoc($select) as $tagArray){
+            $attachedIds[] = $tagArray['record_id'];
+        }
+        
+        if (empty($attachedIds)) {
+            Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' There are no records we could detach the tag(s) from');
+            return;
+        }
+        
+        Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Detaching 1 Tag from ' . count($attachedIds) . ' records.');
+        foreach ($attachedIds as $recordId) {
+            $this->_db->delete(SQL_TABLE_PREFIX . 'tagging', 'tag_id=\'' . $tagId . '\' AND record_id=\'' . $recordId. '\' AND application_id=\'' . $appId . '\'');
+        }
+        
+        $recordIds = array_merge($recordIds, $attachedIds);
+        $controller->concurrencyManagementAndModlogMultiple(
+            $attachedIds,
+            array('tags' => array($tag->toArray())),
+            array('tags' => array())
+        );
+        
+        $this->_deleteOccurrence($tagId, count($attachedIds));
+    }
+    
     /**
      * Creates missing tags on the fly and returns complete list of tags the current
      * user has use rights for.
-     * Allways respects the current acl of the current user!
+     * Always respects the current acl of the current user!
      *
      * @param   array|Tinebase_Record_RecordSet set of string|array|Tinebase_Model_Tag with existing and non-existing tags
      * @return  Tinebase_Record_RecordSet       set of all tags
@@ -668,7 +743,8 @@ class Tinebase_Tags
      */
     protected function _createTagsOnTheFly($_mixedTags)
     {
-        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Creating tags on the fly: ' . print_r($_mixedTags, true));
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ 
+            . ' Creating tags on the fly: ' . print_r(($_mixedTags instanceof Tinebase_Record_RecordSet ? $_mixedTags->toArray() : $_mixedTags), TRUE));
         
         $tagIds = array();
         foreach ($_mixedTags as $tag) {
@@ -705,15 +781,39 @@ class Tinebase_Tags
      */
     protected function _addOccurrence($_tag, $_toAdd)
     {
-        $tagId = $_tag instanceof Tinebase_Model_Tag ? $_tag->getId() : $_tag;
+        $this->_updateOccurrence($_tag, $_toAdd);
+    }
+    
+    /**
+     * update tag occurrrence
+     * 
+     * @param Tinbebase_Tags_Model_Tag|string $tag
+     * @param integer $toAddOrRemove
+     */
+    protected function _updateOccurrence($tag, $toAddOrRemove)
+    {
+        if ($toAddOrRemove == 0) {
+            return;
+        }
+        
+        $tagId = $tag instanceof Tinebase_Model_Tag ? $tag->getId() : $tag;
 
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " inc/decreasing tag occurrence of $tagId by $_toAdd");
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " de/increasing tag occurrence of $tagId by $toAddOrRemove");
 
         $quotedIdentifier = $this->_db->quoteIdentifier('occurrence');
-        $data = array(
-        	'occurrence' => new Zend_Db_Expr('(CASE WHEN (' . $quotedIdentifier . ' + ' . (int)$_toAdd . ') >= 0 THEN ' . $quotedIdentifier . ' + ' . (int)$_toAdd . ' ELSE 0 END)')
-        );
-
+        
+        if ($toAddOrRemove > 0) {
+            $toAdd = (int) $toAddOrRemove;
+            $data = array(
+                'occurrence' => new Zend_Db_Expr($quotedIdentifier . ' + ' . $toAdd)
+            );
+        } else {
+            $toRemove = abs((int) $toAddOrRemove);
+            $data = array(
+                'occurrence' => new Zend_Db_Expr('(CASE WHEN (' . $quotedIdentifier . ' - ' . $toRemove . ') > 0 THEN ' . $quotedIdentifier . ' - ' . $toRemove . ' ELSE 0 END)')
+            );
+        }
+        
         $this->_db->update(SQL_TABLE_PREFIX . 'tags', $data, $this->_db->quoteInto($this->_db->quoteIdentifier('id') . ' = ?', $tagId));
     }
 
@@ -726,16 +826,7 @@ class Tinebase_Tags
      */
     protected function _deleteOccurrence($_tag, $_toDel)
     {
-        $tagId = $_tag instanceof Tinebase_Model_Tag ? $_tag->getId() : $_tag;
-
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . " decreasing tag occurrence of $tagId by $_toDel");
-
-        $quotedIdentifier = $this->_db->quoteIdentifier('occurrence');
-        $data = array(
-            'occurrence' => new Zend_Db_Expr('(CASE WHEN ((' . $quotedIdentifier . ' - ' . (int)$_toDel . ') >= 0 THEN ' . $quotedIdentifier . ' - ' . (int)$_toDel . ' ELSE 0 END))')
-        );
-
-        $this->_db->update(SQL_TABLE_PREFIX . 'tags', $data, $this->_db->quoteInto($this->_db->quoteIdentifier('id') . ' = ?', $tagId));
+        $this->_updateOccurrence($_tag, - $_toDel);
     }
 
     /**
@@ -747,10 +838,14 @@ class Tinebase_Tags
     public function getRights($_tagId)
     {
         $select = $this->_db->select()
-        ->from(SQL_TABLE_PREFIX . 'tags_acl', array('tag_id', 'account_type', 'account_id',
-                 'account_right' => Tinebase_Backend_Sql_Command::getAggregateFunction($this->_db, $this->_db->quoteIdentifier('account_right'))))
-        ->where($this->_db->quoteInto($this->_db->quoteIdentifier('tag_id') . ' = ?', $_tagId))
-        ->group(array('tag_id', 'account_type', 'account_id'));
+            ->from(array('tags_acl' => SQL_TABLE_PREFIX . 'tags_acl'), 
+                   array('tag_id', 'account_type', 'account_id', 'account_right' => $this->_dbCommand->getAggregate('account_right'))
+            )
+            ->where($this->_db->quoteInto($this->_db->quoteIdentifier('tag_id') . ' = ?', $_tagId))
+            ->group(array('tag_id', 'account_type', 'account_id'));
+        
+        Tinebase_Backend_Sql_Abstract::traitGroup($select);
+        
         $stmt = $this->_db->query($select);
         $rows = $stmt->fetchAll(Zend_Db::FETCH_ASSOC);
 
@@ -785,13 +880,15 @@ class Tinebase_Tags
         Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Setting ' . count($rights) . ' tag right(s).');
 
         foreach ($rights as $right) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' ' . print_r($right->toArray(), TRUE));
+            
             if (! ($right instanceof Tinebase_Model_TagRight && $right->isValid())) {
                 throw new Tinebase_Exception_Record_Validation('The given right is not valid!');
             }
             $this->_db->delete(SQL_TABLE_PREFIX . 'tags_acl', array(
                 $this->_db->quoteInto($this->_db->quoteIdentifier('tag_id') . ' = ?', $right->tag_id),
                 $this->_db->quoteInto($this->_db->quoteIdentifier('account_type') . ' = ?', $right->account_type),
-                $this->_db->quoteInto($this->_db->quoteIdentifier('account_id') . ' = ?', $right->account_id)
+                $this->_db->quoteInto($this->_db->quoteIdentifier('account_id') . ' = ?', (string) $right->account_id)
             ));
             foreach (array('view', 'use' ) as $availableRight) {
                 $rightField = $availableRight . '_right';
@@ -816,9 +913,12 @@ class Tinebase_Tags
     public function getContexts($_tagId)
     {
         $select = $this->_db->select()
-        ->from(SQL_TABLE_PREFIX . 'tags_context', array('application_id' => Tinebase_Backend_Sql_Command::getAggregateFunction($this->_db, $this->_db->quoteIdentifier('application_id'))))
-        ->where($this->_db->quoteInto($this->_db->quoteIdentifier('tag_id') . ' = ?', $_tagId))
-        ->group('tag_id');
+            ->from(array('tags_context' => SQL_TABLE_PREFIX . 'tags_context'), array('application_id' => $this->_dbCommand->getAggregate('application_id')))
+            ->where($this->_db->quoteInto($this->_db->quoteIdentifier('tag_id') . ' = ?', $_tagId))
+            ->group('tag_id');
+        
+        Tinebase_Backend_Sql_Abstract::traitGroup($select);
+        
         $apps = $this->_db->fetchOne($select);
 
         if ($apps === '0'){
@@ -911,5 +1011,78 @@ class Tinebase_Tags
             ->where($this->_db->quoteIdentifier('is_deleted') . ' = 0');
 
         return $select;
+    }
+
+    /**
+     * merge duplicate shared tags
+     * 
+     * @param string $model record model for which tags should be merged
+     * @param boolean $deleteObsoleteTags
+     * @param boolean $ignoreAcl
+     * 
+     * @see 0007354: function for merging duplicate tags
+     */
+    public function mergeDuplicateSharedTags($model, $deleteObsoleteTags = TRUE, $ignoreAcl = FALSE)
+    {
+        $select = $this->_db->select()
+            ->from(array('tags'    => SQL_TABLE_PREFIX . 'tags'), 'name')
+            ->where($this->_db->quoteIdentifier('type') . ' = ?', Tinebase_Model_Tag::TYPE_SHARED)
+            ->where($this->_db->quoteIdentifier('is_deleted') . ' = 0')
+            ->group('name')
+            ->having('COUNT(' . $this->_db->quoteIdentifier('name') . ') > 1');
+        $queryResult = $this->_db->fetchAll($select);
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
+            ' Found ' . count($queryResult) . ' duplicate tag names.');
+        
+        $controller = Tinebase_Core::getApplicationInstance($model);
+        if ($ignoreAcl) {
+            $containerChecks = $controller->doContainerACLChecks(FALSE);
+        }
+        $recordFilterModel = $model . 'Filter';
+        
+        foreach ($queryResult as $duplicateTag) {
+            $filter = new Tinebase_Model_TagFilter(array(
+                'name' => $duplicateTag['name'],
+                'type' => Tinebase_Model_Tag::TYPE_SHARED,
+            ));
+            $paging = new Tinebase_Model_Pagination(array('sort' => 'creation_time'));
+            $tagsWithSameName = $this->searchTags($filter, $paging);
+            $targetTag = $tagsWithSameName->getFirstRecord();
+            
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
+                ' Merging tag ' . $duplicateTag['name'] . '. Found ' . count($tagsWithSameName) . ' tags with this name.');
+            
+            foreach ($tagsWithSameName as $tag) {
+                if ($tag->getId() === $targetTag->getId()) {
+                    // skip target (oldest) tag
+                    continue;
+                }
+
+                $recordFilter = new $recordFilterModel(array(
+                    array('field' => 'tag', 'operator' => 'in', 'value' => array($tag->getId()))
+                ));
+                
+                $recordIdsWithTagToMerge = $controller->search($recordFilter, NULL, FALSE, TRUE);
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
+                    ' Found ' . count($recordIdsWithTagToMerge) . ' ' . $model . '(s) with tags to be merged.');
+                
+                $recordFilter = new $recordFilterModel(array(
+                    array('field' => 'id', 'operator' => 'in', 'value' => $recordIdsWithTagToMerge)
+                ));
+                $this->attachTagToMultipleRecords($recordFilter, $targetTag);
+                $this->detachTagsFromMultipleRecords($recordFilter, $tag->getId());
+                
+                // check occurrence of the merged tag and remove it if obsolete
+                $tag = $this->get($tag);
+                if ($deleteObsoleteTags && $tag->occurrence == 0) {
+                    $this->deleteTags($tag->getId(), $ignoreAcl);
+                }
+            }
+        }
+        
+        if ($ignoreAcl) {
+            $controller->doContainerACLChecks($containerChecks);
+        }
     }
 }

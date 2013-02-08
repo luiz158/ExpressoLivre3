@@ -3,7 +3,7 @@
  * 
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 Ext.ns('Tine.widgets.dialog');
 
@@ -41,6 +41,11 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
      */
     appName: null,
     /**
+     * the modelName (filled by application starter)
+     * @type 
+     */
+    modelName: null,
+    /**
      * @cfg {Ext.data.Record} recordClass
      * record definition class  (required)
      */
@@ -53,7 +58,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
      * @cfg {Bool} showContainerSelector
      * show container selector in bottom area
      */
-    showContainerSelector: false,
+    showContainerSelector: null,
     /**
      * @cfg {Bool} evalGrants
      * should grants of a grant-aware records be evaluated (defaults to true)
@@ -84,7 +89,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
     
     /**
      * @cfg {Boolean} doDuplicateCheck
-     * do duplicate check when saveing record (mode remote only)
+     * do duplicate check when saving record (mode remote only)
      */
     doDuplicateCheck: true,
     
@@ -95,20 +100,31 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
     editGrant: 'editGrant',
 
     /**
-     * Shall the MultipleEditDialogPlugin be aplied?
-     * @type Boolean
+     * when a record has the relations-property the relations-panel can be disabled here
+     * @cfg {Boolean} hideRelationsPanel
      */
-    useMultiple: false,
+    hideRelationsPanel: false,
     
     /**
-     * holds items to disable on multiple edit
-     * @type Array
+     * Registry for other relationgridpanels than the generic one,
+     * handling special types of relations the generic one will not.
+     * Panels registered here must have a store with the relation records.
+     * 
+     * @type {Array}
      */
-    disableOnEditMultiple: null,
+    relationPanelRegistry: null,
     
-    selectedRecords: null,
-    selectionFilter: null,
-        
+    /**
+     * ignore relations to given php-class names in the relation grid
+     * @type {Array}
+     */
+    ignoreRelatedModels: null,
+    
+    /**
+     * dialog is currently saving data
+     * @type Boolean
+     */
+    saving: false,
     
     /**
      * @property window {Ext.Window|Ext.ux.PopupWindow|Ext.Air.Window}
@@ -121,6 +137,18 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
      * @property loadMask {Ext.LoadMask}
      */
     
+    /**
+     * @property containerSelectCombo {Tine.widgets.container.selectionComboBox}
+     */
+    containerSelectCombo: null,
+    
+    /**
+     * If set, these fields are readOnly (when called dependent to related record)
+     * json-encoded Array of Object
+     * @type String
+     */
+    fixedFields: null,
+
     // private
     bodyStyle:'padding:5px',
     layout: 'fit',
@@ -130,9 +158,13 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
     deferredRender: false,
     buttonAlign: null,
     bufferResize: 500,
-    
+    // the relationsPanel
+    relationsPanel: null,
+    // Array of Relation Pickers
+    relationPickers: null,
     //private
     initComponent: function() {
+        this.relationPanelRegistry = this.relationPanelRegistry ? this.relationPanelRegistry : [];
         this.addEvents(
             /**
              * @event cancel
@@ -158,15 +190,25 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
             'apply',
             /**
              * @event load
+             * @param {Tine.widgets.dialog.EditDialog} this
+             * @param {Tine.data.Record} record which got loaded
+             * @param {Function} ticket function for async defer
              * Fired when record is loaded
              */
             'load',
             /**
              * @event save
+             * @param {Tine.widgets.dialog.EditDialog} this
+             * @param {Tine.data.Record} record which got loaded
+             * @param {Function} ticket function for async defer
              * Fired when remote record is saving
              */
             'save'
         );
+        
+        if(! this.recordClass && this.modelName) {
+            this.recordClass = Tine[this.appName].Model[this.modelName];
+        }
         
         if (this.recordClass) {
             this.appName    = this.appName    ? this.appName    : this.recordClass.getMeta('appName');
@@ -177,12 +219,13 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
             this.app = Tine.Tinebase.appMgr.get(this.appName);
         }
         
+        if(! this.windowNamePrefix) {
+            this.windowNamePrefix = this.modelName + 'EditWindow_';
+        }
+        
         Tine.log.debug('initComponent: appName: ', this.appName);
         Tine.log.debug('initComponent: modelName: ', this.modelName);
         Tine.log.debug('initComponent: app: ', this.app);
-        
-        this.selectedRecords = Ext.decode(this.selectedRecords);
-        this.selectionFilter = Ext.decode(this.selectionFilter);
         
         // init some translations
         if (this.app.i18n && this.recordClass !== null) {
@@ -196,17 +239,11 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
                 recordClass: this.recordClass
             });
         }
-        
         // init plugins
-        this.plugins = this.plugins ? this.plugins : [];
+        this.plugins = Ext.isString(this.plugins) ? Ext.decode(this.plugins) : Ext.isArray(this.plugins) ? this.plugins.concat(Ext.decode(this.initialConfig.plugins)) : [];
+        
         this.plugins.push(new Tine.widgets.customfields.EditDialogPlugin({}));
         this.plugins.push(this.tokenModePlugin = new Tine.widgets.dialog.TokenModeEditDialogPlugin({}));
-        
-        if(this.useMultiple) {
-            this.mode = 'local';
-            this.record = new this.recordClass({});
-            this.plugins.push(new Tine.widgets.dialog.MultipleEditDialogPlugin({}));
-        }
         
         // init actions
         this.initActions();
@@ -218,10 +255,40 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
         this.initRecord();
         // get items for this dialog
         this.items = this.getFormItems();
-        
+        // init relations panel if relations are defined
+        this.initRelationsPanel();
+
         Tine.widgets.dialog.EditDialog.superclass.initComponent.call(this);
+        // set fields readOnly if set
+        this.fixFields();
     },
-    
+
+    /**
+     * fix fields (used for preselecting form fields when called in dependency to another record)
+     * @return {Boolean}
+     */
+    fixFields: function() {
+        if(this.fixedFields) {
+            if(!this.rendered) {
+                this.fixFields.defer(100, this);
+                return false;
+            }
+            Ext.each(Ext.decode(this.fixedFields), function(prefill) {
+                var field = this.getForm().findField(prefill.key);
+                if(Ext.isFunction(this.recordClass.getField(prefill.key).type)) {
+                    var foreignRecordClass = this.recordClass.getField(prefill.key).type;
+                    var record = new foreignRecordClass(prefill.value);
+                    field.selectedRecord = record;
+                    field.setValue(prefill.value);
+                    field.fireEvent('select');
+                } else {
+                    field.setValue(prefill.value);
+                }
+                field.disable();
+            }, this);
+        }
+    },
+
     /**
      * init actions
      */
@@ -232,6 +299,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
             minWidth: 70,
             ref: '../btnSaveAndClose',
             scope: this,
+            // TODO: remove the defer when all subpanels use the deferByTicket mechanism
             handler: function() { this.onSaveAndClose.defer(500, this) },
             iconCls: 'action_saveAndClose'
         });
@@ -240,6 +308,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
             requiredGrant: this.editGrant,
             text: _('Apply'),
             minWidth: 70,
+            ref: '../btnApplyChanges',
             scope: this,
             handler: this.onApplyChanges,
             iconCls: 'action_applyChanges'
@@ -272,11 +341,8 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
             this.action_delete
         ];
         
-        //this.tbarItems = genericButtons.concat(this.tbarItems);
-        
         this.fbar = [
             '->',
-            //this.action_applyChanges,
             this.action_cancel,
             this.action_saveAndClose
        ];
@@ -293,8 +359,8 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
      */
     initContainerSelector: function() {
         if (this.showContainerSelector) {
-            var ContainerForm = new Tine.widgets.container.selectionComboBox({
-                id: this.app.appName + 'EditDialogContainerSelector',
+            this.containerSelectCombo = new Tine.widgets.container.selectionComboBox({
+                id: this.app.appName + 'EditDialogContainerSelector-' + Ext.id(),
                 fieldLabel: _('Saved in'),
                 width: 300,
                 listWidth: 300,
@@ -303,14 +369,52 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
                 containerName: this.app.i18n.n_hidden(this.recordClass.getMeta('containerName'), this.recordClass.getMeta('containersName'), 1),
                 containersName: this.app.i18n._hidden(this.recordClass.getMeta('containersName')),
                 appName: this.app.appName,
-                requiredGrant: this.evalGrants ? 'addGrant' : false
+                requiredGrant: this.evalGrants ? 'addGrant' : false,
+                disabled: this.isContainerSelectorDisabled(),
+                listeners: {
+                    scope: this,
+                    select: function() {    
+                        // enable or disable save button dependent to containers account grants
+                        var grants = this.containerSelectCombo.selectedContainer ? this.containerSelectCombo.selectedContainer.account_grants : {};
+                        // on edit check editGrant, on add check addGrant
+                        if (this.record.data.id) {  // edit if record has already an id
+                            var disable = grants.hasOwnProperty('editGrant') ? ! grants.editGrant : false;
+                        } else {
+                            var disable = grants.hasOwnProperty('addGrant') ? ! grants.addGrant : false;
+                        }
+                        this.action_saveAndClose.setDisabled(disable);
+                    }
+                }
             });
-            this.on('render', function() {this.getForm().add(ContainerForm);}, this);
+            this.on('render', function() { this.getForm().add(this.containerSelectCombo); }, this);
             
             this.fbar = [
                 _('Saved in'),
-                ContainerForm
+                this.containerSelectCombo
             ].concat(this.fbar);
+        }
+        
+    },
+    
+    /**
+     * checks if the container selector should be disabled (dependent on account grants of the container itself)
+     * @return {}
+     */
+    isContainerSelectorDisabled: function() {
+        if(this.record) {
+            var cp = this.recordClass.getMeta('containerProperty'),
+                container = this.record.data[cp],
+                grants = (container && container.hasOwnProperty('account_grants')) ? container.account_grants : null,
+                cond = false;
+                
+            // check grants if record already exists and grants should be evaluated
+            if(this.evalGrants && this.record.data.id && grants) {
+                cond = ! (grants.hasOwnProperty('editGrant') && grants.editGrant);
+            }
+            
+            return cond;
+        } else {
+            return false;
         }
         
     },
@@ -319,7 +423,6 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
      * init record to edit
      */
     initRecord: function() {
-        
         Tine.log.debug('init record with mode: ' + this.mode);
         if (! this.record) {
             Tine.log.debug('creating new default data record');
@@ -334,7 +437,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
             }
         } else {
             // note: in local mode we expect a valid record
-            if (typeof this.record.beginEdit != 'function') {
+            if (!Ext.isFunction(this.record.beginEdit)) {
                 this.record = this.recordProxy.recordReader({responseText: this.record});
             }
             this.onRecordLoad();
@@ -378,8 +481,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
             this.onRecordLoad.defer(250, this);
             return;
         }
-        
-        Tine.log.debug('loading of the following record completed:');
+        Tine.log.debug('Tine.widgets.dialog.EditDialog::onRecordLoad() - Loading of the following record completed:');
         Tine.log.debug(this.record);
         
         if (this.copyRecord) {
@@ -393,11 +495,26 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
             }
         }
         
-        if (this.fireEvent('load', this) !== false) {
-            this.getForm().loadRecord(this.record);
-            this.getForm().clearInvalid();
+        var ticketFn = this.onAfterRecordLoad.deferByTickets(this),
+            wrapTicket = ticketFn();
+        
+        this.fireEvent('load', this, this.record, ticketFn);
+        wrapTicket();
+    },
+    
+    // finally load the record into the form
+    onAfterRecordLoad: function() {
+        var form = this.getForm();
+        
+        if(form) {
+            form.loadRecord(this.record);
+            form.clearInvalid();
+        }
+        
+        if(this.record && this.record.hasOwnProperty('data') && Ext.isObject(this.record.data[this.recordClass.getMeta('containerProperty')])) {
             this.updateToolbars(this.record, this.recordClass.getMeta('containerProperty'));
-            
+        }
+        if(this.loadMask) {
             this.loadMask.hide();
         }
     },
@@ -407,7 +524,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
      */
     onRecordUpdate: function() {
         var form = this.getForm();
-        
+
         // merge changes from form into record
         form.updateRecord(this.record);
     },
@@ -426,19 +543,16 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
                 scope: this,
                 fn: function() {
                     // focus ok btn
-                    if (this.action_saveAndClose.items) {
+                    if (this.action_saveAndClose.items && this.action_saveAndClose.items.length > 0) {
                         this.action_saveAndClose.items[0].focus();
                     }
-                    this.onSaveAndClose.defer(10, this);
+                    this.onSaveAndClose();
                 }
             }
         ]);
-
-        // should be fixed in WindowFactory
-        //this.setHeight(Ext.fly(this.el.dom.parentNode).getHeight());
-            
+        
         this.loadMask = new Ext.LoadMask(ct, {msg: String.format(_('Transferring {0}...'), this.i18nRecordName)});
-        if (this.mode !== 'local' && this.recordProxy !== null && this.recordProxy.isLoading(this.loadRequest)) {
+        if(this.loadRecord !== false) {
             this.loadMask.show();
         }
     },
@@ -489,31 +603,54 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
     /**
      * @private
      */
-    onSaveAndClose: function(button, event){
-        this.onApplyChanges(button, event, true);
+    onSaveAndClose: function() {
         this.fireEvent('saveAndClose');
+        this.onApplyChanges(true);
     },
     
     /**
      * generic apply changes handler
-     * 
-     * @param {Ext.Button} button
-     * @param {Event} event
      * @param {Boolean} closeWindow
      */
-    onApplyChanges: function(button, event, closeWindow) {
+    onApplyChanges: function(closeWindow) {
+        this.loadMask.show();
+        
+        var ticketFn = this.doApplyChanges.deferByTickets(this, [closeWindow]),
+            wrapTicket = ticketFn();
+
+        this.fireEvent('save', this, this.record, ticketFn);
+        wrapTicket();
+    },
+    
+    /**
+     * is called from onApplyChanges
+     * @param {Boolean} closeWindow
+     */
+    doApplyChanges: function(closeWindow) {
         // we need to sync record before validating to let (sub) panels have 
         // current data of other panels
         this.onRecordUpdate();
-        
+
         if(this.isValid()) {
-            this.loadMask.show();
-            
             if (this.mode !== 'local') {
-                this.fireEvent('save');
                 this.recordProxy.saveRecord(this.record, {
                     scope: this,
-                    success: function(record){this.onRequestSuccess(record,closeWindow)},
+                    success: function(record) {
+                        // override record with returned data
+                        this.record = record;
+                        if (! Ext.isFunction(this.window.cascade)) {
+                            // update form with this new data
+                            // NOTE: We update the form also when window should be closed,
+                            //       cause sometimes security restrictions might prevent
+                            //       closing of native windows
+                            this.onRecordLoad();
+                        }
+                        var ticketFn = this.onAfterApplyChanges.deferByTickets(this, [closeWindow]),
+                            wrapTicket = ticketFn();
+                            
+                        this.fireEvent('update', Ext.util.JSON.encode(this.record.data), this.mode, this, ticketFn);
+                        wrapTicket();
+                    },
                     failure: this.onRequestFailed,
                     timeout: 300000 // 5 minutes
                 }, {
@@ -521,18 +658,25 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
                 });
             } else {
                 this.onRecordLoad();
-                this.fireEvent('update', Ext.util.JSON.encode(this.record.data), this.mode);
-                
-                // free 0 namespace if record got created
-                this.window.rename(this.windowNamePrefix + this.record.id);
-                        
-                if (closeWindow) {
-                    this.purgeListeners();
-                    this.window.close();
-                }
+                var ticketFn = this.onAfterApplyChanges.deferByTickets(this, [closeWindow]),
+                    wrapTicket = ticketFn();
+                    
+                this.fireEvent('update', Ext.util.JSON.encode(this.record.data), this.mode, this, ticketFn);
+                wrapTicket();
             }
         } else {
+            this.loadMask.hide();
             Ext.MessageBox.alert(_('Errors'), this.getValidationErrorMessage());
+        }
+    },
+    
+    onAfterApplyChanges: function(closeWindow) {
+        this.window.rename(this.windowNamePrefix + this.record.id);
+        this.loadMask.hide();
+        if (closeWindow) {
+            this.window.fireEvent('saveAndClose');
+            this.purgeListeners();
+            this.window.close();
         }
     },
     
@@ -560,7 +704,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
                         this.purgeListeners();
                         this.window.close();
                     },
-                    failure: function () { 
+                    failure: function () {
                         Ext.MessageBox.alert(_('Failed'), String.format(_('Could not delete {0}.'), this.i18nRecordName));
                         Ext.MessageBox.hide();
                     }
@@ -636,7 +780,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
             resolveGridPanel.doLayout();
             
             this.doDuplicateCheck = false;
-            this.onSaveAndClose(btn, e);
+            this.onSaveAndClose();
         }, this);
         
         // place in viewport
@@ -653,6 +797,8 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
      * @param {Object} exception
      */
     onRequestFailed: function(exception) {
+        this.saving = false;
+        
         if (exception.code == 629) {
             this.onDuplicateException.apply(this, arguments);
         } else {
@@ -662,29 +808,12 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
     },
     
     /**
-     * add given item disable registry for multiple edit
-     * 
-     * NOTE: this function can be called from any child's scope also
-     * 
-     * @param {Ext.Component} item
+     * creates the relations panel, if relations are defined
      */
-    addToDisableOnEditMultiple: function(item) {
-        
-        var mgrCmpTest = function(p) {return Ext.isFunction(p.addToDisableOnEditMultiple);},
-            me = mgrCmpTest(this) ? this : this.findParentBy(mgrCmpTest);
-            
-        if (me) {
-            me.disableOnEditMultiple = me.disableOnEditMultiple || [];
-            if (me.disableOnEditMultiple.indexOf(item) < 0) {
-                Tine.log.debug('Tine.widgets.dialog.EditDialog::addToDisableOnEditMultiple ' + item.id);
-                me.disableOnEditMultiple.push(item);
-            }
+    initRelationsPanel: function() {
+        if(!this.relationsPanel && !this.hideRelationsPanel && this.recordClass && this.recordClass.hasField('relations')) {
+            this.relationsPanel = new Tine.widgets.relation.GenericPickerGridPanel({ anchor: '100% 100%', editDialog: this }); 
+            this.items.items.push(this.relationsPanel);
         }
-    },
-    
-    getDisableOnEditMultiple: function() {
-        if(!this.disableOnEditMultiple) this.disableOnEditMultiple = new Array();
-        return this.disableOnEditMultiple;
-       
     }
 });

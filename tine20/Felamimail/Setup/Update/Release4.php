@@ -304,11 +304,30 @@ class Felamimail_Setup_Update_Release4 extends Setup_Update_Abstract
         $this->_backend->createTable($tableDefinition, 'Felamimail', 'felamimail_sieve_vacation');
         $this->setApplicationVersion('Felamimail', '4.7');
     }
+
+    public function update_7()
+    {
+        if ($this->getTableVersion('felamimail_cache_message') < 8) {
+            $declaration = new Setup_Backend_Schema_Field_Xml(
+                '<field>
+                    <name>smime</name>
+                    <type>integer</type>
+                    <default>0</default>
+                    <notnull>true</notnull>
+                </field>'
+            );
+
+            $this->_backend->addCol('felamimail_cache_message', $declaration);
+
+            $this->setTableVersion('felamimail_folder', '8');
+            $this->setApplicationVersion('Felamimail', '4.8');
+        }
+    }
     
     /**
      * update to 5.0
      */
-    public function update_7()
+    public function update_8()
     {
         $this->setApplicationVersion('Felamimail', '5.0');
     }
@@ -316,7 +335,7 @@ class Felamimail_Setup_Update_Release4 extends Setup_Update_Abstract
     /**
      * update to 5.0
      */
-    public function update_8()
+    public function update_9()
     {
         $this->setApplicationVersion('Felamimail', '5.0');
     }

@@ -23,12 +23,12 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      * 
      * @todo do we still need this?
      */
-	public function ping()
-	{
-	    Zend_Session::writeClose(true);
-	    sleep(10);
-	    return array('changes' => 'contacts');
-	}
+    public function ping()
+    {
+        Zend_Session::writeClose(true);
+        sleep(10);
+        return array('changes' => 'contacts');
+    }
 
     /**
      * get list of translated country names
@@ -133,7 +133,7 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      */
     public function searchRoles($filter, $paging)
     {
-    	$result = array(
+        $result = array(
             'results'     => array(),
             'totalcount'  => 0
         );
@@ -186,7 +186,7 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      */
     public function clearState($name)
     {
-    	Tinebase_State::getInstance()->clearState($name);
+        Tinebase_State::getInstance()->clearState($name);
     }
 
     /**
@@ -330,6 +330,7 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      */
     public function attachTagToMultipleRecords($filterData, $filterName, $tag)
     {
+        $this->_longRunningRequest();
         $filter = $this->_getFilterGroup($filterData, $filterName);
 
         Tinebase_Tags::getInstance()->attachTagToMultipleRecords($filter, $tag);
@@ -346,6 +347,7 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      */
     public function detachTagsFromMultipleRecords($filterData, $filterName, $tag)
     {
+        $this->_longRunningRequest();
         $filter = $this->_getFilterGroup($filterData, $filterName);
 
         Tinebase_Tags::getInstance()->detachTagsFromMultipleRecords($filter, $tag);
@@ -438,6 +440,8 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      */
     public function login($username, $password, $securitycode=NULL)
     {
+        Tinebase_Core::startSession('tinebase');
+        
         // try to login user
         $success = Tinebase_Controller::getInstance()->login($username, $password, $_SERVER['REMOTE_ADDR'], 'TineJson', $securitycode);
         $msgerror = "Your username and/or your password are wrong!!!";
@@ -483,9 +487,9 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         
         if ($success) {
             $response = array(
-				'success'       => TRUE,
-                'account'       => Tinebase_Core::getUser()->getPublicUser()->toArray(),
-				'jsonKey'       => Tinebase_Core::get('jsonKey'),
+                'success'        => TRUE,
+                'account'        => Tinebase_Core::getUser()->getPublicUser()->toArray(),
+                'jsonKey'        => Tinebase_Core::get('jsonKey'),
                 'welcomeMessage' => "Welcome to Tine 2.0!"
             );
             
@@ -562,11 +566,15 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     public function logout()
     {
         Tinebase_Controller::getInstance()->logout($_SERVER['REMOTE_ADDR']);
-
+        
         Tinebase_Auth_CredentialCache::getInstance()->getCacheAdapter()->resetCache();
+        
+        if (Zend_Session::isStarted()) {
+            Zend_Session::destroy();
+        }
 
         $result = array(
-			'success'=> true,
+            'success'=> true,
         );
 
         return $result;
@@ -592,7 +600,9 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             $defaultUsername = '';
             $defaultPassword = '';
         }
-
+        
+        $numberString = Zend_Locale_Format::toFloat(1234.56);
+        
         $registryData =  array(
             'serviceMap'       => $tbFrontendHttp->getServiceMap(),
             'timeZone'         => Tinebase_Core::get(Tinebase_Core::USERTIMEZONE),
@@ -611,10 +621,12 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             'defaultUsername'   => $defaultUsername,
             'defaultPassword'   => $defaultPassword,
             'denySurveys'       => Tinebase_Core::getConfig()->denySurveys,
-            'titlePostfix'      => Tinebase_Config::getInstance()->getConfig(Tinebase_Model_Config::PAGETITLEPOSTFIX, NULL, '')->value,
-            'redirectUrl'       => Tinebase_Config::getInstance()->getConfig(Tinebase_Model_Config::REDIRECTURL, NULL, '')->value,
+            'titlePostfix'      => Tinebase_Config::getInstance()->get(Tinebase_Model_Config::PAGETITLEPOSTFIX),
+            'redirectUrl'       => Tinebase_Config::getInstance()->get(Tinebase_Model_Config::REDIRECTURL),
             'maxFileUploadSize' => convertToBytes(ini_get('upload_max_filesize')),
-            'maxPostSize'       => convertToBytes(ini_get('post_max_size'))
+            'maxPostSize'       => convertToBytes(ini_get('post_max_size')),
+            'thousandSeparator' => $numberString[1],
+            'decimalSeparator'  => $numberString[5]
         );
 
         if (Tinebase_Core::isRegistered(Tinebase_Core::USER)) {
@@ -624,10 +636,19 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
                 try {
                     $userContactArray = Addressbook_Controller_Contact::getInstance()->getContactByUserId($user->getId(), TRUE)->toArray();
                 } catch (Addressbook_Exception_NotFound $aenf) {
-                    if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' User not found in Addressbook: ' . $user->accountDisplayName);
+                    if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__
+                        . ' User not found in Addressbook: ' . $user->accountDisplayName);
                 }
             }
 
+            try {
+                $persistentFilters = Tinebase_Frontend_Json_PersistentFilter::getAllPersistentFilters();
+            } catch (Tinebase_Exception_NotFound $tenf) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__
+                    . " Failed to fetch persistent filters. Exception: \n". $tenf);
+                $persistentFilters = array();
+            }
+            
             $registryData += array(
                 'currentAccount'    => $user->toArray(),
                 'userContact'       => $userContactArray,
@@ -636,9 +657,9 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
                 'userApplications'  => $user->getApplications()->toArray(),
                 'NoteTypes'         => $this->getNoteTypes(),
                 'stateInfo'         => Tinebase_State::getInstance()->loadStateInfo(),
-                'changepw'          => Tinebase_User::getBackendConfiguration('changepw', true),
+                'changepw'          => Tinebase_Config::getInstance()->get(Tinebase_Config::PASSWORD_CHANGE, TRUE),
                 'mustchangepw'      => $user->mustChangePassword(),
-                'mapPanel'          => Tinebase_Config::getInstance()->getConfig(Tinebase_Config::MAPPANEL, NULL, TRUE)->value,
+                'mapPanel'          => Tinebase_Config::getInstance()->get(Tinebase_Config::MAPPANEL, TRUE),
                 'confirmLogout'     => Tinebase_Core::getPreference()->getValue(Tinebase_Preference::CONFIRM_LOGOUT, 1),
                 'persistentFilters' => Tinebase_Frontend_Json_PersistentFilter::getAllPersistentFilters(),
             );
@@ -659,19 +680,37 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
 
         if (Tinebase_Core::getUser()) {
             $userApplications = Tinebase_Core::getUser()->getApplications(TRUE);
-			$clientConfig = Tinebase_Config::getInstance()->getClientRegistryConfig();
-
+            $clientConfig = Tinebase_Config::getInstance()->getClientRegistryConfig();
+            $genericRelatableModels = array();
+            
             foreach ($userApplications as $application) {
                 $jsonAppName = $application->name . '_Frontend_Json';
-
+                
                 if (class_exists($jsonAppName)) {
                     if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Getting registry data for app ' . $application->name);
-
-                    $applicationJson = new $jsonAppName;
-
-                    $registryData[$application->name] = $applicationJson->getRegistryData();
+                    
+                    try {
+                        $applicationJson = new $jsonAppName;
+                    } catch (Exception $e) {
+                        Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ . ' Disabling ' . $application->name . ': ' . $e->getMessage());
+                        Tinebase_Application::getInstance()->setApplicationState(array($application->getId()), Tinebase_Application::DISABLED);
+                        unset($registryData[$application->name]);
+                        continue;
+                    }
+                    
+                    $registryData[$application->name] = (array_key_exists($application->name, $registryData))
+                        ? array_merge_recursive($registryData[$application->name], $applicationJson->getRegistryData()) 
+                        : $applicationJson->getRegistryData();
+                    
                     $registryData[$application->name]['rights'] = Tinebase_Core::getUser()->getRights($application->name);
                     $registryData[$application->name]['config'] = isset($clientConfig[$application->name]) ? $clientConfig[$application->name]->toArray() : array();
+                    $registryData[$application->name]['models'] = $applicationJson->getModelsConfiguration();
+                    $registryData[$application->name]['defaultModel'] = $applicationJson->getDefaultModel();
+                    foreach($applicationJson->getRelatableModels() as $app => $relModels) {
+                        if (!array_key_exists($app, $registryData)) $registryData[$app] = array();
+                        if (!array_key_exists('relatableModels', $registryData[$app])) $registryData[$app]['relatableModels'] = array();
+                        if (!empty($relModels)) $registryData[$app]['relatableModels'] = array_merge_recursive($registryData[$app]['relatableModels'], $relModels);
+                    }
 
                     // @todo do we need this for all apps?
                     $exportDefinitions = Tinebase_ImportExportDefinition::getInstance()->getExportDefinitionsForApplication($application);
@@ -679,31 +718,40 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
                         'results'               => $exportDefinitions->toArray(),
                         'totalcount'            => count($exportDefinitions),
                     );
-
+                    
                     $customfields = Tinebase_CustomField::getInstance()->getCustomFieldsForApplication($application);
                     Tinebase_CustomField::getInstance()->resolveConfigGrants($customfields);
                     $registryData[$application->name]['customfields'] = $customfields->toArray();
-
+                    
                     // add preferences for app
                     $appPrefs = Tinebase_Core::getPreference($application->name);
                     if ($appPrefs !== NULL) {
                         $allPrefs = $appPrefs->getAllApplicationPreferences();
+                        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ 
+                            . ' ' . print_r($allPrefs, TRUE));
+                        
                         foreach ($allPrefs as $pref) {
-                            $registryData[$application->name]['preferences'][$pref] = $appPrefs->{$pref};
+                            try {
+                                $registryData[$application->name]['preferences'][$pref] = $appPrefs->{$pref};
+                            } catch (Exception $e) {
+                                Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ . ' Could not get ' . $pref . '  preference: ' . $e);
+                            }
                         }
                     }
                 }
             }
-
+            
+            $registryData['Tinebase']['genericRelatableModels'] = $genericRelatableModels;
+            
             if (! array_key_exists('Tinebase', $registryData)) {
                 Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__ . ' User has no permissions to run Tinebase or unable to get Tinebase preferences. Aborting ...');
                 $this->logout();
             }
-
+            
         } else {
             $registryData['Tinebase'] = $this->getRegistryData();
-        }       
-
+        }
+        
         return $registryData;
     }
 
@@ -743,18 +791,36 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         $backend = Tinebase_Core::getPreference($applicationName);
         if ($backend) {
             $records = $backend->search($filter);
+            
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+                . ' Got ' . count($records) . ' preferences for app ' . $applicationName);
+            if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ 
+                . ' ' . print_r($records->toArray(), TRUE));
+            
             $result = $this->_multipleRecordsToJson($records, $filter);
 
             // add translated labels and descriptions
             $translations = $backend->getTranslatedPreferences();
-            foreach ($result as &$prefArray) {
+            foreach ($result as $key => $prefArray) {
                 if (isset($translations[$prefArray['name']])) {
-                    $prefArray = array_merge($prefArray, $translations[$prefArray['name']]);
+                    $result[$key] = array_merge($prefArray, $translations[$prefArray['name']]);
                 } else {
-                    $prefArray = array_merge($prefArray, array('label' => $prefArray['name']));
+                    $result[$key] = array_merge($prefArray, array('label' => $prefArray['name']));
                 }
             }
-
+            
+            // sort prefs by definition
+            $allPrefs = (array) $backend->getAllApplicationPreferences();
+            usort($result, function($a, $b) use ($allPrefs) {
+                $a = (int) array_search($a['name'], $allPrefs);
+                $b = (int) array_search($b['name'], $allPrefs);
+                
+                if ($a == $b) {
+                    return 0;
+                }
+                return ($a < $b) ? -1 : 1;
+            });
+            
         } else {
             $result = array();
         }
@@ -966,9 +1032,10 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      *
      * @param Tinebase_Record_RecordSet $_records Tinebase_Record_Abstract
      * @param Tinebase_Model_Filter_FilterGroup $_filter
+     * @param Tinebase_Model_Pagination $_pagination
      * @return array data
      */
-    protected function _multipleRecordsToJson(Tinebase_Record_RecordSet $_records, $_filter = NULL)
+    protected function _multipleRecordsToJson(Tinebase_Record_RecordSet $_records, $_filter = NULL, $_pagination = NULL)
     {
         if (count($_records) == 0) {
             return array();
@@ -991,7 +1058,7 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
                 break;
         }
 
-        $result = parent::_multipleRecordsToJson($_records, $_filter);
+        $result = parent::_multipleRecordsToJson($_records, $_filter, $_pagination);
         return $result;
     }
 }

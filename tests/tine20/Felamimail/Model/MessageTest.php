@@ -4,7 +4,7 @@
  * 
  * @package     Felamimail
  * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2010-2012 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2010-2013 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  * 
  */
@@ -27,9 +27,9 @@ class Felamimail_Model_MessageTest extends PHPUnit_Framework_TestCase
      */
     public static function main()
     {
-		$suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Felamimail Message Model Tests');
+        $suite  = new PHPUnit_Framework_TestSuite('Tine 2.0 Felamimail Message Model Tests');
         PHPUnit_TextUI_TestRunner::run($suite);
-	}
+    }
 
     /**
      * Sets up the fixture.
@@ -77,5 +77,29 @@ class Felamimail_Model_MessageTest extends PHPUnit_Framework_TestCase
             "lkjlhk\n\n\n" .
             "jjlöjlö\n\n" .
             "Pickhuben 2-4, 20457 Hamburg\n", $result);
+    }
+
+    /**
+     * test conversion from plain text to html (quotes ('> > ...') to blockquotes)
+     * 
+     * @see 0005334: convert plain text quoting ("> ") to html blockquotes
+     */
+    public function testTextToHtml()
+    {
+        $plaintextMessage = "blabla\n" .
+            "> lalülüüla\n" .
+            "> \n" .
+            "> > >lala\n" .
+            ">  >\n" . 
+            ">  > xyz\n" .
+            "\n\n" .
+            "> jojo\n" .
+            "jojo\n" ;
+        
+        $result = Felamimail_Message::convertFromTextToHTML($plaintextMessage);
+        
+        $this->assertEquals('blabla<br /><blockquote class="felamimail-body-blockquote">lalülüüla<br /><br />'
+            . '<blockquote class="felamimail-body-blockquote"><blockquote class="felamimail-body-blockquote">lala<br />'
+            . '</blockquote><br />xyz<br /></blockquote></blockquote><br /><br /><blockquote class="felamimail-body-blockquote">jojo<br /></blockquote>jojo<br />', $result);
     }
 }

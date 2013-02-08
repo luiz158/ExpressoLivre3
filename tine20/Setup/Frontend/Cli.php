@@ -58,6 +58,8 @@ class Setup_Frontend_Cli
             $this->_listInstalled();
         } elseif(isset($_opts->sync_accounts_from_ldap)) {
             $this->_importAccounts($_opts);
+        } elseif(isset($_opts->sync_passwords_from_ldap)) {
+            $this->_syncPasswords($_opts);
         } elseif(isset($_opts->egw14import)) {
             $this->_egw14Import($_opts);
         } elseif(isset($_opts->check_requirements)) {
@@ -104,7 +106,7 @@ class Setup_Frontend_Cli
             Setup_Controller::getInstance()->saveAcceptedTerms($options['acceptedTermsVersion']);
         }
         
-        echo "Successfully installed " . count($applications) . " applications.\n";        
+        echo "Successfully installed " . count($applications) . " applications.\n";
     }
 
     /**
@@ -127,7 +129,7 @@ class Setup_Frontend_Cli
                 fwrite(STDOUT, PHP_EOL . file_get_contents(dirname(dirname(dirname(__FILE__))) . '/PRIVACY' ));
                 $privacyAnswer = Tinebase_Server_Cli::promptInput('I have read the privacy agreement and accept it (type "yes" to accept)');
             
-                if (! (strtoupper($licenseAnswer) == 'YES' && strtoupper($privacyAnswer) == 'YES')) { 
+                if (! (strtoupper($licenseAnswer) == 'YES' && strtoupper($privacyAnswer) == 'YES')) {
                     echo "error: you need to accept the terms! exiting \n";
                     exit (1);
                 }
@@ -216,7 +218,7 @@ class Setup_Frontend_Cli
             $updatecount = $result['updated'];
         }
         
-        echo "Updated " . $updatecount . " applications.\n";        
+        echo "Updated " . $updatecount . " applications.\n";
     }
 
     /**
@@ -246,7 +248,7 @@ class Setup_Frontend_Cli
         
         $controller->uninstallApplications($applications->name);
 
-        echo "Successfully uninstalled " . count($applications) . " applications.\n";        
+        echo "Successfully uninstalled " . count($applications) . " applications.\n";
     }
 
     /**
@@ -282,7 +284,24 @@ class Setup_Frontend_Cli
         Tinebase_Group::syncGroups();
         
         // import users
-        Tinebase_User::syncUsers(true);
+        $options = array('syncContactData' => TRUE);
+        if ($_opts->dbmailldap) {
+            $options['ldapplugins'] = array(
+                new Tinebase_EmailUser_Imap_LdapDbmailSchema(),
+                new Tinebase_EmailUser_Smtp_LdapDbmailSchema()
+            );
+        }
+        Tinebase_User::syncUsers($options);
+    }
+    
+    /**
+     * sync ldap passwords
+     * 
+     * @param Zend_Console_Getopt $_opts
+     */
+    protected function _syncPasswords(Zend_Console_Getopt $_opts)
+    {
+        Tinebase_User::syncLdapPasswords();
     }
     
     /**
@@ -292,22 +311,31 @@ class Setup_Frontend_Cli
      */
     protected function _egw14Import(Zend_Console_Getopt $_opts)
     {
-        list($host, $username, $password, $dbname, $charset) = $_opts->getRemainingArgs();
+        $args = $_opts->getRemainingArgs();
         
-        $egwDb = Zend_Db::factory('PDO_MYSQL', array(
-            'host'     => $host,
-            'username' => $username,
-            'password' => $password,
-            'dbname'   => $dbname
-        ));
-        $egwDb->query("SET NAMES $charset");
+        if (count($args) < 1 || ! is_readable($args[0])) {
+            echo "can not open config file \n";
+            echo "see tine20.org/wiki/EGW_Migration_Howto for details \n\n";
+            echo "usage: ./setup.php --egw14import /path/to/config.ini (see Tinebase/Setup/Import/Egw14/config.ini)\n\n";
+            exit(1);
+        }
+        
+        try {
+            $config = new Zend_Config(array(), TRUE);
+            $config->merge(new Zend_Config_Ini($args[0]));
+            $config = $config->merge($config->all);
+        } catch (Zend_Config_Exception $e) {
+            fwrite(STDERR, "Error while parsing config file($args[0]) " .  $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
         
         $writer = new Zend_Log_Writer_Stream('php://output');
         $logger = new Zend_Log($writer);
-
-        $config = new Zend_Config(array());
         
-        $importer = new Tinebase_Setup_Import_Egw14($egwDb, $config, $logger);
+        $filter = new Zend_Log_Filter_Priority((int) $config->loglevel);
+        $logger->addFilter($filter);
+        
+        $importer = new Tinebase_Setup_Import_Egw14($config, $logger);
         $importer->import();
     }
     
@@ -343,14 +371,17 @@ class Setup_Frontend_Cli
         if (empty($options['configkey'])) {
             $errors[] = 'Missing argument: configkey';
         }
-        if (empty($options['configvalue'])) {
+        if (! isset($options['configvalue'])) {
             $errors[] = 'Missing argument: configvalue';
         }
         $configKey = (string)$options['configkey'];
         $configValue = self::parseConfigValue($options['configvalue']);
+        
+        $applicationName = (isset($options['app'])) ? $options['app'] : 'Tinebase';
+        
         if (empty($errors)) {
-           Setup_Controller::setConfigOption($configKey, $configValue);
-           echo "OK - Updated configuration option $configKey\n";
+           Setup_Controller::getInstance()->setConfigOption($configKey, $configValue, $applicationName);
+           echo "OK - Updated configuration option $configKey for application $applicationName\n";
         } else {
             echo "ERRORS - The following errors occured: \n";
             foreach ($errors as $error) {
@@ -363,6 +394,8 @@ class Setup_Frontend_Cli
      * create admin user / activate existing user / allow to reset password
      * 
      * @param Zend_Console_Getopt $_opts
+     * 
+     * @todo check role by rights and not by name
      */
     protected function _createAdminUser(Zend_Console_Getopt $_opts)
     {
@@ -377,10 +410,14 @@ class Setup_Frontend_Cli
         try {
             $user = Tinebase_User::getInstance()->getFullUserByLoginName($username);
             echo "User $username already exists.\n";
-            $user->accountExpires = $tomorrow;
-            $user->accountStatus = Tinebase_Model_User::ACCOUNT_STATUS_ENABLED;
-            Tinebase_User::getInstance()->updateUser($user);
-            echo "Activated admin user '$username' (expires tomorrow).\n";
+            Tinebase_User::getInstance()->setStatus($user->getId(), Tinebase_Model_User::ACCOUNT_STATUS_ENABLED);
+            echo "Activated admin user '$username'.\n";
+            
+            $expire = Tinebase_Server_Cli::promptInput('Should the admin user expire tomorrow (default: "no", "y" or "yes" for expiry)?');
+            if ($expire === 'y' or $expire === 'yes') {
+                Tinebase_User::getInstance()->setExpiryDate($user->getId(), $tomorrow);
+                echo "User expires tomorrow at $tomorrow.\n";
+            }
             
             $resetPw = Tinebase_Server_Cli::promptInput('Do you want to reset the password (default: "no", "y" or "yes" for reset)?');
             if ($resetPw === 'y' or $resetPw === 'yes') {
@@ -401,6 +438,8 @@ class Setup_Frontend_Cli
                 }
             }
             
+            $this->_checkAdminRole($user);
+            
         } catch (Tinebase_Exception_NotFound $tenf) {
             if (Tinebase_User::getConfiguredBackend() === Tinebase_User::LDAP) {
                 die('It is not possible to create a new user with LDAP user backend here.');
@@ -414,6 +453,55 @@ class Setup_Frontend_Cli
                 'expires'        => $tomorrow,
             ));
             echo "Created new admin user '$username' that expires tomorrow.\n";
+        }
+    }
+    
+    /**
+     * check admin role membership
+     * 
+     * @param Tinebase_Model_FullUser $user
+     */
+    protected function _checkAdminRole($user)
+    {
+        $roleMemberships = Tinebase_Acl_Roles::getInstance()->getRoleMemberships($user->getId());
+        $adminRoleFound = FALSE;
+        foreach ($roleMemberships as $roleId) {
+            $role = Tinebase_Acl_Roles::getInstance()->getRoleById($roleId);
+            if ($role->name === 'admin role') {
+                $adminRoleFound = TRUE;
+                break;
+            }
+        }
+        
+        if (! $adminRoleFound) {
+            echo "Admin role not found for user " . $user->accountLoginName . ".\n";
+            $adminRole = new Tinebase_Model_Role(array(
+                'name'                  => 'admin role',
+                'description'           => 'admin role for tine. this role has all rights per default.',
+            ));
+            $adminRole = Tinebase_Acl_Roles::getInstance()->createRole($adminRole);
+            Tinebase_Acl_Roles::getInstance()->setRoleMembers($adminRole->getId(), array(
+                array(
+                    'id'    => $user->getId(),
+                    'type'  => Tinebase_Acl_Rights::ACCOUNT_TYPE_USER, 
+                )
+            ));
+            
+            // add all rights for all apps
+            $enabledApps = Tinebase_Application::getInstance()->getApplicationsByState(Tinebase_Application::ENABLED);
+            $roleRights = array();
+            foreach ($enabledApps as $application) {
+                $allRights = Tinebase_Application::getInstance()->getAllRights($application->getId());
+                foreach ($allRights as $right) {
+                    $roleRights[] = array(
+                        'application_id' => $application->getId(),
+                        'right'          => $right,
+                    );
+                }
+            }
+            Tinebase_Acl_Roles::getInstance()->setRoleRights($adminRole->getId(), $roleRights);
+            
+            echo "Created admin role for user " . $user->accountLoginName . ".\n";
         }
     }
     

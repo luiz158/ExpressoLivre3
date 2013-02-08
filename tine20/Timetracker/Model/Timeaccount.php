@@ -19,14 +19,14 @@
  * @subpackage  Model
  */
 class Timetracker_Model_Timeaccount extends Tinebase_Record_Abstract
-{  
+{
     /**
      * key in $_validators/$_properties array for the filed which 
      * represents the identifier
      * 
      * @var string
      */    
-    protected $_identifier = 'id';    
+    protected $_identifier = 'id';
     
     /**
      * application the record belongs to
@@ -35,6 +35,16 @@ class Timetracker_Model_Timeaccount extends Tinebase_Record_Abstract
      */
     protected $_application = 'Timetracker';
 
+    /**
+     * @see Tinebase_Record_Abstract
+     */
+    protected static $_relatableConfig = array(
+        array('relatedApp' => 'Sales', 'relatedModel' => 'CostCenter', 'config' => array(
+            array('type' => 'COST_CENTER', 'degree' => 'sibling', 'text' => 'Cost Center', 'max' => '1:0'), // _('Cost Center')
+            )
+        )
+    );
+    
     /**
      * relation type: contract
      *
@@ -74,7 +84,7 @@ class Timetracker_Model_Timeaccount extends Tinebase_Record_Abstract
         'is_open'               => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => 1),
         'is_billable'           => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => 1),
         'billed_in'             => array(Zend_Filter_Input::ALLOW_EMPTY => true),
-        'status'                => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => 'not yet billed'),    
+        'status'                => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => 'not yet billed'),
     // how long can users book timesheets for this timeaccount 
         'deadline'              => array(
             Zend_Filter_Input::ALLOW_EMPTY      => true, 
@@ -89,18 +99,20 @@ class Timetracker_Model_Timeaccount extends Tinebase_Record_Abstract
         'is_deleted'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'deleted_time'          => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'deleted_by'            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'seq'                   => array(Zend_Filter_Input::ALLOW_EMPTY => true),
     // relations (linked Timetracker_Model_Timeaccount records) and other metadata
         'relations'             => array(Zend_Filter_Input::ALLOW_EMPTY => true, Zend_Filter_Input::DEFAULT_VALUE => NULL),
-        'tags'                  => array(Zend_Filter_Input::ALLOW_EMPTY => true),    
+        'tags'                  => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'notes'                 => array(Zend_Filter_Input::ALLOW_EMPTY => true),
         'grants'                => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+        'customfields'          => array(Zend_Filter_Input::ALLOW_EMPTY => true),
     );
 
     /**
      * name of fields containing datetime or an array of datetime information
      *
      * @var array list of datetime fields
-     */    
+     */
     protected $_datetimeFields = array(
         'creation_time',
         'last_modified_time',

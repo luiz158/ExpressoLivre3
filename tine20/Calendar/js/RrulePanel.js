@@ -103,8 +103,8 @@ Tine.Calendar.RrulePanel = Ext.extend(Ext.Panel, {
         }];
         
         this.items = [
-        	this.ruleCards
-    	];
+            this.ruleCards
+        ];
         
         Tine.Calendar.RrulePanel.superclass.initComponent.call(this);
     },
@@ -119,13 +119,20 @@ Tine.Calendar.RrulePanel = Ext.extend(Ext.Panel, {
         this.activeRuleCard = this[freq + 'card'];
     },
     
+    /**
+     * disable contents not panel
+     */
+    setDisabled: function(v) {
+        this.items.each(function(item) {
+            item.setDisabled(v);
+        }, this);
+    },
+    
     onRecordLoad: function(record) {
         this.record = record;
         
         if (! this.record.get('editGrant') || this.record.isRecurException()) {
-            this.items.each(function(item) {
-                item.setDisabled(true);
-            }, this);
+            this.setDisabled(true);
         }
         
         this.rrule = this.record.get('rrule');
@@ -284,6 +291,8 @@ Tine.Calendar.RrulePanel.AbstractCard = Ext.extend(Ext.Panel, {
             requiredGrant : 'editGrant',
             style         : 'text-align:right;',
             //fieldLabel    : this.intervalBeforeString,
+            minValue      : 1,
+            allowBlank    : false,
             value         : 1,
             width         : 40
         });
@@ -381,7 +390,7 @@ Tine.Calendar.RrulePanel.AbstractCard = Ext.extend(Ext.Panel, {
     },
     
     setRule: function(rrule) {
-        this.interval.setValue(rrule.interval);
+        this.interval.setValue(rrule.interval || 1);
         var date = Date.parseDate(rrule.until, Date.patterns.ISO8601Long);
         this.until.value = date;
         

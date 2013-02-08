@@ -1,11 +1,8 @@
 /*
  * Tine 2.0
  *
- * @license     http://www.tine20.org/licenses/agpl-nonus.txt AGPL Version 1 (Non-US)
- *              NOTE: According to sec. 8 of the AFFERO GENERAL PUBLIC LICENSE (AGPL), 
- *              Version 1, the distribution of the Tine 2.0 ActiveSync module in or to the 
- *              United States of America is excluded from the scope of this license.
- * @copyright   Copyright (c) 2010 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @copyright   Copyright (c) 2010-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Cornelius Weiss <c.weiss@metaways.de>
  */
 Ext.ns('Tine.ActiveSync');
@@ -88,7 +85,7 @@ Tine.ActiveSync.Application = Ext.extend(Tine.Tinebase.Application, {
         if (btn.checked) {
             // if btn was checked, we need to reset filter
             Tine.ActiveSync.setDeviceContentFilter(device.id, contentClass, null, function(response) {
-                device.set([Ext.util.Format.lowercase(contentClass) + 'filter_id'], null);  
+                device.set([Ext.util.Format.lowercase(contentClass) + 'filter_id'], null);
                 
                 Ext.Msg.alert(this.i18n._('Resetted Sync Filter'), String.format(
                     this.i18n._('{0} filter for device "{1}" is now "{2}"'),
@@ -100,7 +97,7 @@ Tine.ActiveSync.Application = Ext.extend(Tine.Tinebase.Application, {
             }, this);
         } else {
             Tine.ActiveSync.setDeviceContentFilter(device.id, contentClass, filter.id, function(response) {
-                device.set([Ext.util.Format.lowercase(contentClass) + 'filter_id'], filter.id); 
+                device.set([Ext.util.Format.lowercase(contentClass) + 'filter_id'], filter.id);
                 
                 Ext.Msg.alert(this.i18n._('Set Sync Filter'), String.format(
                     this.i18n._('{0} filter for device "{1}" is now "{2}"'),

@@ -77,6 +77,8 @@ Ext.ux.WindowFactory.prototype = {
     getExtWindow: function (c) {
         // add titleBar
         c.height = c.height + 20;
+        // border width
+        c.width = c.width + 16;
         
         //limit the window size
         c.height = Math.min(Ext.getBody().getBox().height, c.height);
@@ -151,6 +153,10 @@ ls[p].call(ls.scope, arguments[0], arguments[1], arguments[2], arguments[3], arg
             // this may be overwritten depending on concrete window implementation
             config.contentPanelConstructorConfig.window = config;
             
+            // (re-) create auto apps on BrowserWindows
+            if(this.windowType == 'Browser') {
+                Tine.Tinebase.ApplicationStarter.init();
+            }
             // find the constructor in this context
             var parts = config.contentPanelConstructor.split('.'),
             ref = window;

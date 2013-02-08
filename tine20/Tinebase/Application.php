@@ -5,7 +5,7 @@
  * @package     Tinebase
  * @subpackage  Application
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2007-2010 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Lars Kneschke <l.kneschke@metaways.de>
  *
  * @todo        add 'getTitleTranslation' function?
@@ -78,7 +78,7 @@ class Tinebase_Application
      *
      */
     private function __clone() 
-    {        
+    {
     }
 
     /**
@@ -174,18 +174,16 @@ class Tinebase_Application
             $cacheId = 'getApplicationByName_' . $_applicationName;
             if ($cache->test($cacheId)) {
                 $result = $cache->load($cacheId);
-                
-                $this->_addToClassCache($result);
-                
-                return $result;
+                if ($result instanceof Tinebase_Model_Application) {
+                    $this->_addToClassCache($result);
+                    return $result;
+                }
             }
-        } 
+        }
         
         $select = $this->_db->select();
         $select->from($this->_tableName)
                ->where($this->_db->quoteIdentifier('name') . ' = ?', $_applicationName);
-        
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' getting application by name: ' . $select->assemble());
 
         $stmt = $this->_db->query($select);
         $queryResult = $stmt->fetch();
@@ -269,20 +267,20 @@ class Tinebase_Application
     }
     
     /**
-     * return if application is installed
+     * return if application is installed (and enabled)
      *
-     * @param  string  $_applicationName  the application name
+     * @param  Tinebase_Model_Application|string  $applicationId  the application name/id/object
+     * @param  booelan $checkEnabled (FALSE by default)
      * 
-     * @return bool
+     * @return boolean
      */
-    public function isInstalled($_applicationName)
+    public function isInstalled($applicationId, $checkEnabled = FALSE)
     {
         try {
-            $this->getApplicationByName($_applicationName);
-            
-            return true;
+            $app = $this->getApplicationById($applicationId);
+            return ($checkEnabled) ? ($app->status === self::ENABLED) : TRUE;
         } catch (Tinebase_Exception_NotFound $tenf) {
-            return false;
+            return FALSE;
         }
     }
     
@@ -308,8 +306,14 @@ class Tinebase_Application
         
         $affectedRows = $this->_applicationTable->update($data, $where);
         
+        if ($affectedRows === count($_applicationIds)) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Disabled ' . $affectedRows . ' applications.');
+        } else {
+            if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__
+                . ' Could not disable all requested applications: ' . print_r($_applicationIds, TRUE));
+        }
+        
         $this->_cleanCache();
-        //error_log("AFFECTED:: $affectedRows");
     }
     
     /**
@@ -351,7 +355,7 @@ class Tinebase_Application
             $appAclObj = call_user_func(array($appAclClassName, 'getInstance'));
             $allRights = $appAclObj->getAllApplicationRights();
         } else {
-            $allRights = Tinebase_Acl_Rights::getInstance()->getAllApplicationRights($application->name);   
+            $allRights = Tinebase_Acl_Rights::getInstance()->getAllApplicationRights($application->name);
         }
         
         return $allRights;
@@ -375,9 +379,12 @@ class Tinebase_Application
         $appAclClassName = $application->name . '_Acl_Rights';
         if (! @class_exists($appAclClassName)) {
             $appAclClassName = 'Tinebase_Acl_Rights';
+            $function = 'getTranslatedBasicRightDescriptions';
+        } else {
+            $function = 'getTranslatedRightDescriptions';
         }
         
-        $descriptions = call_user_func(array($appAclClassName, 'getTranslatedRightDescriptions'));
+        $descriptions = call_user_func(array($appAclClassName, $function));
         return $descriptions;
     }
     
@@ -407,6 +414,15 @@ class Tinebase_Application
             $tables[] = $row['name'];
         }
         return $tables;
+    }
+    
+    /**
+     * get models for an application
+     * @param string $_applicationId
+     */
+    public function getApplicationModels($_applicationId)
+    {
+        return $this->getApplicationById($_applicationId)->getModels();
     }
     
     /**
@@ -488,7 +504,6 @@ class Tinebase_Application
         return $result;
     }
     
-    
     /**
      * delete containers, configs and other data of an application
      * 
@@ -502,16 +517,18 @@ class Tinebase_Application
         $dataToDelete = array(
             'container'     => array('tablename' => ''),
             'config'        => array('tablename' => ''),
-            'customfield'	=> array('tablename' => ''),
+            'customfield'   => array('tablename' => ''),
             'rights'        => array('tablename' => 'role_rights'),
             'definitions'   => array('tablename' => 'importexport_definition'),
             'filter'        => array('tablename' => 'filter'),
+            'modlog'        => array('tablename' => 'timemachine_modlog')
         );
         $countMessage = ' Deleted';
         
         $where = array(
             $this->_db->quoteInto($this->_db->quoteIdentifier('application_id') . '= ?', $_application->getId())
-        );        
+        );
+        
         foreach ($dataToDelete as $dataType => $info) {
             switch ($dataType) {
                 case 'container':
@@ -520,9 +537,9 @@ class Tinebase_Application
                 case 'config':
                     $count = Tinebase_Config::getInstance()->deleteConfigByApplicationId($_application->getId());
                     break;
-              	case 'customfield':
-              		$count = Tinebase_CustomField::getInstance()->deleteCustomFieldsForApplication($_application->getId());
-              		break;
+                  case 'customfield':
+                      $count = Tinebase_CustomField::getInstance()->deleteCustomFieldsForApplication($_application->getId());
+                      break;
                 default:
                     if (array_key_exists('tablename', $info) && ! empty($info['tablename'])) {
                         $count = $this->_db->delete(SQL_TABLE_PREFIX . $info['tablename'], $where);

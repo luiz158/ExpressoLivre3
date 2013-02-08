@@ -53,7 +53,7 @@ class Felamimail_Controller_Cache_Sql_Message extends Felamimail_Controller_Cach
         return self::$_instance;
     }
     
-    /**
+     /**
     * get folder status and return all folders where something needs to be done
     *
     * @param Felamimail_Model_FolderFilter  $_filter
@@ -81,7 +81,16 @@ class Felamimail_Controller_Cache_Sql_Message extends Felamimail_Controller_Cach
             
             $imap = Felamimail_Backend_ImapFactory::factory($folder->account_id);
             
-            $folder = Felamimail_Controller_Cache_Folder::getInstance()->getIMAPFolderCounter($folder);
+            try {
+                $folder = Felamimail_Controller_Cache_Folder::getInstance()->getIMAPFolderCounter($folder);
+            } catch (Zend_Mail_Storage_Exception $zmse) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ .  ' ' . $zmse->getMessage());
+                if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ 
+                    . ' Removing folder and contained messages from cache.');
+                Felamimail_Controller_Message::getInstance()->deleteByFolder($folder);
+                Felamimail_Controller_Cache_Folder::getInstance()->delete($folder->getId());
+                continue;
+            }
             
             if ($this->_cacheIsInvalid($folder) || $this->_messagesInCacheButNotOnIMAP($folder)) {
                 $result->addRecord($folder);
@@ -146,6 +155,9 @@ class Felamimail_Controller_Cache_Sql_Message extends Felamimail_Controller_Cach
         
         $this->_updateFolderQuota($folder, $imap);
         
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ 
+            . ' Folder status of ' . $folder->globalname . ' after updateCache(): ' . $folder->cache_status);
+        
         // reset max execution time to old value
         Tinebase_Core::setExecutionLifeTime($oldMaxExcecutionTime);
         
@@ -170,7 +182,7 @@ class Felamimail_Controller_Cache_Sql_Message extends Felamimail_Controller_Cach
         $messageToCache = $this->_createMessageToCache($_message, $_folder);
         $cachedMessage = $this->_addMessageToCache($messageToCache);
         
-        if ($cachedMessage !== FALSE) { 
+        if ($cachedMessage !== FALSE) {
             $this->_saveMessageInTinebaseCache($cachedMessage, $_folder, $_message);
             
             if ($_updateFolderCounter == TRUE) {
@@ -271,5 +283,76 @@ class Felamimail_Controller_Cache_Sql_Message extends Felamimail_Controller_Cach
             . ' New unreadcount after flags update: ' . $updatedCounters['cache_unreadcount']);
         
         return $folder;
+    }
+    
+    /**
+     * get messages befora a date 
+     * 
+     * @param  mixed  $_folderId
+     * @param  string $_date
+     * @return array
+     */
+    public function SelectBeforeDate($_folderId,$_date) 
+    {
+        $folderId = ($_folderId instanceof Felamimail_Model_Folder) ? $_folderId->getId() : $_folderId;
+        $imapbbackend = Felamimail_Controller_Message::getInstance()->_getBackendAndSelectFolder($folderId);
+        $filter = new Felamimail_Model_MessageFilter(array(
+            array(
+                'field'    => 'folder_id', 
+                'operator' => 'equals', 
+                'value'    => $folderId
+            ),
+           array(
+                'field'    => 'received', 
+                'operator' => 'before', 
+                'value'    => $_date
+            )            
+        ));
+        
+        $result = $this->_backend->searchMessageUids($filter);
+        
+        if (count($result) === 0) {
+            return null;
+        }
+        
+        $temp_result = array();
+        
+        foreach ($result as $key => $value) {
+            $imapbbackend->addFlags($value, array('\\Deleted'));
+            $temp_result[] = $key;
+        }
+        
+        $result = $this->_deleteMessagesByIdAndUpdateCounters($temp_result, $_folderId);
+        
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__ . ' Got Messages before date: ' . print_r($temp_result, TRUE));
+        
+        return $result;
+    }
+    
+    /**
+     * fetch message summary from IMAP server
+     * 
+     * @param string $messageUid
+     * @param string $accountId
+     * @param string $folderId
+     * @return array
+     */
+    public function getMessageSummary($messageUid, $accountId, $folderId = NULL)
+    {
+        $imap = Felamimail_Backend_ImapFactory::factory($accountId);
+        
+        if ($folderId !== NULL) {
+            try {
+                $folder = Felamimail_Controller_Folder::getInstance()->get($folderId);
+                $imap->selectFolder(Felamimail_Model_Folder::encodeFolderName($folder->globalname));
+            } catch (Exception $e) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::WARN)) Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ 
+                    . ' Could not select folder ' . $folder->globalname . ': ' . $e->getMessage());
+            }
+        }
+        
+        $summary = $imap->getSummary($messageUid, NULL, TRUE);
+        
+        return $summary;
     }
 }

@@ -144,7 +144,7 @@ Tine.Addressbook.Model.Contact.getFilterModel = function() {
         {label: app.i18n._('Phone'),                                                    field: 'telephone',          operators: ['contains']},
         {label: app.i18n._('Job Title'),                                                field: 'title'},
         {label: app.i18n._('Job Role'),                                                 field: 'role'},
-        {label: app.i18n._('Note'),                                                     field: 'note'},
+        {label: app.i18n._('Description'),                                              field: 'note'},
         {label: app.i18n._('E-Mail'),                                                   field: 'email_query',        operators: ['contains']},
         {filtertype: 'tinebase.tag', app: app},
         //{label: app.i18n._('Birthday'),    field: 'bday', valueType: 'date'},
@@ -159,10 +159,10 @@ Tine.Addressbook.Model.Contact.getFilterModel = function() {
         {label: app.i18n._('City') + ' (' + app.i18n._('Private Address') + ')',        field: 'adr_two_locality'},
         {label: app.i18n._('Country') + '  (' + app.i18n._('Private Address') + ')',    field: 'adr_two_countryname', valueType: 'country'},
         {label: app.i18n._('Type'), defaultValue: 'contact', valueType: 'combo',        field: 'type',               store: typeStore},
-        {label: app.i18n._('Last modified'),                                            field: 'last_modified_time', valueType: 'date'},
-        {label: app.i18n._('Last modifier'),                                            field: 'last_modified_by', 	 valueType: 'user'},
-        {label: app.i18n._('Creation Time'),                                            field: 'creation_time', 	 valueType: 'date'},
-        {label: app.i18n._('Creator'),                                                  field: 'created_by', 		 valueType: 'user'}
+        {label: _('Last Modified Time'),                                                field: 'last_modified_time', valueType: 'date'},
+        {label: _('Last Modified By'),                                                  field: 'last_modified_by',   valueType: 'user'},
+        {label: _('Creation Time'),                                                     field: 'creation_time',      valueType: 'date'},
+        {label: _('Created By'),                                                        field: 'created_by',         valueType: 'user'}
     ];
 };
     

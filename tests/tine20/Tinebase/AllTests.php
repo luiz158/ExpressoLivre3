@@ -4,7 +4,7 @@
  * 
  * @package     Tinebase
  * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2007-2011 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2012 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Matthias Greiling <m.greiling@metaways.de>
  */
 
@@ -59,6 +59,8 @@ class Tinebase_AllTests
         $suite->addTestSuite('Tinebase_NotificationTest');
         $suite->addTestSuite('Tinebase_Model_Filter_TextTest');
         $suite->addTestSuite('Tinebase_TagsTest');
+        $suite->addTestSuite('Tinebase_Log_AllTests');
+        $suite->addTestSuite('Tinebase_Redis_QueueTest');
         
         $suite->addTest(Tinebase_User_AllTests::suite());
         $suite->addTest(Tinebase_Group_AllTests::suite());

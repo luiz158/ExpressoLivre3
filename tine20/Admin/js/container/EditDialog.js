@@ -98,14 +98,15 @@ Tine.Admin.ContainerEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
      * returns dialog
      */
     getFormItems: function () {
+        var userApplications = Tine.Tinebase.registry.get('userApplications');
         this.appStore = new Ext.data.JsonStore({
             root: 'results',
             totalProperty: 'totalcount',
             fields: Tine.Admin.Model.Application
         });
         this.appStore.loadData({
-            results:    Tine.Tinebase.registry.get('userApplications'),
-            totalcount: Tine.Tinebase.registry.get('userApplications').length
+            results: userApplications,
+            totalcount: userApplications.length
         });
         
         return {

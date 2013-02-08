@@ -49,13 +49,12 @@ Tine.Timetracker.TimeaccountGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, 
         this.initFilterToolbar();
         
         this.plugins = this.plugins || [];
-        this.plugins.push(this.action_showClosedToggle, this.filterToolbar);        
+        this.plugins.push(this.filterToolbar);
         
         Tine.Timetracker.TimeaccountGridPanel.superclass.initComponent.call(this);
         
         this.action_addInNewWindow.setDisabled(! Tine.Tinebase.common.hasRight('manage', 'Timetracker', 'timeaccounts'));
         this.action_editInNewWindow.requiredGrant = 'editGrant';
-        
     },
     
     /**
@@ -66,9 +65,12 @@ Tine.Timetracker.TimeaccountGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, 
     initFilterToolbar: function() {
         this.filterToolbar = new Tine.widgets.grid.FilterToolbar({
             app: this.app,
+            recordClass: this.recordClass,
             filterModels: Tine.Timetracker.Model.Timeaccount.getFilterModel(),
-            defaultFilter: 'query',
-            filters: [],
+            defaultFilter: 'is_open',
+            filters: [
+                {field: 'is_open', operator: 'equals', value: true}
+            ],
             plugins: [
                 new Tine.widgets.grid.FilterToolbarQuickFilterPlugin()
             ]
@@ -82,7 +84,7 @@ Tine.Timetracker.TimeaccountGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, 
      * @private
      */
     getColumnModel: function(){
-        return new Ext.grid.ColumnModel({ 
+        return new Ext.grid.ColumnModel({
             defaults: {
                 sortable: true,
                 resizable: true
@@ -101,7 +103,7 @@ Tine.Timetracker.TimeaccountGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, 
                 dataIndex: 'title'
             },{
                 id: 'status',
-                header: this.app.i18n._("Status"),
+                header: this.app.i18n._("Billed"),
                 width: 150,
                 dataIndex: 'status',
                 renderer: this.statusRenderer.createDelegate(this)
@@ -122,6 +124,17 @@ Tine.Timetracker.TimeaccountGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, 
                 header: this.app.i18n._("Booking deadline"),
                 width: 100,
                 dataIndex: 'deadline'
+            },{
+                id: 'is_open',
+                header: this.app.i18n._("Status"),
+                width: 150,
+                dataIndex: 'is_open',
+                renderer: function(value) {
+                    if(value) return this.app.i18n._('open');
+                    return this.app.i18n._('closed');
+                },
+                scope: this,
+                hidden: true
             }]
         });
     },
@@ -165,23 +178,13 @@ Tine.Timetracker.TimeaccountGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, 
                 ]
             }
         });
-    	
-        this.action_showClosedToggle = new Tine.widgets.grid.FilterButton({
-            text: this.app.i18n._('Show closed'),
-            iconCls: 'action_showArchived',
-            field: 'showClosed',
-            scale: 'medium',
-            rowspan: 2,
-            iconAlign: 'top'
-        });
         
         return [
             Ext.apply(new Ext.Button(this.exportButton), {
                 scale: 'medium',
                 rowspan: 2,
                 iconAlign: 'top'
-            }),
-            this.action_showClosedToggle
+            })
         ];
     }    
 });

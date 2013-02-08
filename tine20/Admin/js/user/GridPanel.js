@@ -29,7 +29,7 @@ Tine.Admin.user.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
     defaultSortInfo: {field: 'accountLoginName', direction: 'ASC'},
     evalGrants: false,
     gridConfig: {
-    	id: 'gridAdminUsers',
+        id: 'gridAdminUsers',
         autoExpandColumn: 'accountDisplayName'
     },
     
@@ -53,7 +53,7 @@ Tine.Admin.user.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
     initActions: function() {
         this.actionEnable = new Ext.Action({
             requiredGrant: 'readGrant',
-            text: this.app.i18n._('enable account'),
+            text: this.app.i18n._('Enable Account'),
             allowMultiple: true,
             disabled: true,
             handler: this.enableDisableButtonHandler.createDelegate(this, ['enabled']),
@@ -63,7 +63,7 @@ Tine.Admin.user.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
     
         this.actionDisable = new Ext.Action({
             requiredGrant: 'readGrant',
-            text: this.app.i18n._('disable account'),
+            text: this.app.i18n._('Disable Account'),
             allowMultiple: true,
             disabled: true,
             handler: this.enableDisableButtonHandler.createDelegate(this, ['disabled']),
@@ -73,7 +73,7 @@ Tine.Admin.user.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
     
         this.actionResetPassword = new Ext.Action({
             requiredGrant: 'readGrant',
-            text: this.app.i18n._('reset password'),
+            text: this.app.i18n._('Reset Password'),
             disabled: true,
             handler: this.resetPasswordHandler,
             iconCls: 'action_password',
@@ -155,7 +155,7 @@ Tine.Admin.user.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
      * @private
      */
     getColumnModel: function() {
-        return new Ext.grid.ColumnModel({ 
+        return new Ext.grid.ColumnModel({
             defaults: {
                 sortable: true,
                 hidden: true,
@@ -174,8 +174,8 @@ Tine.Admin.user.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         return [
             { header: this.app.i18n._('ID'), id: 'accountId', dataIndex: 'accountId', width: 50},
             { header: this.app.i18n._('Status'), id: 'accountStatus', dataIndex: 'accountStatus', hidden: this.isLdapBackend, width: 50, renderer: this.statusRenderer},
-            { header: this.app.i18n._('Displayname'), id: 'accountDisplayName', dataIndex: 'accountDisplayName', hidden: false},
-            { header: this.app.i18n._('Loginname'), id: 'accountLoginName', dataIndex: 'accountLoginName', width: 160, hidden: false},
+            { header: this.app.i18n._('Display name'), id: 'accountDisplayName', dataIndex: 'accountDisplayName', hidden: false},
+            { header: this.app.i18n._('Login name'), id: 'accountLoginName', dataIndex: 'accountLoginName', width: 160, hidden: false},
             { header: this.app.i18n._('Last name'), id: 'accountLastName', dataIndex: 'accountLastName'},
             { header: this.app.i18n._('First name'), id: 'accountFirstName', dataIndex: 'accountFirstName'},
             { header: this.app.i18n._('Email'), id: 'accountEmailAddress', dataIndex: 'accountEmailAddress', width: 200, hidden: false},
@@ -237,7 +237,8 @@ Tine.Admin.user.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
     /**
      * reset password
      * 
-     * @todo add checkbox for must change pw
+     * TODO add checkbox for must change pw
+     * TODO add pw repeat (see user edit dialog)
      */
     resetPasswordHandler: function(_button, _event) {
         Ext.MessageBox.prompt(this.app.i18n._('Set new password'), this.app.i18n._('Please enter the new password:'), function(_button, _text) {
@@ -258,6 +259,8 @@ Tine.Admin.user.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
                             if(result.success === true) {
                                 this.grid.getStore().reload();
                             }
+                        } else {
+                            Tine.Tinebase.ExceptionHandler.handleRequestException(_response);
                         }
                     }
                 });

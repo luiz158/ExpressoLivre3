@@ -26,14 +26,11 @@ class ExampleApplication_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     protected $_controller = NULL;
     
     /**
-     * user fields (created_by, ...) to resolve in _multipleRecordsToJson and _recordToJson
-     *
+     * the models handled by this frontend
      * @var array
      */
-    protected $_resolveUserFields = array(
-        'ExampleApplication_Model_ExampleRecord' => array('created_by', 'last_modified_by')
-    );
-    
+    protected $_models = array('ExampleRecord');
+
     /**
      * the constructor
      *
@@ -54,7 +51,7 @@ class ExampleApplication_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     public function searchExampleRecords($filter, $paging)
     {
         return $this->_search($filter, $paging, $this->_controller, 'ExampleApplication_Model_ExampleRecordFilter', TRUE);
-    }     
+    }
     
     /**
      * Return a single record
@@ -75,7 +72,7 @@ class ExampleApplication_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      */
     public function saveExampleRecord($recordData)
     {
-        return $this->_save($recordData, $this->_controller, 'ExampleRecord');        
+        return $this->_save($recordData, $this->_controller, 'ExampleRecord');
     }
     
     /**
@@ -95,12 +92,11 @@ class ExampleApplication_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      * @return array
      */
     public function getRegistryData()
-    {   
-        $defaultContainerArray = Tinebase_Container::getInstance()->getDefaultContainer($this->_applicationName)->toArray();
-        $defaultContainerArray['account_grants'] = Tinebase_Container::getInstance()->getGrantsOfAccount(Tinebase_Core::getUser(), $defaultContainerArray['id'])->toArray();
-        
+    {
+        $defaultContainerArray = Tinebase_Container::getInstance()->getDefaultContainer('ExampleApplication_Model_ExampleRecord', NULL, 'defaultExampleRecordContainer')->toArray();
+        $defaultContainerArray['account_grants'] = Tinebase_Container::getInstance()->getGrantsOfAccount(Tinebase_Core::getUser(), $defaultContainerArray['id'])->toArray();#
         return array(
-            'defaultContainer' => $defaultContainerArray
+            'defaultExampleRecordContainer' => $defaultContainerArray
         );
     }
 }

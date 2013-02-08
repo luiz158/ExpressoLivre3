@@ -28,15 +28,21 @@ class Tasks_Controller extends Tinebase_Controller_Event implements Tinebase_Con
      */
     private function __construct() {
         $this->_applicationName = 'Tasks';
-        $this->_currentAccount = Tinebase_Core::getUser();
     }
+    
+
+    /**
+     * holds the default Model of this application
+     * @var string
+     */
+    protected static $_defaultModel = 'Tasks_Model_Task';
     
     /**
      * don't clone. Use the singleton.
      *
      */
     private function __clone() 
-    {        
+    {
     }
     
     /**
@@ -59,7 +65,7 @@ class Tasks_Controller extends Tinebase_Controller_Event implements Tinebase_Con
     }
     
     /**
-     * temporaray function to get a default container]
+     * temporary function to get a default container]
      * 
      * @param string $_referingApplication
      * @return Tinebase_Model_Container container
@@ -68,7 +74,7 @@ class Tasks_Controller extends Tinebase_Controller_Event implements Tinebase_Con
      */
     public function getDefaultContainer($_referingApplication = 'tasks')
     {
-        $taskConfig = Tinebase_Core::getConfig()->tasks;
+        $taskConfig = Tasks_Config::getInstance();
         $configString = 'defaultcontainer_' . ( empty($_referingApplication) ? 'tasks' : $_referingApplication );
         
         if (isset($taskConfig->$configString)) {
@@ -97,7 +103,8 @@ class Tasks_Controller extends Tinebase_Controller_Event implements Tinebase_Con
             'type'              => Tinebase_Model_Container::TYPE_PERSONAL,
             'owner_id'          => $_accountId,
             'backend'           => 'Sql',
-            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName('Tasks')->getId() 
+            'application_id'    => Tinebase_Application::getInstance()->getApplicationByName('Tasks')->getId(),
+            'model'             => static::$_defaultModel
         ));
         
         $personalContainer = Tinebase_Container::getInstance()->addContainer($newContainer);
